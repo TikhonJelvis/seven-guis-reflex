@@ -1,0 +1,13 @@
+# Direnv
+.direnv
+.envrc
+
+# Nix
+result
+
+# Emacs
+*~
+
+# Haskell
+dist
+dist-newstyle
