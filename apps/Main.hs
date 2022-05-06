@@ -1,4 +1,7 @@
 module Main where
 
+import qualified Counter
+import           Reflex.Dom (el, elAttr, mainWidget, text, (=:))
+
 main :: IO ()
-main = putStrLn "This will eventually let you run any of the seven example GUI tasks."
+main = mainWidget Counter.widget

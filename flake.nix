@@ -12,9 +12,9 @@
         pkgs = nixpkgs.legacyPackages.${system};
         haskellPackages = pkgs.haskellPackages;
 
-        package = returnShellEnv:
+
+        package =
           haskellPackages.developPackage {
-            inherit returnShellEnv;
             name = "seven-guis";
             root = ./.;
 
@@ -37,7 +37,9 @@
               ]);
           };
       in {
-        defaultPackage = package false;
-        devShell = package true;
+        defaultPackage = package;
+        devShell = haskellPackages.shellFor {
+          packages = p: [package];
+        };
       });
 }
