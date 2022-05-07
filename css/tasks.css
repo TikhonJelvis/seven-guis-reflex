@@ -1,0 +1,19 @@
+/** Basic styling for my seven tasks examples. */
+div.counter {
+  padding: 1px;
+}
+
+div.counter > * {
+  display: inline-block;
+}
+
+div.label {
+  position: relative;
+  width: 5ex;
+  padding: 1px 4px;
+  margin: 0 4px;
+
+  text-align: right;
+
+  border: 1px solid black;
+}

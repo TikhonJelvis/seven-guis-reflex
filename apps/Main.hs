@@ -1,7 +1,15 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
+import           Data.FileEmbed (embedFile)
+import qualified Data.Text      as Text
+
+import           Text.Printf    (printf)
+
+import           Reflex.Dom     (mainWidgetWithCss)
+
 import qualified Counter
-import           Reflex.Dom (el, elAttr, mainWidget, text, (=:))
 
 main :: IO ()
-main = mainWidget Counter.widget
+main = mainWidgetWithCss css Counter.widget
+  where css = $(embedFile "css/tasks.css")

@@ -7,6 +7,7 @@ synopsis:
 author:        Tikhon Jelvis <tikhon@jelv.is>
 maintainer:    Tikhon Jelvis <tikhon@jelv.is>
 copyright:     ©2021 Tikhon Jelvis
+data-files:    css/tasks.css
 
 executable guis
   hs-source-dirs:   apps
@@ -15,6 +16,7 @@ executable guis
   other-modules:    Counter
   build-depends:
     , base
+    , file-embed
     , hashable
     , reflex
     , reflex-dom
