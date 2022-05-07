@@ -1,27 +1,25 @@
-cabal-version:      2.4
-name:               seven-guis
-version:            0.1.0.0
+cabal-version: 2.4
+name:          seven-guis
+version:       0.1.0.0
+synopsis:
+  An implementation of the 'Seven GUIs' benchmark using reflex-frp.
 
-synopsis:           An implementation of the 'Seven GUIs' benchmark using reflex-frp.
-
-author:             Tikhon Jelvis <tikhon@jelv.is>
-maintainer:         Tikhon Jelvis <tikhon@jelv.is>
-
-copyright:          ©2021 Tikhon Jelvis
+author:        Tikhon Jelvis <tikhon@jelv.is>
+maintainer:    Tikhon Jelvis <tikhon@jelv.is>
+copyright:     ©2021 Tikhon Jelvis
 
 executable guis
   hs-source-dirs:   apps
   default-language: Haskell2010
-
   main-is:          Main.hs
   other-modules:    Counter
-
-  build-depends:    base
-                  , hashable
-                  , reflex
-                  , reflex-dom
-                  , reflex-dom-core
-                  , text
-                  , text-display
-                  , unordered-containers
-                  , vector
+  build-depends:
+    , base
+    , hashable
+    , reflex
+    , reflex-dom
+    , reflex-dom-core
+    , text
+    , text-display
+    , unordered-containers
+    , vector
