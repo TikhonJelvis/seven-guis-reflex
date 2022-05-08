@@ -7,7 +7,7 @@ div.counter > * {
   display: inline-block;
 }
 
-div.label {
+div.output {
   position: relative;
   width: 5ex;
   padding: 1px 4px;
@@ -16,4 +16,24 @@ div.label {
   text-align: right;
 
   border: 1px solid black;
+}
+
+div.converter > * {
+  display: inline-block;
+}
+
+.temperature {
+  margin: 0 10px 0 5px;
+}
+
+.temperature input {
+  position: relative;
+  width: 7ex;
+  margin: 0 5px;
+
+  text-align: right;
+}
+
+.temperature > * {
+  display: inline-block;
 }

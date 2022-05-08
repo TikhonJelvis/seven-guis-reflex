@@ -1,15 +1,19 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
-import           Data.FileEmbed (embedFile)
-import qualified Data.Text      as Text
+import qualified Data.ByteString      as BS
+import           Data.FileEmbed       (embedFile)
+import qualified Data.Text            as Text
+import qualified Data.Text.IO         as Text
 
-import           Text.Printf    (printf)
+import           Text.Printf          (printf)
 
-import           Reflex.Dom     (mainWidgetWithCss)
+import           Reflex.Dom           (mainWidgetWithCss)
 
 import qualified Counter
+import qualified TemperatureConverter
+
 
 main :: IO ()
-main = mainWidgetWithCss css Counter.widget
-  where css = $(embedFile "css/tasks.css")
+main = do
+  css <- BS.readFile "css/tasks.css"
+  mainWidgetWithCss css TemperatureConverter.widget
