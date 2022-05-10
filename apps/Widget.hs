@@ -18,15 +18,24 @@ import           Reflex.Dom
 type Dom t m = (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m)
 
 -- | A label that displays a dynamically updating value.
+--
+-- These outputs can all be styled with @div.output@.
 output :: (Display a, Dom t m) => Dynamic t a -> m ()
 output value = elClass "div" "output" $ do
   dynText $ Display.display <$> value
 
 -- | An input element that contains a value of some readable type.
 --
+-- The 'Read' and 'Show' instances need to be consistent with each
+-- other: @∀a. read (show a) = a@.
+--
+-- Warning: this will __not__ work well for 'Text', 'String' or
+-- similar types because their 'Read'/'Show' instances require quotes
+-- and escaping (@"foo\\"@ rather than @foo\@).
+--
 -- If the value entered by the user doesn't parse, the dynamic will
 -- contain 'Nothing'.
-readInput :: (Dom t m, Read a, Display a)
+readInput :: (Dom t m, Read a, Show a)
           => a
           -- ^ The initial value to display in the input.
           -> Event t a
@@ -38,5 +47,7 @@ readInput initial setEvents = do
   holdDyn initial $ fmapMaybe parse $ _inputElement_input input
   where parse = readMaybe . Text.unpack
 
-        config = def & inputElementConfig_initialValue .~ Display.display initial
-                     & inputElementConfig_setValue .~ (Display.display <$> setEvents)
+        config = def & inputElementConfig_initialValue .~ show' initial
+                     & inputElementConfig_setValue .~ (show' <$> setEvents)
+
+        show' = Text.pack . show
