@@ -1,5 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecursiveDo       #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecursiveDo                #-}
 module TemperatureConverter where
 
 import           Control.Monad.Fix (MonadFix)
@@ -10,11 +12,14 @@ import qualified Data.Text         as Text
 import           Reflex
 import           Reflex.Dom
 
+import           Text.Printf       (printf)
+
+import           Data.Maybe        (fromJust)
 import           Widget
 
 -- | The Temperature Converter has a frame with two text fields (°C
 -- and °F) that convert automatically.
-widget :: (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m) => m ()
+widget :: Dom t m => m ()
 widget = elClass "div" "converter" $ do
   rec f <- temperature "°F" (-32) updateF
       text "="
@@ -25,20 +30,26 @@ widget = elClass "div" "converter" $ do
   where toF c = c * (9/5) + 32
         toC f = (f - 32) * (5/9)
 
+-- | A temperature in °C or °F, with a user-friendly Show instance.
+newtype Temperature = Temperature { toDouble :: Double }
+  deriving newtype (Fractional, Num, Read)
+
+instance Show Temperature where show = printf "%.2f" . toDouble
+
 -- | A widget for entering and displaying a temperature.
 --
 -- Has a textbox and a label for the units (°C vs °F... etc).
 --
 -- If the user enters an invalid temperature, sets to 'Nothing'.
-temperature :: (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m)
+temperature :: Dom t m
             => Text
             -- ^ Unit label (eg @"°C"@)
-            -> Double
+            -> Temperature
             -- ^ Starting temperature.
-            -> Event t Double
+            -> Event t Temperature
             -- ^ Updates to the displayed temperature.
-            -> m (Dynamic t Double)
+            -> m (Dynamic t Temperature)
 temperature unit start updates = elClass "div" "temperature" $ do
-  t <- readInput start updates
-  elClass "div" "label" (text unit)
-  pure t
+  t <- readInput start updates (constDyn Enabled)
+  label unit
+  ignoreNothing start t

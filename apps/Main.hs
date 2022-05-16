@@ -10,10 +10,11 @@ import           Text.Printf          (printf)
 import           Reflex.Dom           (mainWidgetWithCss)
 
 import qualified Counter
+import qualified FlightBooker
 import qualified TemperatureConverter
 
 
 main :: IO ()
 main = do
   css <- BS.readFile "css/tasks.css"
-  mainWidgetWithCss css TemperatureConverter.widget
+  mainWidgetWithCss css FlightBooker.widget

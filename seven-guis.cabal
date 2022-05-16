@@ -15,12 +15,14 @@ executable guis
   main-is:          Main.hs
   other-modules:
     Counter
+    FlightBooker
     TemperatureConverter
     Widget
 
   build-depends:
     , base
     , bytestring
+    , containers
     , file-embed
     , hashable
     , lens
@@ -29,5 +31,6 @@ executable guis
     , reflex-dom-core
     , text
     , text-display
+    , time
     , unordered-containers
     , vector

@@ -18,7 +18,7 @@ import           Widget
 --  * a button that says "count"
 --
 -- Each time the button is pressed, the label goes up by 1.
-widget :: (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m) => m ()
+widget :: Dom t m => m ()
 widget = elClass "div" "counter" $ do
   rec output @Integer =<< count clicks
       clicks <- button "count"

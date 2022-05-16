@@ -1,15 +1,8 @@
 /** Basic styling for my seven tasks examples. */
-div.counter {
-  padding: 1px;
-}
 
-div.counter > * {
-  display: inline-block;
-}
-
-div.output {
+/* Widgets */
+.output {
   position: relative;
-  width: 5ex;
   padding: 1px 4px;
   margin: 0 4px;
 
@@ -18,7 +11,24 @@ div.output {
   border: 1px solid black;
 }
 
-div.converter > * {
+.invalid > input {
+  background-color: red;
+}
+
+
+/* Counter  */
+.counter {
+  padding: 1px;
+}
+
+.counter > * {
+  display: inline-block;
+}
+
+
+/* Temperature Converter */
+
+.converter > * {
   display: inline-block;
 }
 
@@ -34,6 +44,17 @@ div.converter > * {
   text-align: right;
 }
 
+.temperature .output {
+  width: 5ex;
+}
+
 .temperature > * {
+  display: inline-block;
+}
+
+
+/* Flight Booker */
+.flight-booker {
+  position: relative;
   display: inline-block;
 }
