@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE ViewPatterns        #-}
 -- | Widgets that I use throughout the seven example tasks.
 module Widget where
 
@@ -15,17 +16,28 @@ import           Control.Monad.Fix (MonadFix)
 
 import           Data.Map          (Map)
 import qualified Data.Map          as Map
+import           Data.Maybe        (fromMaybe)
 import           Data.Text         (Text)
 import qualified Data.Text         as Text
 import           Data.Text.Display (Display)
 import qualified Data.Text.Display as Display
 
+import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
 
 import           Reflex
 import           Reflex.Dom
 
 -- * Widgets
+
+-- ** Attributes
+
+-- | Add the given class to the set of attributes. If the class is
+-- already present, this will add it again.
+withClass :: Text -> Map Text Text -> Map Text Text
+withClass = Map.insertWith (\ a b -> a <> " " <> b) "class"
+
+-- ** Outputs
 
 type Dom t m = (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m)
 
@@ -37,7 +49,7 @@ label = elClass "div" "label" . text . Display.display
 --
 -- These outputs can all be styled with @div.output@.
 output :: forall a m t. (Display a, Dom t m) => Dynamic t a -> m ()
-output value = elClass "div" "output" $ do
+output value = elClass "div" "output" do
   dynText $ Display.display <$> value
 
 -- | A label displaying the given value. Has the CSS class @output@.
@@ -49,9 +61,25 @@ output' :: forall a m t. (Display a, Dom t m)
         -> Dynamic t a
         -- ^ Dynamically changing value to display.
         -> m ()
-output' attributes value = elDynAttr "div" (withClass <$> attributes) do
+output' attributes value = elDynAttr "div" (withClass "output" <$> attributes) do
   dynText $ Display.display <$> value
-  where withClass = Map.insertWith (\ a b -> a <> " " <> b) "class" "output"
+
+-- | A progress bar that fills up left-to-right.
+--
+-- Progress is a 'Double' clamped between 0 (empty) and 1 (full).
+progressBar :: forall m t. Dom t m
+            => Dynamic t Double
+            -- ^ Progress between 0 and 1. Values < 0 are treated as
+            -- 0, values > 1 are treated as 1.
+            -> m ()
+progressBar progress = elClass "div" "progress-bar" do
+  elDynAttr "div" (withClass "bar" . toWidth <$> progress) $ pure ()
+  where toWidth :: Double -> Map Text Text
+        toWidth (toPercent -> p) =
+          [("style", Text.pack $ printf "width: %.2f%%" p)]
+        toPercent p = max 0 (min 1 p) * 100
+
+-- ** Inputs
 
 -- | Whether an input element is enabled or disabled.
 --
@@ -67,17 +95,18 @@ setEnabled :: Map Text Text -> Enabled -> Map Text Text
 setEnabled attributes Enabled  = Map.delete "disabled" attributes
 setEnabled attributes Disabled = Map.insert "disabled" "true" attributes
 
--- | A button with the given label that can be enabled or disabled.
+-- | A button with the given label that can be enabled or disabled,
+-- with a label that can change dynamically.
 --
 -- Returns a stream of button press events.
 button' :: forall a m t. (Dom t m)
-        => Text
-        -- ^ Text label for the button.
+        => Dynamic t Text
+        -- ^ The button label.
         -> Dynamic t Enabled
         -- ^ Whether the button is enabled or disabled.
         -> m (Event t ())
 button' label enabled = do
-  (e, _) <- elDynAttr' "button" attrs $ text label
+  (e, _) <- elDynAttr' "button" attrs $ dynText label
   pure $ void $ domEvent Click e
   where attrs = enabled <&> \case
           Enabled  -> []
@@ -140,6 +169,22 @@ selectEnum = do
 
         showEnum = Text.pack . show . fromEnum
 
+-- | A range input element (a slider).
+--
+-- Returns the position as a 'Double' between 0 and 1.
+range :: forall a m t. Dom t m => m (Dynamic t Double)
+range = do
+  e <- inputElement config
+  pure $ readValue <$> value e
+  where config = def & inputElementConfig_initialValue .~ "0.5"
+                     & initialAttributes .~ [ ("type", "range")
+                                            , ("min", "0.0")
+                                            , ("max", "1.0")
+                                            , ("step", "any") ]
+
+        -- This should only be Nothing if somebody is manually
+        -- screwing around with the DOM or something...
+        readValue = fromMaybe 0 . readMaybe . Text.unpack
 
 -- * FRP Utilities
 

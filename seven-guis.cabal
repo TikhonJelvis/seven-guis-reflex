@@ -17,6 +17,7 @@ executable guis
     Counter
     FlightBooker
     TemperatureConverter
+    Timer
     Widget
 
   build-depends:
