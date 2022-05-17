@@ -15,6 +15,7 @@ executable guis
   main-is:          Main.hs
   other-modules:
     Counter
+    CRUD
     FlightBooker
     TemperatureConverter
     Timer

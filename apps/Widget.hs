@@ -1,5 +1,7 @@
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -21,12 +23,14 @@ import           Data.Text         (Text)
 import qualified Data.Text         as Text
 import           Data.Text.Display (Display)
 import qualified Data.Text.Display as Display
+import           Data.Vector       (Vector)
 
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
 
 import           Reflex
 import           Reflex.Dom
+import qualified Data.Vector as Vector
 
 -- * Widgets
 
@@ -185,6 +189,24 @@ range = do
         -- This should only be Nothing if somebody is manually
         -- screwing around with the DOM or something...
         readValue = fromMaybe 0 . readMaybe . Text.unpack
+
+-- | An interactive box that displays a dynamic sequence of
+-- values. One value at a time can be selected.
+--
+-- The dynamic returned has the index currently selected as well as
+-- the value itself.
+listbox :: forall a m t. (Display a, Dom t m)
+        => Dynamic t (Vector a)
+        -> m (Dynamic t (Maybe (Int, a)))
+listbox elements = elClass "div" "listBox" do
+  listViewWithKey (toMap <$> elements) row
+  undefined
+  where row key value = do
+          (e, _) <- elAttr' "div" [("class", "row")] $
+            dynText (Display.display <$> value)
+          pure $ (key, value) <$ domEvent Click e
+
+        toMap vec = Map.fromList $ [0..] `zip` Vector.toList vec
 
 -- * FRP Utilities
 
