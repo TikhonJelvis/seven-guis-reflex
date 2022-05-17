@@ -27,6 +27,21 @@
   background-color: blue;
 }
 
+.listbox {
+  position: relative;
+  width: 15ex;
+  border: 1px solid black;
+}
+
+.listbox .row {
+  cursor: pointer;
+}
+
+.listbox .selected {
+  background-color: blue;
+  color: white;
+}
+
 
 /* Counter  */
 .counter {

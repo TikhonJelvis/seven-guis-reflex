@@ -5,8 +5,11 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ViewPatterns        #-}
 -- | Widgets that I use throughout the seven example tasks.
@@ -16,6 +19,7 @@ import           Control.Lens      ((<&>), (^.))
 import           Control.Monad     (void)
 import           Control.Monad.Fix (MonadFix)
 
+import qualified Data.Foldable     as Foldable
 import           Data.Map          (Map)
 import qualified Data.Map          as Map
 import           Data.Maybe        (fromMaybe)
@@ -28,9 +32,9 @@ import           Data.Vector       (Vector)
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
 
+import qualified Data.Vector       as Vector
 import           Reflex
 import           Reflex.Dom
-import qualified Data.Vector as Vector
 
 -- * Widgets
 
@@ -190,6 +194,7 @@ range = do
         -- screwing around with the DOM or something...
         readValue = fromMaybe 0 . readMaybe . Text.unpack
 
+        -- TODO: This code is rather complicated/ugly, to be honest...
 -- | An interactive box that displays a dynamic sequence of
 -- values. One value at a time can be selected.
 --
@@ -198,15 +203,31 @@ range = do
 listbox :: forall a m t. (Display a, Dom t m)
         => Dynamic t (Vector a)
         -> m (Dynamic t (Maybe (Int, a)))
-listbox elements = elClass "div" "listBox" do
-  listViewWithKey (toMap <$> elements) row
-  undefined
-  where row key value = do
-          (e, _) <- elAttr' "div" [("class", "row")] $
-            dynText (Display.display <$> value)
-          pure $ (key, value) <$ domEvent Click e
+listbox elements = elClass "div" "listbox" do
+  rec clicks <- combine <$> listWithKey (toMap <$> elements) row
+      selected <- flatten <$> holdSelection (switch $ current clicks)
+      let row key value = do
+            (e, _) <- elDynClass' "div" (isSelected key <$> selected) $
+              dynText (Display.display <$> value)
+            pure $ (key, value) <$ domEvent Click e
+  pure selected
+  where combine events = leftmost . Foldable.toList <$> events
+        toMap vec = Map.fromList
+          [(i, x) | x <- Vector.toList vec | i <- [0..]]
 
-        toMap vec = Map.fromList $ [0..] `zip` Vector.toList vec
+        isSelected key (Just (selectedKey, _))
+          | key == selectedKey = "row selected"
+        isSelected _ _ = "row"
+
+        holdSelection :: Event t (Int, Dynamic t a)
+                      -> m (Dynamic t (Maybe (Int, Dynamic t a)))
+        holdSelection = foldDyn (\ a _ -> Just a) Nothing
+
+        flatten :: Dynamic t (Maybe (Int, Dynamic t a))
+                -> Dynamic t (Maybe (Int, a))
+        flatten as = as >>= \case
+            Nothing      -> pure Nothing
+            Just (i, as) -> Just . (i,) <$> as
 
 -- * FRP Utilities
 
