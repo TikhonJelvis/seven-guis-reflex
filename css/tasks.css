@@ -31,6 +31,8 @@
   position: relative;
   width: 15ex;
   border: 1px solid black;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .listbox .row {
