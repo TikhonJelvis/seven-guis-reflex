@@ -28,8 +28,6 @@
 }
 
 .listbox {
-  position: relative;
-  width: 15ex;
   border: 1px solid black;
   -webkit-user-select: none;
   user-select: none;
@@ -67,14 +65,14 @@
 
 .temperature input {
   position: relative;
-  width: 7ex;
+  width: 5em;
   margin: 0 5px;
 
   text-align: right;
 }
 
 .temperature .output {
-  width: 5ex;
+  width: 3em;
 }
 
 .temperature > * {
@@ -92,7 +90,76 @@
 
 .timer .output {
   position: relative;
-  width: 8ex;
+  width: 5em;
   border: none;
   text-align: left;
+}
+
+/* CRUD */
+
+.crud {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  grid-template-rows: 3ex 1fr 3ex;
+  gap: 10px;
+}
+
+.crud input {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+}
+
+.crud .label {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.crud .filter {
+  display: flex;
+  margin: 0 2px;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.crud .filter input {
+  min-width: 4em;
+}
+
+.crud .listbox {
+  width: auto;
+  min-height: 20ex;
+
+  margin: 0 2px;
+
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.crud .name-input {
+  display: inline-block;
+  grid-row: 2;
+  grid-column: 2;
+}
+
+.crud .name-input > div {
+  display: grid;
+  grid-template-columns: min-content auto;
+  grid-template-rows: 1fr 1fr;
+}
+
+.crud .crud-controls {
+  display: grid;
+  grid-template-columns: repeat(3, min-content);
+
+  grid-row: 3;
+  grid-column: 1;
+}
+
+.crud .name-input .label {
+  grid-column: 1;
+}
+
+.crud .name-input input {
+  grid-column: 2;
 }

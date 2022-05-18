@@ -1,6 +1,7 @@
 module Main where
 
 import qualified Seven.Counter              as Counter
+import qualified Seven.CRUD                 as CRUD
 import qualified Seven.FlightBooker         as FlightBooker
 import qualified Seven.TemperatureConverter as TemperatureConverter
 
@@ -17,4 +18,4 @@ import           Text.Printf                (printf)
 main :: IO ()
 main = do
   css <- BS.readFile "css/tasks.css"
-  mainWidgetWithCss css FlightBooker.widget
+  mainWidgetWithCss css CRUD.widget

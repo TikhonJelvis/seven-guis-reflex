@@ -48,9 +48,9 @@ withClass = Map.insertWith (\ a b -> a <> " " <> b) "class"
 
 type Dom t m = (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m)
 
--- | A label displaying the given value. Has the CSS class @label@.
-label :: forall a m t. (Display a, DomBuilder t m) => a -> m ()
-label = elClass "div" "label" . text . Display.display
+-- | A static label with some text. Has the CSS class @label@.
+label :: forall m t. DomBuilder t m => Text -> m ()
+label = elClass "div" "label" . text
 
 -- | A label that displays a dynamically updating value.
 --

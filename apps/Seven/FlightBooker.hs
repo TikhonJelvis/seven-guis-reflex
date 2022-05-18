@@ -73,7 +73,7 @@ widget = elClass "div" "flight-booker" do
         toTrip Return start end = Return' <$> start <*> end
 
         confirmationMessage Nothing     = pure ()
-        confirmationMessage (Just trip) = label trip
+        confirmationMessage (Just trip) = label $ Display.display trip
 
 -- | A date input with validation.
 --
