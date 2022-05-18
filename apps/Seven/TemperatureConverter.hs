@@ -2,10 +2,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecursiveDo                #-}
-module TemperatureConverter where
+module Seven.TemperatureConverter where
+
+import           Seven.Widget
 
 import           Control.Monad.Fix (MonadFix)
 
+import           Data.Maybe        (fromJust)
 import           Data.Text         (Text)
 import qualified Data.Text         as Text
 
@@ -13,9 +16,6 @@ import           Reflex
 import           Reflex.Dom
 
 import           Text.Printf       (printf)
-
-import           Data.Maybe        (fromJust)
-import           Widget
 
 -- | The Temperature Converter has a frame with two text fields (°C
 -- and °F) that convert automatically.

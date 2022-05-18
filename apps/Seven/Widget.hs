@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ViewPatterns        #-}
 -- | Widgets that I use throughout the seven example tasks.
-module Widget where
+module Seven.Widget where
 
 import           Control.Lens      ((<&>), (^.))
 import           Control.Monad     (join, void)
@@ -27,13 +27,13 @@ import qualified Data.Text         as Text
 import           Data.Text.Display (Display)
 import qualified Data.Text.Display as Display
 import           Data.Vector       (Vector)
+import qualified Data.Vector       as Vector
+
+import           Reflex
+import           Reflex.Dom
 
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
-
-import qualified Data.Vector       as Vector
-import           Reflex
-import           Reflex.Dom
 
 -- * Widgets
 

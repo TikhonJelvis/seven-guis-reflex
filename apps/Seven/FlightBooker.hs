@@ -5,13 +5,14 @@
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
-module FlightBooker where
+module Seven.FlightBooker where
+
+import           Seven.Widget
 
 import           Control.Applicative    ((<|>))
 import           Control.Monad          (void)
 import           Control.Monad.Fix      (MonadFix)
 import           Control.Monad.IO.Class (MonadIO (liftIO))
-
 
 import qualified Data.Text              as Text
 import           Data.Text.Display      (Display (..))
@@ -24,7 +25,6 @@ import           Reflex
 import           Reflex.Dom
 
 import qualified Text.Printf            as Text
-import           Widget
 
 -- | A UI with three parts:
 --

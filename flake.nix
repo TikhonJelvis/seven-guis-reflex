@@ -31,7 +31,6 @@
                 haskell-language-server
 
                 cabal-fmt
-                stylish-haskell
                 pkgs.nixpkgs-fmt
               ]);
           };

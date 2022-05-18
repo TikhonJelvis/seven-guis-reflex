@@ -14,12 +14,12 @@ executable guis
   default-language: Haskell2010
   main-is:          Main.hs
   other-modules:
-    Counter
-    CRUD
-    FlightBooker
-    TemperatureConverter
-    Timer
-    Widget
+    Seven.Counter
+    Seven.CRUD
+    Seven.FlightBooker
+    Seven.TemperatureConverter
+    Seven.Timer
+    Seven.Widget
 
   build-depends:
     , base

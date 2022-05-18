@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TypeApplications  #-}
-module Counter where
+module Seven.Counter where
+
+import           Seven.Widget
 
 import           Control.Monad.Fix (MonadFix)
 
@@ -9,8 +11,6 @@ import qualified Data.Text         as Text
 
 import           Reflex
 import           Reflex.Dom
-
-import           Widget
 
 -- | The Counter has a frame with two components:
 --

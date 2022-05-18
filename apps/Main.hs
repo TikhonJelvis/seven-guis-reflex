@@ -1,17 +1,17 @@
 module Main where
 
-import qualified Data.ByteString      as BS
-import           Data.FileEmbed       (embedFile)
-import qualified Data.Text            as Text
-import qualified Data.Text.IO         as Text
+import qualified Seven.Counter              as Counter
+import qualified Seven.FlightBooker         as FlightBooker
+import qualified Seven.TemperatureConverter as TemperatureConverter
 
-import           Text.Printf          (printf)
+import qualified Data.ByteString            as BS
+import           Data.FileEmbed             (embedFile)
+import qualified Data.Text                  as Text
+import qualified Data.Text.IO               as Text
 
-import           Reflex.Dom           (mainWidgetWithCss)
+import           Reflex.Dom                 (mainWidgetWithCss)
 
-import qualified Counter
-import qualified FlightBooker
-import qualified TemperatureConverter
+import           Text.Printf                (printf)
 
 
 main :: IO ()
