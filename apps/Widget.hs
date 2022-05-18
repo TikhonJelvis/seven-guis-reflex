@@ -5,7 +5,6 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -16,13 +15,13 @@
 module Widget where
 
 import           Control.Lens      ((<&>), (^.))
-import           Control.Monad     (void)
+import           Control.Monad     (join, void)
 import           Control.Monad.Fix (MonadFix)
 
 import qualified Data.Foldable     as Foldable
 import           Data.Map          (Map)
 import qualified Data.Map          as Map
-import           Data.Maybe        (fromMaybe)
+import           Data.Maybe        (fromMaybe, listToMaybe)
 import           Data.Text         (Text)
 import qualified Data.Text         as Text
 import           Data.Text.Display (Display)
@@ -194,40 +193,36 @@ range = do
         -- screwing around with the DOM or something...
         readValue = fromMaybe 0 . readMaybe . Text.unpack
 
-        -- TODO: This code is rather complicated/ugly, to be honest...
 -- | An interactive box that displays a dynamic sequence of
 -- values. One value at a time can be selected.
 --
 -- The dynamic returned has the index currently selected as well as
 -- the value itself.
-listbox :: forall a m t. (Display a, Dom t m)
-        => Dynamic t (Vector a)
-        -> m (Dynamic t (Maybe (Int, a)))
+listbox :: forall a k m t. (Ord k, Display a, Dom t m)
+        => Dynamic t (Map k a)
+        -> m (Dynamic t (Maybe (k, a)))
 listbox elements = elClass "div" "listbox" do
-  rec clicks <- combine <$> listWithKey (toMap <$> elements) row
-      selected <- flatten <$> holdSelection (switch $ current clicks)
-      let row key value = do
-            (e, _) <- elDynClass' "div" (isSelected key <$> selected) $
-              dynText (Display.display <$> value)
-            pure $ (key, value) <$ domEvent Click e
-  pure selected
-  where combine events = leftmost . Foldable.toList <$> events
-        toMap vec = Map.fromList
-          [(i, x) | x <- Vector.toList vec | i <- [0..]]
+  rec selections <- listViewWithKey elements (row selected)
+      selected <- foldDyn getSelected Nothing selections
 
-        isSelected key (Just (selectedKey, _))
-          | key == selectedKey = "row selected"
+  pure $ zipDynWith toKV selected elements
+  where row selected k a = do
+          (element, _) <- elDynClass' "div" (isSelected k <$> selected) $
+            dynText (Display.display <$> a)
+
+          let select   = Just k  <$ domEvent Click element
+              unselect = Nothing <$ domEvent Dblclick element
+          pure $ leftmost [unselect, select]
+
+        getSelected map _ =
+          join $ listToMaybe $ Map.elems map
+
+        isSelected k (Just k')
+          | k == k' = "row selected"
         isSelected _ _ = "row"
 
-        holdSelection :: Event t (Int, Dynamic t a)
-                      -> m (Dynamic t (Maybe (Int, Dynamic t a)))
-        holdSelection = foldDyn (\ a _ -> Just a) Nothing
-
-        flatten :: Dynamic t (Maybe (Int, Dynamic t a))
-                -> Dynamic t (Maybe (Int, a))
-        flatten as = as >>= \case
-            Nothing      -> pure Nothing
-            Just (i, as) -> Just . (i,) <$> as
+        toKV (Just k) map = (k,) <$> Map.lookup k map
+        toKV Nothing _    = Nothing
 
 -- * FRP Utilities
 
@@ -244,3 +239,9 @@ ignoreNothing :: forall a m t. (Reflex t, MonadHold t m, MonadFix m)
               -- ^ A dynamic that can have invalid values.
               -> m (Dynamic t a)
 ignoreNothing initial input = foldDynMaybe const initial (updated input)
+
+-- | The value from the last time the given event fired, or 'Nothing'
+-- if it hasn't fired yet.
+lastEvent :: (Reflex t, MonadHold t m, MonadFix m)
+          => Event t a -> m (Dynamic t (Maybe a))
+lastEvent = foldDyn (\ a _ -> Just a) Nothing

@@ -10,7 +10,7 @@ import           Reflex.Dom
 import           Widget
 
 widget :: Dom t m => m ()
-widget = void $ listbox (constDyn [1::Int ..10])
+widget = void $ listbox (constDyn [(1::Int, "a"), (2, "b")])
 
 main :: IO ()
 main = do
