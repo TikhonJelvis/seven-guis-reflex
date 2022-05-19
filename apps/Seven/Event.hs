@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 module Seven.Event where
 
-import           Control.Lens             ((<&>))
+import           Control.Lens             (element, (<&>))
 
 import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
@@ -18,9 +18,13 @@ import           Data.Word                (Word8)
 import qualified GHCJS.DOM.ClipboardEvent as ClipboardEvent
 import qualified GHCJS.DOM.DataTransfer   as DataTransfer
 import qualified GHCJS.DOM.Element        as Element
+import qualified GHCJS.DOM.Event          as Event
 import qualified GHCJS.DOM.EventM         as GHCJS
 import qualified GHCJS.DOM.KeyboardEvent  as KeyboardEvent
 import qualified GHCJS.DOM.MouseEvent     as MouseEvent
+import qualified GHCJS.DOM.Types          as GHCJS
+import qualified GHCJS.DOM.UIEvent        as UIEvent
+import qualified GHCJS.DOM.WheelEvent     as WheelEvent
 
 import qualified Reflex.Dom               as Dom
 
@@ -34,17 +38,17 @@ data Modifier = Ctrl | Shift | Alt | Meta
 
 -- | Information from when the event triggered.
 data MouseEventResult = MouseEventResult
-  { screen    :: (Int, Int)
+  { screen    :: !(Int, Int)
   -- ^ The cursor position in global (screen) coordinates.
 
-  , client    :: (Int, Int)
+  , client    :: !(Int, Int)
   -- ^ The cursor position in local (DOM content) coordinates.
 
-  , movement  :: (Int, Int)
+  , movement  :: !(Int, Int)
   -- ^ The cursor position relative to the last 'Dom.Mousemove'
   -- event.
 
-  , offset    :: (Int, Int)
+  , offset    :: !(Int, Int)
   -- ^ The cursor position relative to the element of the event's
   -- target node. The relative position is calculated relative to the
   -- position of the padding edge of the target node.
@@ -57,7 +61,7 @@ data MouseEventResult = MouseEventResult
   , modifiers :: Set Modifier
   -- ^ Any modifier keys that were held down when the event triggered.
 
-  , button    :: Word
+  , button    :: !Word
   -- ^ The number of the button that was pressed for the event.
   --
   -- TODO: Logically this should be a Maybe, but it isn't a 'Maybe' in
@@ -84,16 +88,83 @@ getMouseEvent = do
   let modifiers = Set.fromList $
         [Ctrl | ctrl] <> [Shift | shift] <> [Alt | alt] <> [Meta | meta]
 
-  pure $ MouseEventResult
+  pure MouseEventResult
     { screen, client, movement, offset, modifiers, button }
+
+-- ** Wheel Events
+
+-- | Information about how the mouse wheel moved to trigger a
+-- wheel event.
+data WheelEventResult = WheelEventResult
+  { delta     :: (Double, Double, Double)
+    -- ^ The x, y and z deltas respectively. These specify how the
+    -- wheel moved along three axes.
+  , deltaMode :: !DeltaMode
+    -- ^ How the deltas were measured.
+  }
+
+-- | How the change in position for a wheel event was measured.
+data DeltaMode = Delta_Line
+               | Delta_Pixel
+               | Delta_Page
+               | Delta_Unknown Word
+  deriving stock (Show, Eq, Ord)
+
+
+-- TODO: Get MouseEvent properties for WheelEvent too?
+-- | Build a 'WheelEventResult' from a JS event.
+getWheelEvent :: GHCJS.EventM e WheelEvent.WheelEvent WheelEventResult
+getWheelEvent = do
+  e <- GHCJS.event
+
+  x <- WheelEvent.getDeltaX e
+  y <- WheelEvent.getDeltaY e
+  z <- WheelEvent.getDeltaZ e
+
+  deltaMode <- WheelEvent.getDeltaMode e <&> \case
+    0 -> Delta_Line
+    1 -> Delta_Pixel
+    2 -> Delta_Page
+    x -> Delta_Unknown x
+
+  pure WheelEventResult { delta = (x, y, z), deltaMode }
+
+-- ** Scrolling
+
+-- | The information accompanying a scroll event.
+data ScrollEventResult = ScrollEventResult
+  { scrollTop  :: !Double
+  -- ^ How much the target element is scrolled vertically.
+  , scrollLeft :: !Double
+  -- ^ How much the target element is scrolled horizontally.
+  --
+  -- If the element's @direction@ is @rtl@, this is calculated from
+  -- the right instead.
+  }
+  deriving stock (Show, Eq, Ord)
+
+-- | Build a 'ScrollEventResult' from a scroll event.
+--
+-- This works fine for any 'UIEvent.UIEvent', so it's only
+-- scroll-specific because it returns information on how the target
+-- element is scrolled.
+getScrollEvent :: GHCJS.EventM e UIEvent.UIEvent ScrollEventResult
+getScrollEvent = do
+  e <- GHCJS.event
+  element <- GHCJS.uncheckedCastTo Element.Element <$> Event.getTargetUnchecked e
+
+  scrollLeft <- fromIntegral <$> Element.getScrollLeft element
+  scrollTop  <- fromIntegral <$> Element.getScrollTop element
+
+  pure ScrollEventResult { scrollLeft, scrollTop }
 
 -- * Keyboard Events
 
 -- | Information for a keyboard event containing things like keycode
 -- and modifier keys.
 data KeyboardEventResult = KeyboardEventResult
-  { key       :: Key
-  , modifiers :: Set Modifier
+  { key       :: !Key
+  , modifiers :: !(Set Modifier)
   }
 
 -- TODO: Replace with a structure type—straightforward, but it was
@@ -161,9 +232,11 @@ getKeyboardEvent = do
   let modifiers = Set.fromList $
         [Ctrl | ctrl] <> [Shift | shift] <> [Alt | alt] <> [Meta | meta]
 
-  pure $ KeyboardEventResult { modifiers, key }
+  pure KeyboardEventResult { modifiers, key }
 
 -- * Clipboard Events
+
+    -- TODO: API for other kinds of copy/paste data?
 
 -- | Get the clipboard data that was pasted in as 'Text', if it's
 -- available.
@@ -182,7 +255,7 @@ type family EventResultType en where
   EventResultType 'Dom.KeypressTag    = KeyboardEventResult
   EventResultType 'Dom.KeydownTag     = KeyboardEventResult
   EventResultType 'Dom.KeyupTag       = KeyboardEventResult
-  EventResultType 'Dom.ScrollTag      = Double
+  EventResultType 'Dom.ScrollTag      = ScrollEventResult
   EventResultType 'Dom.MousemoveTag   = MouseEventResult
   EventResultType 'Dom.MousedownTag   = MouseEventResult
   EventResultType 'Dom.MouseupTag     = MouseEventResult
@@ -206,7 +279,7 @@ type family EventResultType en where
   EventResultType 'Dom.LoadTag        = ()
   EventResultType 'Dom.MouseoutTag    = MouseEventResult
   EventResultType 'Dom.MouseoverTag   = MouseEventResult
-  EventResultType 'Dom.MousewheelTag  = ()
+  EventResultType 'Dom.MousewheelTag  = MouseEventResult
   EventResultType 'Dom.SelectTag      = ()
   EventResultType 'Dom.SubmitTag      = ()
   EventResultType 'Dom.BeforecutTag   = ()
@@ -222,7 +295,7 @@ type family EventResultType en where
   EventResultType 'Dom.TouchmoveTag   = Dom.TouchEventResult
   EventResultType 'Dom.TouchendTag    = Dom.TouchEventResult
   EventResultType 'Dom.TouchcancelTag = Dom.TouchEventResult
-  EventResultType 'Dom.WheelTag       = Dom.WheelEventResult
+  EventResultType 'Dom.WheelTag       = WheelEventResult
 
 newtype EventResult en = EventResult { unEventResult :: EventResultType en }
 
@@ -234,7 +307,7 @@ domHandler element eventName = Just . EventResult <$> case eventName of
   Dom.Click       -> getMouseEvent
   Dom.Dblclick    -> getMouseEvent
   Dom.Keypress    -> getKeyboardEvent
-  Dom.Scroll      -> pure ()
+  Dom.Scroll      -> getScrollEvent
   Dom.Keydown     -> getKeyboardEvent
   Dom.Keyup       -> getKeyboardEvent
   Dom.Mousemove   -> getMouseEvent
@@ -267,13 +340,13 @@ domHandler element eventName = Just . EventResult <$> case eventName of
   Dom.Beforecopy  -> pure ()
   Dom.Copy        -> pure ()
   Dom.Beforepaste -> pure ()
-  Dom.Paste       -> pure ()
+  Dom.Paste       -> getPasteText
   Dom.Reset       -> pure ()
   Dom.Search      -> pure ()
   Dom.Selectstart -> pure ()
-  Dom.Touchstart  -> getTouchEvent
-  Dom.Touchmove   -> getTouchEvent
-  Dom.Touchend    -> getTouchEvent
-  Dom.Touchcancel -> getTouchEvent
+  Dom.Touchstart  -> Dom.getTouchEvent
+  Dom.Touchmove   -> Dom.getTouchEvent
+  Dom.Touchend    -> Dom.getTouchEvent
+  Dom.Touchcancel -> Dom.getTouchEvent
   Dom.Mousewheel  -> getMouseEvent
   Dom.Wheel       -> getWheelEvent

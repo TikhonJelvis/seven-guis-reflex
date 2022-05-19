@@ -46,7 +46,12 @@ withClass = Map.insertWith (\ a b -> a <> " " <> b) "class"
 
 -- ** Outputs
 
-type Dom t m = (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m)
+type Dom t m = ( MonadFix m
+               , MonadHold t m
+               , PostBuild t m
+               , DomBuilder t m
+               , EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec
+               )
 
 -- | A static label with some text. Has the CSS class @label@.
 label :: forall m t. DomBuilder t m => Text -> m ()
