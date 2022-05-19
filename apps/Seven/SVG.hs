@@ -1,4 +1,6 @@
+{-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
@@ -26,15 +28,13 @@ import           Data.Text.Display      (Display (..))
 import qualified Data.Text.Lazy.Builder as Builder
 import           Data.Word              (Word8)
 
+import qualified GHCJS.DOM.Element      as Element
+import qualified GHCJS.DOM.Event        as Event
+import qualified GHCJS.DOM.MouseEvent   as MouseEvent
+
 import qualified Numeric
 
-import           Reflex.Dom             (AttributeName (..),
-                                         DomBuilder (DomBuilderSpace, element),
-                                         Element, EventResult,
-                                         HasNamespace (namespace),
-                                         InitialAttributes (initialAttributes),
-                                         PostBuild (getPostBuild), Reflex (Dynamic), constDyn,
-                                         elDynAttrNS', NotReady (notReadyUntil))
+import           Reflex.Dom
 
 import           Text.Printf            (printf)
 
@@ -43,16 +43,17 @@ import           Text.Printf            (printf)
 -- ** Arbitrary Elements
 
 -- | Create an SVG element.
-svg :: forall a m t. (PostBuild t m, DomBuilder t m)
+svg :: forall a m t. (PostBuild t m, DomBuilder t m, EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec)
     => Text
     -- ^ Tag
     -> m a
     -- ^ Body
     -> m a
 svg tag body = snd <$> svg' tag body
+{-# INLINABLE svg #-}
 
 -- | Create an SVG element with static attributes.
-svgAttr :: forall a m t. (PostBuild t m, DomBuilder t m)
+svgAttr :: forall a m t. (PostBuild t m, DomBuilder t m, EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec)
         => Text
         -- ^ Tag name
         -> Map Text Text
@@ -61,9 +62,10 @@ svgAttr :: forall a m t. (PostBuild t m, DomBuilder t m)
         -- ^ Body
         -> m a
 svgAttr tag attr body = snd <$> svgAttr' tag attr body
+{-# INLINABLE svgAttr #-}
 
 -- | Create an SVG element with a dynamic set of attributes.
-svgDynAttr :: forall a m t. (PostBuild t m, DomBuilder t m)
+svgDynAttr :: forall a m t. (PostBuild t m, DomBuilder t m, EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec)
            => Text
            -- ^ Tag name
            -> Dynamic t (Map Text Text)
@@ -72,20 +74,22 @@ svgDynAttr :: forall a m t. (PostBuild t m, DomBuilder t m)
            -- ^ Body
            -> m a
 svgDynAttr tag attr body = snd <$> svgDynAttr' tag attr body
+{-# INLINABLE svgDynAttr #-}
 
 -- *** With Element Results
 
 -- | Create and return an SVG element.
-svg' :: forall a m t. (PostBuild t m, DomBuilder t m)
+svg' :: forall a m t. (PostBuild t m, DomBuilder t m, EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec)
      => Text
      -- ^ Tag name
      -> m a
      -- ^ Body
      -> m (Element EventResult (DomBuilderSpace m) t, a)
 svg' tag = svgAttr' tag []
+{-# INLINABLE svg' #-}
 
 -- | Create and return an SVG element with a static set of attributes.
-svgAttr' :: forall a m t. (PostBuild t m, DomBuilder t m)
+svgAttr' :: forall a m t. (PostBuild t m, DomBuilder t m, EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec)
          => Text
          -- ^ Tag name
          -> Map Text Text
@@ -94,9 +98,10 @@ svgAttr' :: forall a m t. (PostBuild t m, DomBuilder t m)
          -- ^ Body
          -> m (Element EventResult (DomBuilderSpace m) t, a)
 svgAttr' tag = svgDynAttr' tag . constDyn
+{-# INLINABLE svgAttr' #-}
 
 -- | Create and return an SVG element with a dynamic set of attributes.
-svgDynAttr' :: forall a m t. (PostBuild t m, DomBuilder t m)
+svgDynAttr' :: forall a m t. (PostBuild t m, DomBuilder t m, EventSpec (DomBuilderSpace m) ~ GhcjsEventSpec)
             => Text
             -- ^ Tag name
             -> Dynamic t (Map Text Text)
@@ -104,7 +109,26 @@ svgDynAttr' :: forall a m t. (PostBuild t m, DomBuilder t m)
             -> m a
             -- ^ Body
             -> m (Element EventResult (DomBuilderSpace m) t, a)
-svgDynAttr' = elDynAttrNS' (Just svgNamespace)
+svgDynAttr' tag attrs body = do
+  modifyAttrs <- dynamicAttributesToModifyAttributes attrs
+  let config = ElementConfig
+        { _elementConfig_namespace = Just svgNamespace
+        , _elementConfig_initialAttributes = Map.empty
+        , _elementConfig_modifyAttributes =
+          Just $ fmapCheap mapKeysToAttributeName modifyAttrs
+        , _elementConfig_eventSpec = eventSpec
+        }
+  result <- element tag config body
+  postBuild <- getPostBuild
+  notReadyUntil postBuild
+  pure result
+  where eventSpec = GhcjsEventSpec filters handler
+        filters = undefined
+        handler = GhcjsEventHandler \ (name, event) -> case name of
+          Click    -> getMouseEvent
+          Dblclick -> getMouseEvent
+          _        -> undefined
+{-# INLINABLE svgDynAttr' #-}
 
 -- ** Presentation
 

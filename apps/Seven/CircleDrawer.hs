@@ -1,5 +1,7 @@
 {-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.CircleDrawer where
 
@@ -12,13 +14,26 @@ import qualified Data.ByteString  as BS
 import           Reflex.Dom
 
 widget :: forall m t. Dom t m => m ()
-widget = elClass "div" "circleDrawer" do
-  svg "svg" do
-    let c = Circle { center = (25, 50), radius = 25 }
-    circle c (toAttributes def { width = 4, color = "#36f" })
+widget = elClass "div" "circle-drawer" do
+  action <- elClass "div" "centered controls" do
+    undos <- button "↶"
+    redos <- button "↷"
+    pure $ leftmost [undos, redos]
 
-    let c' = Circle { center = (50, 50), radius = 25 }
-    circle c' (toAttributes def { width = 4, color = "#36f" })
+  elClass "div" "canvas" do
+    rec (canvas, _) <- svg' "svg" $ dyn circles
+        let canvasClicks = domEvent Mouseup canvas
+        circles <- foldDyn addCircle (pure ()) canvasClicks
+    pure ()
+  where addCircle point body = body *> circleAt point
+
+-- | Create a "standard" circle centered at the given coordinates.
+circleAt :: Dom t m => (Int, Int) -> m ()
+circleAt (x, y) = circle c []
+  where c = Circle { center = (fromIntegral x, fromIntegral y)
+                   , radius = 25
+                   }
+
 
 main :: IO ()
 main = do

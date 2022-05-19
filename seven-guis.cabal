@@ -18,6 +18,7 @@ executable guis
     Seven.CircleDrawer
     Seven.Counter
     Seven.CRUD
+    Seven.Event
     Seven.FlightBooker
     Seven.SVG
     Seven.TemperatureConverter
@@ -31,7 +32,9 @@ executable guis
     , containers
     , data-default-class
     , file-embed
+    , ghcjs-dom
     , hashable
+    , jsaddle
     , lens
     , reflex
     , reflex-dom
