@@ -175,7 +175,8 @@
   height: 90%;
 
   display: grid;
-  grid-template-rows: 40px 1fr;
+  grid-template-rows: 4.5ex 1fr;
+  gap: 10px;
 }
 
 .circle-drawer .canvas {
@@ -194,7 +195,7 @@
 }
 
 .circle-drawer .controls button {
-  height: 30px;
-  width: 30px;
+  height: 3ex;
+  width: 3ex;
   margin: 0 4px;
 }

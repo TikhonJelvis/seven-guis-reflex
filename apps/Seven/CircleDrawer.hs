@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -11,13 +13,15 @@ import           Seven.Widget
 
 import qualified Data.ByteString  as BS
 
-import           Reflex.Dom
+import Reflex.Dom hiding (button)
+import qualified Reflex.Dom as Reflex
+import Seven.Event
 
 widget :: forall m t. Dom t m => m ()
 widget = elClass "div" "circle-drawer" do
   action <- elClass "div" "centered controls" do
-    undos <- button "↶"
-    redos <- button "↷"
+    undos <- Reflex.button "↶"
+    redos <- Reflex.button "↷"
     pure $ leftmost [undos, redos]
 
   elClass "div" "canvas" do
@@ -25,7 +29,7 @@ widget = elClass "div" "circle-drawer" do
         let canvasClicks = domEvent Mouseup canvas
         circles <- foldDyn addCircle (pure ()) canvasClicks
     pure ()
-  where addCircle point body = body *> circleAt point
+  where addCircle MouseEventResult { offset } body = body *> circleAt offset
 
 -- | Create a "standard" circle centered at the given coordinates.
 circleAt :: Dom t m => (Int, Int) -> m ()

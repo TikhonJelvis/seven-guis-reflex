@@ -299,11 +299,9 @@ type family EventResultType en where
 
 newtype EventResult en = EventResult { unEventResult :: EventResultType en }
 
-domHandler :: Element.IsElement e
-           => e
-           -> Dom.EventName en
+domHandler :: Dom.EventName en
            -> GHCJS.EventM e (Dom.EventType en) (Maybe (EventResult en))
-domHandler element eventName = Just . EventResult <$> case eventName of
+domHandler eventName = Just . EventResult <$> case eventName of
   Dom.Click       -> getMouseEvent
   Dom.Dblclick    -> getMouseEvent
   Dom.Keypress    -> getKeyboardEvent

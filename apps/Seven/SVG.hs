@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE GADTs                 #-}
@@ -7,6 +8,8 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 module Seven.SVG where
 
 import           Seven.Attributes       (ToAttributeValue (..),
@@ -34,9 +37,12 @@ import qualified GHCJS.DOM.MouseEvent   as MouseEvent
 
 import qualified Numeric
 
-import           Reflex.Dom
+import Reflex.Dom hiding (EventResult, EventResultType)
 
 import           Text.Printf            (printf)
+import Control.Monad.Reader (ReaderT(runReaderT))
+import Seven.Event
+import Data.Functor.Misc (WrapArg(..))
 
 -- * SVG Elements
 
@@ -123,12 +129,15 @@ svgDynAttr' tag attrs body = do
   notReadyUntil postBuild
   pure result
   where eventSpec = GhcjsEventSpec filters handler
-        filters = undefined
-        handler = GhcjsEventHandler \ (name, event) -> case name of
-          Click    -> getMouseEvent
-          Dblclick -> getMouseEvent
-          _        -> undefined
+        filters = mempty
+        handler = GhcjsEventHandler \ (eventName, event) ->
+          runReaderT (domHandler eventName) (unGhcjsDomEvent event)
 {-# INLINABLE svgDynAttr' #-}
+
+instance Reflex t => HasDomEvent t (Element EventResult d t) en where
+  type DomEventType (Element EventResult d t) en = EventResultType en
+  {-# INLINABLE domEvent #-}
+  domEvent en e = coerceEvent $ select (_element_events e) (WrapArg en)
 
 -- ** Presentation
 

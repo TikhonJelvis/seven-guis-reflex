@@ -36,11 +36,13 @@ executable guis
     , hashable
     , jsaddle
     , lens
+    , mtl
     , reflex
     , reflex-dom
     , reflex-dom-core
     , text
     , text-display
     , time
+    , transformers
     , unordered-containers
     , vector
