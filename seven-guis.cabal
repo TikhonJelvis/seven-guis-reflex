@@ -46,3 +46,4 @@ executable guis
     , transformers
     , unordered-containers
     , vector
+    , witherable

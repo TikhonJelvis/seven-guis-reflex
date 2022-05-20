@@ -1,8 +1,10 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -10,6 +12,7 @@ module Seven.Event where
 
 import           Control.Lens             (element, (<&>))
 
+import           Data.Functor.Misc        (WrapArg (..))
 import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
 import           Data.Text                (Text)
@@ -26,7 +29,9 @@ import qualified GHCJS.DOM.Types          as GHCJS
 import qualified GHCJS.DOM.UIEvent        as UIEvent
 import qualified GHCJS.DOM.WheelEvent     as WheelEvent
 
+import           Reflex                   (select)
 import qualified Reflex.Dom               as Dom
+import           Reflex.Dom               (HasDomEvent, Reflex)
 
 -- * Modifier Keys
 
@@ -348,3 +353,9 @@ domHandler eventName = Just . EventResult <$> case eventName of
   Dom.Touchcancel -> Dom.getTouchEvent
   Dom.Mousewheel  -> getMouseEvent
   Dom.Wheel       -> getWheelEvent
+
+instance Reflex t => HasDomEvent t (Dom.Element EventResult d t) en where
+  type DomEventType (Dom.Element EventResult d t) en = EventResultType en
+  {-# INLINABLE domEvent #-}
+  domEvent en e =
+    Dom.coerceEvent $ select (Dom._element_events e) (WrapArg en)

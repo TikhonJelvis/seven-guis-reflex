@@ -14,6 +14,8 @@
 -- | Widgets that I use throughout the seven example tasks.
 module Seven.Widget where
 
+import           Seven.Event
+
 import           Control.Lens      ((<&>), (^.))
 import           Control.Monad     (join, void)
 import           Control.Monad.Fix (MonadFix)
@@ -30,10 +32,11 @@ import           Data.Vector       (Vector)
 import qualified Data.Vector       as Vector
 
 import           Reflex
-import           Reflex.Dom
+import           Reflex.Dom        hiding (EventResult)
 
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
+import Data.IntMap (IntMap)
 
 -- * Widgets
 
@@ -228,6 +231,29 @@ listbox elements = elClass "div" "listbox" do
 
         toKV (Just k) map = (k,) <$> Map.lookup k map
         toKV Nothing _    = Nothing
+
+-- * Element Interaction
+
+-- | Returns a behavior that is 'True' when the mouse is over the
+-- element and 'False' otherwise.
+--
+-- This uses the @mouseenter@ and @mouseleave@ events under the hood,
+-- so it registers the mouse when it's over the element even if the
+-- element is covered by a child element.
+hovering :: Dom t m
+         => Bool
+         -- ^ Starting state: is the cursor over the element now?
+         --
+         -- This is a bit awkward, but figuring out whether the cursor
+         -- is over a given element in JavaScript is surpringly
+         -- fiddly, so pushing it to the caller seems like the best
+         -- option right now...
+         -> Element EventResult (DomBuilderSpace m) t
+         -> m (Dynamic t Bool)
+hovering start element = holdDyn start $ leftmost [over, leave]
+  where over  = True  <$ domEvent Mouseover element
+        leave = False <$ domEvent Mouseleave element
+
 
 -- * FRP Utilities
 

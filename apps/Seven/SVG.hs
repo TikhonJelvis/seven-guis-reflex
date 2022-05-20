@@ -134,11 +134,6 @@ svgDynAttr' tag attrs body = do
           runReaderT (domHandler eventName) (unGhcjsDomEvent event)
 {-# INLINABLE svgDynAttr' #-}
 
-instance Reflex t => HasDomEvent t (Element EventResult d t) en where
-  type DomEventType (Element EventResult d t) en = EventResultType en
-  {-# INLINABLE domEvent #-}
-  domEvent en e = coerceEvent $ select (_element_events e) (WrapArg en)
-
 -- ** Presentation
 
 -- *** Color
@@ -262,6 +257,11 @@ instance ToAttributes Circle where
     , ("r", toAttributeValue r)
     ]
 
+instance Display Circle where
+  displayBuilder Circle { center, radius } =
+    "Circle at " <> displayBuilder center <>
+    " with radius = " <> displayBuilder radius
+
 -- | Create a circle element with the given settings.
 --
 -- @
@@ -269,8 +269,15 @@ instance ToAttributes Circle where
 -- in
 -- circle c (toAttributes def { width = 4, color = "#36f" })
 -- @
-circle :: forall m t. Dom t m => Circle -> Map Text Text -> m ()
-circle c attrs = svgAttr "circle" (with c attrs) $ pure ()
+circle :: forall m t. Dom t m
+       => Dynamic t Circle
+       -- ^ Core circle settings.
+       -> Dynamic t (Map Text Text)
+       -- ^ Additional attributes. The 'Circle' argument will override
+       -- @cx@, @cy@ and @r@ in this map.
+       -> m (Element EventResult (DomBuilderSpace m) t)
+circle c attrs =
+  fst <$> svgDynAttr' "circle" (zipDynWith with c attrs) (pure ())
 
 -- * SVG Namespace
 
