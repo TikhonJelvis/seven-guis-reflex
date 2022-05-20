@@ -33,10 +33,12 @@ widget = elClass "div" "circle-drawer" do
 
 -- | Create a "standard" circle centered at the given coordinates.
 circleAt :: Dom t m => (Int, Int) -> m ()
-circleAt (x, y) = circle c []
+circleAt (x, y) = circle c $ toAttributes stroke <> [("fill", "none")]
   where c = Circle { center = (fromIntegral x, fromIntegral y)
-                   , radius = 25
+                   , radius = 50
                    }
+
+        stroke = def { width = 2 }
 
 
 main :: IO ()
