@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DerivingStrategies  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -10,17 +11,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
 -- | Widgets that I use throughout the seven example tasks.
 module Seven.Widget where
 
 import           Seven.Event
+import qualified Seven.PushMap     as PushMap
+import           Seven.PushMap     (PushMap)
 
 import           Control.Lens      ((<&>), (^.))
 import           Control.Monad     (join, void)
 import           Control.Monad.Fix (MonadFix)
 
+import           Data.Bool         (bool)
 import qualified Data.Foldable     as Foldable
+import           Data.IntMap       (IntMap)
+import           Data.IntSet       (IntSet)
 import           Data.Map          (Map)
 import qualified Data.Map          as Map
 import           Data.Maybe        (fromMaybe, listToMaybe)
@@ -31,12 +38,13 @@ import qualified Data.Text.Display as Display
 import           Data.Vector       (Vector)
 import qualified Data.Vector       as Vector
 
+import           GHC.Exts          (IsList (..))
+
 import           Reflex
 import           Reflex.Dom        hiding (EventResult)
 
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
-import Data.IntMap (IntMap)
 
 -- * Widgets
 
@@ -206,31 +214,20 @@ range = do
 --
 -- The dynamic returned has the index currently selected as well as
 -- the value itself.
-listbox :: forall a k m t. (Ord k, Display a, Dom t m)
-        => Dynamic t (Map k a)
-        -> m (Dynamic t (Maybe (k, a)))
+listbox :: forall a m t. (Display a, Dom t m)
+        => Dynamic t (PushMap a)
+        -> m (Dynamic t (Maybe Int))
 listbox elements = elClass "div" "listbox" do
-  rec selections <- listViewWithKey elements (row selected)
-      selected <- foldDyn getSelected Nothing selections
-
-  pure $ zipDynWith toKV selected elements
-  where row selected k a = do
-          (element, _) <- elDynClass' "div" (isSelected k <$> selected) $
+  rec selected <- holdDyn Nothing =<< selectView selected elements row
+  pure selected
+  where row k a selected = do
+          let isSelected is = if is then "row selected" else "row"
+          (element, _) <- elDynClass' "div" (isSelected <$> selected) $
             dynText (Display.display <$> a)
 
           let select   = Just k  <$ domEvent Click element
               unselect = Nothing <$ domEvent Dblclick element
           pure $ leftmost [unselect, select]
-
-        getSelected map _ =
-          join $ listToMaybe $ Map.elems map
-
-        isSelected k (Just k')
-          | k == k' = "row selected"
-        isSelected _ _ = "row"
-
-        toKV (Just k) map = (k,) <$> Map.lookup k map
-        toKV Nothing _    = Nothing
 
 -- * Element Interaction
 
@@ -276,3 +273,35 @@ ignoreNothing initial input = foldDynMaybe const initial (updated input)
 lastEvent :: (Reflex t, MonadHold t m, MonadFix m)
           => Event t a -> m (Dynamic t (Maybe a))
 lastEvent = foldDyn (\ a _ -> Just a) Nothing
+
+-- ** Select Views
+
+-- | Manage a set of widgets based on a dynamic collection of
+-- values. One widget may be optionally selected.
+--
+-- Each widget is created by a function that takes:
+--
+--  * The index of the widget
+--  * A 'Dynamic' of the value for the widget
+--  * A 'Dynamic' for whether that widget is selected
+--
+-- and returns the widget itself, as well as a stream of events from
+-- that widget.
+selectView :: (Adjustable t m, MonadFix m, MonadHold t m, PostBuild t m, Reflex t)
+           => Dynamic t (Maybe Int)
+           -- ^ Which widget, if any, is selected.
+           -> Dynamic t (PushMap a)
+           -- ^ The dynamic set of values.
+           -> (Int -> Dynamic t a -> Dynamic t Bool -> m (Event t b))
+           -- ^ The function to create each widget.
+           -> m (Event t b)
+           -- ^ An event that fires when any of the widget event
+           -- fires. Contains the index of the widget and the value
+           -- from the fired event.
+selectView selection values child = do
+  -- shared between children for performance
+  let selectionDemux = demux selection
+  childEvents <- listWithKey (PushMap.toMap <$> values) $ \ i a -> do
+    let selected = demuxed selectionDemux (Just i)
+    fmap (i,) <$> child i a selected
+  pure $ snd <$> switchPromptlyDyn (leftmost . Map.elems <$> childEvents)

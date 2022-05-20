@@ -8,11 +8,11 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RecursiveDo           #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
 module Seven.CircleDrawer where
 
 import           Seven.Attributes  (ToAttributes (..))
 import           Seven.Event
+import qualified Seven.PushMap     as PushMap
 import           Seven.SVG
 import           Seven.Widget
 
@@ -40,41 +40,25 @@ widget = elClass "div" "circle-drawer" do
     pure $ leftmost [undos, redos]
 
   elClass "div" "canvas" do
-    rec (canvas, selected) <- svg' "svg" do
-          -- TODO: Hack because selectViewListWithKey can't deal with
-          -- nothing being selected...
-          let selected' = fromMaybe (-1) <$> selected
-              justAdded =
-                mapMaybe (\ i -> (,True) <$> i) $ updated $ maxKey <$> circles
-          selectedFromSvg <- selectViewListWithKey selected' circles svgCircle
-          let setSelected = leftmost [justAdded, selectedFromSvg]
-          foldDyn (\ (i, isSelected) _ -> [i | isSelected]) Nothing setSelected
-
-        let canvasClicks = domEvent Mouseup canvas
-        circles <- foldDyn pushCircle mempty canvasClicks
+    rec circles <- foldDyn pushCircle mempty $ domEvent Click canvas
+        (canvas, selected) <- svg' "svg" do
+          let justAdded = updated $ PushMap.maxKey <$> circles
+          selectedFromSvg <- selectView selected circles svgCircle
+          holdDyn Nothing $ leftmost [justAdded, selectedFromSvg]
 
     let getSelected selected circles = do
           k <- selected
-          Map.lookup k circles
+          PushMap.lookup k circles
     output $ zipDynWith getSelected selected circles
-  where pushCircle :: MouseEventResult -> Map Int Circle -> Map Int Circle
-        pushCircle MouseEventResult { offset } circles = case maxKey circles of
-          Just maxKey -> Map.insert (maxKey + 1) (standardCircle offset) circles
-          Nothing     -> [(0, standardCircle offset)]
+  where pushCircle MouseEventResult { offset } = PushMap.push (standardCircle offset)
 
-        svgCircle :: Int
-                  -> Dynamic t Circle
-                  -> Dynamic t Bool
-                  -> m (Event t Bool)
+        svgCircle :: Int -> Dynamic t Circle -> Dynamic t Bool -> m (Event t (Maybe Int))
         svgCircle i circle isSelected = do
           let fillSelect = bool [("fill", "#fff0")] [("fill", "gray")] <$> isSelected
           element <- circleAt circle fillSelect
-          updated <$> hovering True element
-
-        maxKey :: Map k a -> Maybe k
-        maxKey map
-          | Map.null map = Nothing
-          | otherwise    = Just $ fst $ Map.findMax map
+          isHovered <- hovering True element
+          pure $ updated $ isHovered <&> \ hovered ->
+            if hovered then Just i else Nothing
 
 -- * State
 
@@ -91,9 +75,8 @@ circleAt :: Dom t m
          => Dynamic t Circle
          -> Dynamic t (Map Text Text)
          -> m (Element EventResult (DomBuilderSpace m) t)
-circleAt c attributes = circle c $ (<> baseAttributes) <$> attributes
-  where stroke = def { width = 2 }
-        baseAttributes = toAttributes stroke <> [("fill", "none")]
+circleAt c attributes = circle c $ withDefaults <$> attributes
+  where withDefaults attributes = attributes <> toAttributes def { width = 2 }
 
 -- | A circle at the given point with the "standard" radius—this is
 -- the default circle created when a user clicks, before the radius

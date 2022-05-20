@@ -7,26 +7,26 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.CRUD where
 
+import qualified Seven.PushMap     as PushMap
+import           Seven.PushMap     (PushMap)
 import           Seven.Widget
 
 import           Control.Lens
 import           Control.Monad     (void)
 
 import qualified Data.ByteString   as BS
-import           Data.Map          (Map)
-import qualified Data.Map          as Map
 import           Data.Text         (Text)
 import qualified Data.Text         as Text
 import           Data.Text.Display
 
 import           Reflex.Dom        hiding (Delete)
 
+import qualified Witherable        (Filterable (filter))
+
 widget :: forall m t. Dom t m => m ()
 widget = elClass "div" "crud" do
-  rec names <- foldDynMaybe ($) Map.empty updates
-
-      let selectedEntered = current $ zipDyn selected entered
-          updates = attachWith act selectedEntered action
+  rec let updates = current (zipDynWith act selected entered) <@> action
+      names <- foldDynMaybe ($) mempty updates
 
       prefix   <- filter
       selected <- listbox $ zipDynWith filterPrefix prefix names
@@ -38,23 +38,16 @@ widget = elClass "div" "crud" do
       label "Filter prefix: "
       value <$> inputElement def
 
-    act (_, entered) Create names =
-      pure $ create entered names
-    act (Just (selected, _), _) Delete names =
-      pure $ delete selected names
-    act (Just (selected, _), entered) Update names =
-      pure $ update selected entered names
-    act (Nothing, _) _ _ =
-      Nothing
-
+    act selected entered action names = case action of
+      Create -> pure $ PushMap.push entered names
+      Delete -> (PushMap.delete <$> selected) ?? names
+      Update -> (PushMap.insert <$> selected) ?? entered ?? names
 
 
 -- * Controls
 
 -- | The three CRUD operations.
-data Crud = Create
-          | Update
-          | Delete
+data Crud = Create | Update | Delete
   deriving stock (Show, Eq, Ord)
 
 -- | A control pane with three buttons:
@@ -67,23 +60,7 @@ crud = elClass "div" "crud-controls" do
   create <- button "Create"
   update <- button "Update"
   delete <- button "Delete"
-  pure $ leftmost
-    [ Create <$ create
-    , Update <$ update
-    , Delete <$ delete
-    ]
-
-create :: Ord a => a -> Map Int a -> Map Int a
-create new db = Map.insert (maxKey + 1) new db
-  where maxKey
-          | Map.null db = 0
-          | otherwise  = fst $ Map.findMax db
-
-update :: Ord a => Int -> a -> Map Int a -> Map Int a
-update = Map.insert
-
-delete :: Ord a => Int -> Map Int a -> Map Int a
-delete = Map.delete
+  pure $ leftmost [Create <$ create, Update <$ update, Delete <$ delete]
 
 -- * Names
 
@@ -91,10 +68,7 @@ delete = Map.delete
 -- good approach in general—many people don't have names that fit well
 -- into first + surname!—but it'll have to do for a small demo task
 -- like this.
-data Name = Name
-  { first   :: Text
-  , surname :: Text
-  }
+data Name = Name { first :: Text, surname :: Text }
   deriving stock (Eq, Ord, Show)
 
 instance Display Name where
@@ -115,8 +89,8 @@ nameInput = el "div" do
 
 -- | Filter a collection of names, keeping only those where 'last' has
 -- the given prefix.
-filterPrefix :: Ord k => Text -> Map k Name -> Map k Name
-filterPrefix prefix = Map.filter (Text.isPrefixOf prefix . surname)
+filterPrefix :: Witherable.Filterable f => Text -> f Name -> f Name
+filterPrefix prefix = Witherable.filter (Text.isPrefixOf prefix . surname)
 
 main :: IO ()
 main = do
