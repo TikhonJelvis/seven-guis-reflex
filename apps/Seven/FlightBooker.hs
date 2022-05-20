@@ -1,6 +1,6 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecursiveDo         #-}

@@ -1,27 +1,30 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies          #-}
 module Seven.SVG where
 
 import           Seven.Attributes       (ToAttributeValue (..),
                                          ToAttributes (..), with)
+import           Seven.Event
 import           Seven.Widget           (Dom)
 
 import           Control.Lens           ((&), (.~), (?~))
+import           Control.Monad.Reader   (ReaderT (runReaderT))
 
 import           Data.Colour            (AlphaColour, Colour, ColourOps (over))
 import qualified Data.Colour            as Colour
 import qualified Data.Colour.SRGB       as Colour
 import           Data.Default.Class     (Default, def)
+import           Data.Functor.Misc      (WrapArg (..))
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.String            (IsString (..))
@@ -37,12 +40,9 @@ import qualified GHCJS.DOM.MouseEvent   as MouseEvent
 
 import qualified Numeric
 
-import Reflex.Dom hiding (EventResult, EventResultType)
+import           Reflex.Dom             hiding (EventResult, EventResultType)
 
 import           Text.Printf            (printf)
-import Control.Monad.Reader (ReaderT(runReaderT))
-import Seven.Event
-import Data.Functor.Misc (WrapArg(..))
 
 -- * SVG Elements
 

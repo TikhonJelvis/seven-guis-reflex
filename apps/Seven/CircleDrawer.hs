@@ -1,6 +1,6 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecursiveDo         #-}
@@ -8,14 +8,14 @@
 module Seven.CircleDrawer where
 
 import           Seven.Attributes (ToAttributes (..))
+import           Seven.Event
 import           Seven.SVG
 import           Seven.Widget
 
 import qualified Data.ByteString  as BS
 
-import Reflex.Dom hiding (button)
-import qualified Reflex.Dom as Reflex
-import Seven.Event
+import qualified Reflex.Dom       as Reflex
+import           Reflex.Dom       hiding (button)
 
 widget :: forall m t. Dom t m => m ()
 widget = elClass "div" "circle-drawer" do

@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecursiveDo                #-}
