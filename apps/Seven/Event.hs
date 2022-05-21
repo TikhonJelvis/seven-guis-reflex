@@ -47,6 +47,34 @@ data Modifier = Ctrl | Shift | Alt | Meta
 
 -- * Mouse Events
 
+-- | Specifies which mouse button was clicked to trigger an event.
+--
+-- Note that a mouse may be configured different from the standard
+-- left-right button; for example, left-handed users often reverse
+-- left- and right-clicking.
+--
+-- See MDN: [@MouseEvent.button@](https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button)
+data MouseButton = Main
+                 -- ^ The main, usually left, button.
+                 | Auxiliary
+                 -- ^ A third, extra button, usually the middle button
+                 -- or mouse wheel.
+                 | Secondary
+                 -- ^ The secondary, usually right button.
+                 | Fourth
+                 -- ^ The fourth button, often a browser back button.
+                 | Fifth
+                 -- ^ The fifth button, often a browser forward
+                 -- button.
+                 | UnknownButton !Word
+                 -- ^ Some other, unknown mouse button.
+  deriving stock (Show, Eq)
+
+-- TODO: Separate out "click"-style events (mousedown, mouseup, click)
+-- from "move"-style events (mouseenter, mouseleave, mouseover,
+-- mouseout, mousemove) since the 'button' field for the latter does
+-- not make sense.
+
 -- | Information from when the event triggered.
 data MouseEventResult = MouseEventResult
   { screen    :: !(Int, Int)
@@ -72,7 +100,7 @@ data MouseEventResult = MouseEventResult
   , modifiers :: Set Modifier
   -- ^ Any modifier keys that were held down when the event triggered.
 
-  , button    :: !Word
+  , button    :: !MouseButton
   -- ^ The number of the button that was pressed for the event.
   --
   -- TODO: Logically this should be a Maybe, but it isn't a 'Maybe' in
@@ -94,7 +122,13 @@ getMouseEvent = do
   alt   <- MouseEvent.getAltKey e
   meta  <- MouseEvent.getMetaKey e
 
-  button <- MouseEvent.getButton e
+  button <- MouseEvent.getButton e <&> \case
+    0 -> Main
+    1 -> Auxiliary
+    2 -> Secondary
+    3 -> Fourth
+    4 -> Fifth
+    x -> UnknownButton x
 
   let modifiers = Set.fromList $
         [Ctrl | ctrl] <> [Shift | shift] <> [Alt | alt] <> [Meta | meta]
