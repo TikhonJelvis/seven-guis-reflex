@@ -1,10 +1,12 @@
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecursiveDo                #-}
 module Seven.TemperatureConverter where
 
+import           Seven.Element
 import           Seven.Widget
 
 import           Control.Monad.Fix (MonadFix)

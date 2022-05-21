@@ -18,6 +18,8 @@ executable guis
     Seven.CircleDrawer
     Seven.Counter
     Seven.CRUD
+    Seven.Dialog
+    Seven.Element
     Seven.Event
     Seven.FlightBooker
     Seven.PushMap

@@ -1,9 +1,11 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TypeApplications  #-}
 module Seven.Counter where
 
+import           Seven.Element
 import           Seven.Widget
 
 import           Control.Monad.Fix (MonadFix)

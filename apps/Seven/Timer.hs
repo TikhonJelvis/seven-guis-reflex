@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.Timer where
 
+import           Seven.Element
 import           Seven.Widget
 
 import           Control.Lens           ((<&>))

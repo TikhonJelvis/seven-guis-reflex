@@ -47,6 +47,15 @@
   margin-right: auto;
 }
 
+.alert {
+  padding: 15px 10px 5px 10px;
+}
+
+.alert form {
+  margin-bottom: 0;
+  margin-top: 2ex;
+}
+
 /* Counter  */
 .counter {
   padding: 1px;

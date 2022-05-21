@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE DerivingStrategies  #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -7,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.CRUD where
 
+import           Seven.Element
 import qualified Seven.PushMap     as PushMap
 import           Seven.PushMap     (PushMap)
 import           Seven.Widget

@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeApplications    #-}
 module Seven.FlightBooker where
 
+import           Seven.Element
 import           Seven.Widget
 
 import           Control.Applicative    ((<|>))

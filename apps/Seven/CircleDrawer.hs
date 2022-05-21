@@ -1,8 +1,8 @@
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MonadComprehensions   #-}
-{-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -11,6 +11,7 @@
 module Seven.CircleDrawer where
 
 import           Seven.Attributes  (ToAttributes (..))
+import           Seven.Element
 import           Seven.Event
 import qualified Seven.PushMap     as PushMap
 import           Seven.SVG
@@ -50,7 +51,8 @@ widget = elClass "div" "circle-drawer" do
           k <- selected
           PushMap.lookup k circles
     output $ zipDynWith getSelected selected circles
-  where pushCircle MouseEventResult { offset } = PushMap.push (standardCircle offset)
+  where pushCircle MouseEventResult { offset = (x, y) } =
+          PushMap.push Circle { center = (fromIntegral x, fromIntegral y), radius = 50 }
 
         svgCircle :: Int -> Dynamic t Circle -> Dynamic t Bool -> m (Event t (Maybe Int))
         svgCircle i circle isSelected = do
@@ -60,31 +62,8 @@ widget = elClass "div" "circle-drawer" do
           pure $ updated $ isHovered <&> \ hovered ->
             if hovered then Just i else Nothing
 
--- * State
-
--- | The set of circles currently drawn in the app along with
--- information about which circle is selected.
-data Circles = Circles
-  { circles  :: Map Int Circle
-  , selected :: Int
-  }
-  deriving stock (Show, Eq)
-
--- | Render an SVG circle for the given 'Circle'.
-circleAt :: Dom t m
-         => Dynamic t Circle
-         -> Dynamic t (Map Text Text)
-         -> m (Element EventResult (DomBuilderSpace m) t)
-circleAt c attributes = circle c $ withDefaults <$> attributes
-  where withDefaults attributes = attributes <> toAttributes def { width = 2 }
-
--- | A circle at the given point with the "standard" radius—this is
--- the default circle created when a user clicks, before the radius
--- has been adjusted manually.
-standardCircle :: (Int, Int) -> Circle
-standardCircle (x, y) =
-  Circle { center = (fromIntegral x, fromIntegral y), radius = 50 }
-
+        circleAt c attributes = circle c $ withDefaults <$> attributes
+        withDefaults attributes = attributes <> toAttributes def { width = 2 }
 
 main :: IO ()
 main = do
