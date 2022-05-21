@@ -2,70 +2,112 @@
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MonadComprehensions   #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RecursiveDo           #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 module Seven.CircleDrawer where
 
-import           Seven.Attributes  (ToAttributes (..))
+import           Seven.Attributes   (ToAttributes (..))
+import           Seven.Dialog       (ModalState (..), dialog)
 import           Seven.Element
 import           Seven.Event
-import qualified Seven.PushMap     as PushMap
+import qualified Seven.PushMap      as PushMap
 import           Seven.SVG
 import           Seven.Widget
 
-import           Control.Lens      ((<&>), (??))
-import           Control.Monad     (void)
+import           Control.Lens       (element, (<&>), (??))
+import           Control.Monad      (join, void)
 
-import           Data.Bool         (bool)
-import qualified Data.ByteString   as BS
-import           Data.Map          (Map)
-import qualified Data.Map          as Map
-import           Data.Maybe        (fromMaybe)
-import           Data.Text         (Text)
-import           Data.Text.Display (Display)
+import           Data.Bool          (bool)
+import qualified Data.ByteString    as BS
+import           Data.Default.Class (def)
+import           Data.Map           (Map)
+import qualified Data.Map           as Map
+import           Data.Maybe         (fromMaybe)
+import           Data.Text          (Text)
+import           Data.Text.Display  (Display)
 
-import qualified Reflex.Dom        as Reflex hiding (EventResult)
-import           Reflex.Dom        hiding (EventResult, button)
+import           Reflex
+import qualified Reflex.Dom         as Dom
 
-import           Witherable        (catMaybes)
+import           Witherable         (Filterable (..), catMaybes)
 
 widget :: forall m t. Dom t m => m ()
-widget = elClass "div" "circle-drawer" do
-  action <- elClass "div" "centered controls" do
-    undos <- Reflex.button "↶"
-    redos <- Reflex.button "↷"
+widget = Dom.elClass "div" "circle-drawer" do
+  action <- Dom.elClass "div" "centered controls" do
+    undos <- Dom.button "↶"
+    redos <- Dom.button "↷"
     pure $ leftmost [undos, redos]
 
-  elClass "div" "canvas" do
-    rec circles <- foldDyn pushCircle mempty $ domEvent Click canvas
-        (canvas, selected) <- svg' "svg" do
+  Dom.elClass "div" "canvas" do
+    rec let clicks = Witherable.filter isMain $ Dom.domEvent Dom.Click canvas
+            isMain e = button e == Main
+        circles <- foldDyn pushCircle mempty clicks
+        (canvas, (selected, clicked)) <- svg' "svg" do
           let justAdded = updated $ PushMap.maxKey <$> circles
-          selectedFromSvg <- selectView selected circles svgCircle
-          holdDyn Nothing $ leftmost [justAdded, selectedFromSvg]
+          (selectedFromSvg, clicked) <-
+            fanCircle <$> selectView selected circles (withId svgCircle)
 
-    let getSelected selected circles = do
-          k <- selected
-          PushMap.lookup k circles
-    output $ zipDynWith getSelected selected circles
+          selected <- holdDyn Nothing $ leftmost [justAdded, selectedFromSvg]
+          pure (selected, clicked)
+
+    let getClicked circles i = join $ (PushMap.lookup <$> i) ?? circles
+    clickedI <- holdDyn Nothing $ Just <$> clicked
+    let clickedCircle = zipDynWith getClicked circles clickedI
+    void $ dialog (ShowModal <$ clicked) (constDyn []) do
+      output clickedCircle
   where pushCircle MouseEventResult { offset = (x, y) } =
           PushMap.push Circle { center = (fromIntegral x, fromIntegral y), radius = 50 }
 
-        svgCircle :: Int -> Dynamic t Circle -> Dynamic t Bool -> m (Event t (Maybe Int))
-        svgCircle i circle isSelected = do
-          let fillSelect = bool [("fill", "#fff0")] [("fill", "gray")] <$> isSelected
-          element <- circleAt circle fillSelect
-          isHovered <- hovering True element
-          pure $ updated $ isHovered <&> \ hovered ->
-            if hovered then Just i else Nothing
+        withId :: (Dynamic t a -> Dynamic t Bool -> m (Event t b))
+               -> (Int -> Dynamic t a -> Dynamic t Bool -> m (Event t (b, Int)))
+        withId f i value selected = do
+          event <- f value selected
+          pure $ (,i) <$> event
 
-        circleAt c attributes = circle c $ withDefaults <$> attributes
-        withDefaults attributes = attributes <> toAttributes def { width = 2 }
+        fanCircle events = (mapMaybe overOut events, mapMaybe click events)
+        overOut = \case
+          (Over, i)  -> Just (Just i)
+          (Out, _)   -> Just Nothing
+          (Click, _) -> Nothing
+        click = \case
+          (Click, i) -> Just i
+          _          -> Nothing
+
+
+-- | Render an SVG circle.
+--
+-- The 'Event' returned will trigger when the mouse is moved over the
+-- element or the element is clicked.
+svgCircle :: forall m t. Dom t m
+          => Dynamic t Circle
+          -> Dynamic t Bool
+          -> m (Event t CircleEvent)
+svgCircle c isSelected = do
+  element   <- circle c $ withDefaults <$> fillSelect
+  isHovered <- hovering True element
+  let hover = updated $ isHovered <&> bool Out Over
+      isAuxiliary e = button e == Auxiliary
+      click = Click <$ Witherable.filter isAuxiliary (Dom.domEvent Dom.Click element)
+  pure $ leftmost [click, hover]
+  where fillSelect = bool [("fill", "#fff0")] [("fill", "gray")] <$> isSelected
+        withDefaults = (<> toAttributes def { width = 2 })
+
+-- | Events to track on circles generated by the user.
+data CircleEvent = Over
+                 -- ^ The mouse moved over the circle
+                 | Out
+                 -- ^ The mouse moved out of the circle
+                 | Click
+                 -- ^ The user clicked on the circle
+  deriving stock (Show, Eq, Ord, Enum, Bounded)
 
 main :: IO ()
 main = do
   css <- BS.readFile "css/tasks.css"
-  mainWidgetWithCss css widget
+  Dom.mainWidgetWithCss css widget
