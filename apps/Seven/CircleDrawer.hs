@@ -1,41 +1,50 @@
 {-# LANGUAGE BlockArguments        #-}
-{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE DerivingVia           #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MonadComprehensions   #-}
+{-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RecursiveDo           #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE TypeApplications      #-}
 module Seven.CircleDrawer where
 
-import           Seven.Attributes   (ToAttributes (..))
-import           Seven.Dialog       (ModalState (..), dialog)
+import           Seven.Attributes    (ToAttributes (..))
+import           Seven.Dialog        (DialogElement (..), ModalState (..),
+                                      dialog)
 import           Seven.Element
 import           Seven.Event
-import qualified Seven.PushMap      as PushMap
+import qualified Seven.PushMap       as PushMap
+import           Seven.PushMap       (PushMap)
 import           Seven.SVG
 import           Seven.Widget
 
-import           Control.Lens       (element, (<&>), (??))
-import           Control.Monad      (join, void)
+import           Control.Applicative ((<|>))
+import           Control.Lens        ((<&>), (??))
+import           Control.Monad       (join, void)
 
-import           Data.Bool          (bool)
-import qualified Data.ByteString    as BS
-import           Data.Default.Class (def)
-import           Data.Map           (Map)
-import qualified Data.Map           as Map
-import           Data.Maybe         (fromMaybe)
-import           Data.Text          (Text)
-import           Data.Text.Display  (Display)
+import           Data.Bool           (bool)
+import qualified Data.ByteString     as BS
+import           Data.Default.Class  (def)
+import           Data.Map            (Map)
+import qualified Data.Map            as Map
+import           Data.Maybe          (fromMaybe)
+import           Data.Text           (Text)
+import qualified Data.Text           as Text
+import           Data.Text.Display   (Display, ShowInstance (..))
 
 import           Reflex
-import qualified Reflex.Dom         as Dom
+import qualified Reflex.Dom          as Dom
+import           Reflex.Dom          (dynText)
 
-import           Witherable         (Filterable (..), catMaybes)
+import qualified Text.Printf         as Text
+
+import           Witherable          (Filterable (..), catMaybes, (<&?>))
 
 widget :: forall m t. Dom t m => m ()
 widget = Dom.elClass "div" "circle-drawer" do
@@ -45,40 +54,104 @@ widget = Dom.elClass "div" "circle-drawer" do
     pure $ leftmost [undos, redos]
 
   Dom.elClass "div" "canvas" do
-    rec let clicks = Witherable.filter isMain $ Dom.domEvent Dom.Click canvas
-            isMain e = button e == Main
-        circles <- foldDyn pushCircle mempty clicks
-        (canvas, (selected, clicked)) <- svg' "svg" do
-          let justAdded = updated $ PushMap.maxKey <$> circles
-          (selectedFromSvg, clicked) <-
-            fanCircle <$> selectView selected circles (withId svgCircle)
+    rec circles <- foldDyn applyAction mempty $
+          leftmost [Just <$> adds, previews, modifies]
 
-          selected <- holdDyn Nothing $ leftmost [justAdded, selectedFromSvg]
-          pure (selected, clicked)
+        let adds = mainClicks canvas <&> \ MouseEventResult { offset = (x, y) } ->
+              AddCircle (fromIntegral x, fromIntegral y)
+            modifies =
+              changeRadius <$> current modifiedCircle <@> setRadius
+            previews =
+              changeRadius <$> current modifiedCircle <@> updated previewRadius
 
-    let getClicked circles i = join $ (PushMap.lookup <$> i) ?? circles
-    clickedI <- holdDyn Nothing $ Just <$> clicked
-    let clickedCircle = zipDynWith getClicked circles clickedI
-    void $ dialog (ShowModal <$ clicked) (constDyn []) do
-      output clickedCircle
-  where pushCircle MouseEventResult { offset = (x, y) } =
-          PushMap.push Circle { center = (fromIntegral x, fromIntegral y), radius = 50 }
+        let highlighted = zipDynWith (<|>) beingModified hovered
+        (canvas, (hovered, clicked)) <- circlesCanvas circles highlighted
 
-        withId :: (Dynamic t a -> Dynamic t Bool -> m (Event t b))
-               -> (Int -> Dynamic t a -> Dynamic t Bool -> m (Event t (b, Int)))
-        withId f i value selected = do
-          event <- f value selected
-          pure $ (,i) <$> event
+        beingModified <- holdDyn Nothing $
+          leftmost [Just <$> clicked, Nothing <$ setRadius]
 
-        fanCircle events = (mapMaybe overOut events, mapMaybe click events)
-        overOut = \case
-          (Over, i)  -> Just (Just i)
-          (Out, _)   -> Just Nothing
-          (Click, _) -> Nothing
-        click = \case
-          (Click, i) -> Just i
-          _          -> Nothing
+        let modifiedCircle = zipDynWith getCircle beingModified circles
+        (setRadius, previewRadius) <-
+          circleDialog beingModified $ fmap snd <$> modifiedCircle
 
+    output beingModified
+    pure ()
+  where changeRadius (Just (i, Circle { radius })) newRadius =
+          Just $ ChangeRadius i Diff { before = radius, after = newRadius }
+        changeRadius Nothing _ = Nothing
+
+        getCircle (Just i) circles = (i,) <$> PushMap.lookup i circles
+        getCircle Nothing _        = Nothing
+
+        mainClicks = Witherable.filter isMain . Dom.domEvent Dom.Click
+        isMain e = button e == Main
+
+-- | The SVG element where the circles are rendered.
+--
+-- Returns three values:
+--
+--  * the containing SVG element itself
+--  * a 'Dynamic' specifying which circle, if any, has the mouse over
+--    it
+--  * an 'Event' that fires when a circle is clicked
+circlesCanvas :: forall m t. Dom t m
+              => Dynamic t (PushMap Circle)
+              -- ^ The full set of circles to render.
+              -> Dynamic t (Maybe Int)
+              -- ^ Which circle, if any, should be highlighted.
+              -> m ( Dom.Element EventResult Dom.GhcjsDomSpace t
+                   , (Dynamic t (Maybe Int), Event t Int) )
+circlesCanvas circles highlighted = svg' "svg" do
+  let justAdded = updated $ PushMap.maxKey <$> circles
+  (hoveredSvg, clicked) <-
+    fanCircle <$> selectView highlighted circles (withId svgCircle)
+
+  hovered <- holdDyn Nothing $ leftmost [justAdded, hoveredSvg]
+  pure (hovered, clicked)
+  where fanCircle events =
+          ( events <&?> \case
+              (Over, i)  -> Just (Just i)
+              (Out, _)   -> Just Nothing
+              (Click, _) -> Nothing
+          , events <&?> \case
+              (Click, i) -> Just i
+              _          -> Nothing
+          )
+
+
+-- | Editing actions we can take in the UI
+data Action = AddCircle (Double, Double)
+            -- ^ Add a circle with the standard radius at the given
+            -- point.
+            | ChangeRadius Int (Diff Double)
+            --              ↑        ↑
+            --             id      radius
+            -- ^ Change the radius of the circle with the given id.
+  deriving stock (Show, Eq)
+  deriving Display via (ShowInstance Action)
+
+-- | Execute the action, if possible, on the given state.
+--
+-- Some actions like a 'ChangeRadius' for an id that is not in the map
+-- cannot be executed, in which case the input map is returned
+-- unchanged.
+applyAction :: Maybe Action -> PushMap Circle -> PushMap Circle
+applyAction Nothing circles = circles
+applyAction (Just (AddCircle center)) circles =
+  PushMap.push Circle { center, radius = 50 } circles
+applyAction (Just (ChangeRadius i radius)) circles =
+  case PushMap.lookup i circles of
+    Just c  -> PushMap.insert i c { radius = after radius } circles
+    Nothing -> circles
+
+
+-- | An atomic change to a value, recording the value before and after
+-- the change.
+data Diff a = Diff
+  { before :: a
+  , after  :: a
+  }
+  deriving stock (Show, Eq)
 
 -- | Render an SVG circle.
 --
@@ -89,7 +162,7 @@ svgCircle :: forall m t. Dom t m
           -> Dynamic t Bool
           -> m (Event t CircleEvent)
 svgCircle c isSelected = do
-  element   <- circle c $ withDefaults <$> fillSelect
+  element <- circle c $ withDefaults <$> fillSelect
   isHovered <- hovering True element
   let hover = updated $ isHovered <&> bool Out Over
       isAuxiliary e = button e == Auxiliary
@@ -106,6 +179,42 @@ data CircleEvent = Over
                  | Click
                  -- ^ The user clicked on the circle
   deriving stock (Show, Eq, Ord, Enum, Bounded)
+
+-- | The dialog that lets us control the radius of a cricle.
+--
+-- The dialog will be shown as a modal each time the input 'Dynamic'
+-- updates to a 'Just', and it will be closed each time the input
+-- 'Dynamic' updates to a 'Nothing'.
+--
+-- The function returns two values:
+--
+--  * A 'Dynamic' with the radius set for the circle
+--
+--  * An 'Event' that fires with the final radius when the dialog is
+--  * closed.
+circleDialog :: forall m t. Dom t m
+             => Dynamic t (Maybe Int)
+             -> Dynamic t (Maybe Circle)
+             -- ^ The circle that the dialog controls.
+             -> m (Event t Double, Dynamic t Double)
+circleDialog beingModified targetCircle = do
+  (dialogElement, newRadius) <- dialog showHide (constDyn []) do
+    dynText $ message . center . fromMaybe blank <$> targetCircle
+    rec let baseRadius = current targetCircle <@ updated beingModified
+            setRadius = (/ maxRadius) . radius <$> catMaybes baseRadius
+        new <- fmap (* maxRadius) <$> range setRadius
+    pure new
+
+  pure (current newRadius <@ closed dialogElement, newRadius)
+  where showHide = updated beingModified <&> \case
+          Just _  -> ShowModal
+          Nothing -> Hide
+
+        maxRadius = 500
+        message = Text.pack . Text.printf "Adjust diameter of circle at %s" . show
+
+        blank = Circle { center = (0, 0), radius = 0 }
+
 
 main :: IO ()
 main = do

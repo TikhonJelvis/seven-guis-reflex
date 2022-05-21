@@ -2,7 +2,6 @@
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -16,7 +15,7 @@ import           Seven.Event
 import           Seven.Widget
 
 import           Control.Lens                ((^.))
-import           Control.Monad               (void)
+import           Control.Monad               (unless, void, when)
 import           Control.Monad.Fix           (MonadFix)
 import           Control.Monad.IO.Class      (liftIO)
 
@@ -27,13 +26,15 @@ import           Data.Text                   (Text)
 import qualified GHCJS.DOM.Element           as GHCJS
 
 import           Language.Javascript.JSaddle (JSVal, MakeObject, MonadJSM, fun,
-                                              js, jsf, liftJSM)
+                                              js, jsf, liftJSM, valToBool, (!))
 
 import           Reflex
 import qualified Reflex.Dom                  as Dom hiding (element)
 import           Reflex.Dom                  hiding (EventResult,
                                               EventResultType, button,
                                               elDynAttr', element)
+
+import qualified Witherable
 
 -- | HTML modal dialogs can either be hidden or shown in two ways:
 --
@@ -65,9 +66,9 @@ data ModalState = Show | ShowModal | Hide
 --   * [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/cancel_event)
 --   * [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
 data DialogElement d t = DialogElement
-  { element :: Element EventResult d t
-  , close   :: Event t ()
-  , cancel  :: Event t ()
+  { element  :: Element EventResult d t
+  , closed   :: Event t ()
+  , canceled :: Event t ()
   }
 
 -- | Create a floating dialog using the HTML5 @dialog@ element.
@@ -95,10 +96,10 @@ dialog states attrs body = do
   (element, result) <- elDynAttr' "dialog" attrs body
   performEvent_ $ setDialogState element <$> states
 
-  cancel <- onCancel element
-  close  <- onClose element
+  canceled <- onCancel element
+  closed   <- onClose element
 
-  pure (DialogElement { element, cancel, close }, result)
+  pure (DialogElement { element, closed, canceled }, result)
 {-# INLINABLE dialog #-}
 
 -- | When the input 'Event' triggers, show the user a modal dialog
@@ -134,14 +135,24 @@ alert trigger = do
 -- @dialog@ element objects.
 
 -- | Explicitly set the dialog state.
+--
+-- If the dialog is already open, 'Show' and 'ShowModal' do nothing.
+--
+-- If the dialog is already closed, 'Hide' does nothing.
+--
+-- Note that the dialog can be closed through user actions outside of
+-- Haskell code, so it /is/ possible for two 'Show'/'ShowModal' events
+-- in a row to both have an effect.
 setDialogState :: (MonadJSM m, MakeObject (RawElement d))
                => Element er d t
                -> ModalState
                -> m ()
-setDialogState dialog = void . liftJSM . \case
-  Show      -> raw ^. jsf ("show" :: Text) ()
-  ShowModal -> raw ^. jsf ("showModal" :: Text) ()
-  Hide      -> raw ^. jsf ("hide" :: Text) ()
+setDialogState dialog state = liftJSM do
+  open <- valToBool =<< raw ! ("open" :: Text)
+  case state of
+    Show      -> unless open $ void $ raw ^. jsf ("show" :: Text) ()
+    ShowModal -> unless open $ void $ raw ^. jsf ("showModal" :: Text) ()
+    Hide      -> when open   $ void $ raw ^. jsf ("hide" :: Text) ()
   where raw = _element_raw dialog
 
 -- | An 'Event' that triggers when the given @dialog@ element is
@@ -168,9 +179,9 @@ main = do
   css <- BS.readFile "css/tasks.css"
   mainWidgetWithCss css do
     press <- Dom.button "Hello"
-    DialogElement { close, cancel } <- alert ("Hello, World!" <$ press)
-    countClose <- count close
-    countCancel <- count cancel
+    DialogElement { closed, canceled } <- alert ("Hello, World!" <$ press)
+    countClose <- count closed
+    countCancel <- count canceled
     output @Int countClose
     output @Int countCancel
     pure ()

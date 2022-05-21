@@ -42,7 +42,7 @@ widget = elClass "div" "timer" do
       progressBar $ remaining <$> duration <*> elapsed
       output $ renderSeconds . fromMaybe 0 <$> elapsed
 
-      r <- range
+      r <- range never
       let duration = realToFrac . (* 120) <$> r
 
       resetTime <- tag (Just <$> current time) <$> button' buttonLabel (constDyn Enabled)

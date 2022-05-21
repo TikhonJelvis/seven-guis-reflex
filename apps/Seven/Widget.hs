@@ -42,7 +42,7 @@ import qualified Data.Vector       as Vector
 import           GHC.Exts          (IsList (..))
 
 import           Reflex
-import           Reflex.Dom        hiding (elDynAttr', EventResult)
+import           Reflex.Dom        hiding (EventResult, elDynAttr')
 
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
@@ -188,12 +188,23 @@ selectEnum = do
 
 -- | A range input element (a slider).
 --
+-- The argument is an 'Event' that sets the slider to the given
+-- value. Values < 0 will be clamped to 0; values > 1 will be clamped
+-- to 1.
+--
+-- If you do not want to set the element, you can use
+--
+-- @
+-- range never
+-- @
+--
 -- Returns the position as a 'Double' between 0 and 1.
-range :: forall a m t. Dom t m => m (Dynamic t Double)
-range = do
+range :: forall a m t. Dom t m => Event t Double -> m (Dynamic t Double)
+range (fmap (Text.pack . show) -> setEvents) = do
   e <- inputElement config
   pure $ readValue <$> value e
   where config = def & inputElementConfig_initialValue .~ "0.5"
+                     & inputElementConfig_setValue .~ setEvents
                      & initialAttributes .~ [ ("type", "range")
                                             , ("min", "0.0")
                                             , ("max", "1.0")
@@ -299,3 +310,15 @@ selectView selection values child = do
     let selected = demuxed selectionDemux (Just i)
     fmap (i,) <$> child i a selected
   pure $ snd <$> switchPromptlyDyn (leftmost . Map.elems <$> childEvents)
+
+-- | Keeps track of an 'Int' id for widgets used in 'selectView'.
+withId :: (Monad m, Reflex t)
+       => (Dynamic t a -> Dynamic t Bool -> m (Event t b))
+       -- ^ A widget function for 'selectView'.
+       -> (Int -> Dynamic t a -> Dynamic t Bool -> m (Event t (b, Int)))
+       -- ^ A widget-generating function that can be passed into
+       -- 'selectView'
+withId f i value selected = do
+  event <- f value selected
+  pure $ (,i) <$> event
+
