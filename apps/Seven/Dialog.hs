@@ -148,29 +148,20 @@ setDialogState dialog = void . liftJSM . \case
 -- closed.
 --
 -- See MDN: [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-onClose :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m)
+onClose :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
         => Element er d t
         -> m (Event t ())
-onClose dialog = do
-  (event, trigger) <- newTriggerEvent
-  let jsTrigger _f _this _args = liftIO $ trigger ()
-  liftJSM $ raw ^. jsf ("addEventListener" :: Text) ("close" :: Text, fun jsTrigger)
-  pure event
-  where raw = _element_raw dialog
+onClose dialog = void <$> addEventListener dialog "close"
 
 -- | An 'Event' that triggers when the given @dialog@ element is
 -- closed.
 --
 -- See MDN: [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-onCancel :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m)
+onCancel :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
          => Element er d t
          -> m (Event t ())
-onCancel dialog = do
-  (event, trigger) <- newTriggerEvent
-  let jsTrigger _f _this _args = liftIO $ trigger ()
-  liftJSM $ raw ^. jsf ("addEventListener" :: Text) ("cancel" :: Text, fun jsTrigger)
-  pure event
-  where raw = _element_raw dialog
+onCancel dialog = void <$> addEventListener dialog "cancel"
+
 
 main :: IO ()
 main = do

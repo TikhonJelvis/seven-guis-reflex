@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
@@ -10,28 +11,33 @@
 {-# LANGUAGE TypeFamilies          #-}
 module Seven.Event where
 
-import           Control.Lens             (element, (<&>))
+import           Control.Lens                (element, (<&>), (^.))
+import           Control.Monad.IO.Class      (MonadIO (liftIO))
 
-import           Data.Functor.Misc        (WrapArg (..))
-import           Data.Set                 (Set)
-import qualified Data.Set                 as Set
-import           Data.Text                (Text)
-import           Data.Word                (Word8)
+import           Data.Functor.Misc           (WrapArg (..))
+import           Data.Set                    (Set)
+import qualified Data.Set                    as Set
+import           Data.Text                   (Text)
+import           Data.Word                   (Word8)
 
-import qualified GHCJS.DOM.ClipboardEvent as ClipboardEvent
-import qualified GHCJS.DOM.DataTransfer   as DataTransfer
-import qualified GHCJS.DOM.Element        as Element
-import qualified GHCJS.DOM.Event          as Event
-import qualified GHCJS.DOM.EventM         as GHCJS
-import qualified GHCJS.DOM.KeyboardEvent  as KeyboardEvent
-import qualified GHCJS.DOM.MouseEvent     as MouseEvent
-import qualified GHCJS.DOM.Types          as GHCJS
-import qualified GHCJS.DOM.UIEvent        as UIEvent
-import qualified GHCJS.DOM.WheelEvent     as WheelEvent
+import qualified GHCJS.DOM.ClipboardEvent    as ClipboardEvent
+import qualified GHCJS.DOM.DataTransfer      as DataTransfer
+import qualified GHCJS.DOM.Element           as Element
+import qualified GHCJS.DOM.Event             as Event
+import qualified GHCJS.DOM.EventM            as GHCJS
+import qualified GHCJS.DOM.KeyboardEvent     as KeyboardEvent
+import qualified GHCJS.DOM.MouseEvent        as MouseEvent
+import qualified GHCJS.DOM.Types             as GHCJS
+import qualified GHCJS.DOM.UIEvent           as UIEvent
+import qualified GHCJS.DOM.WheelEvent        as WheelEvent
 
-import           Reflex                   (select)
-import qualified Reflex.Dom               as Dom
-import           Reflex.Dom               (HasDomEvent, Reflex)
+import qualified Language.Javascript.JSaddle as Js
+
+import qualified Reflex
+import qualified Reflex.Dom                  as Dom
+import           Reflex.Dom                  (HasDomEvent, Reflex)
+
+import           Text.Printf                 (printf)
 
 -- * Modifier Keys
 
@@ -358,4 +364,36 @@ instance Reflex t => HasDomEvent t (Dom.Element EventResult d t) en where
   type DomEventType (Dom.Element EventResult d t) en = EventResultType en
   {-# INLINABLE domEvent #-}
   domEvent en e =
-    Dom.coerceEvent $ select (Dom._element_events e) (WrapArg en)
+    Dom.coerceEvent $ Reflex.select (Dom._element_events e) (WrapArg en)
+
+-- * Wrapping JS Events
+
+-- | Return an 'Event' that triggers based on an arbitrary JavaScript
+-- event on the given element.
+--
+-- Conceptually, this is equvivalent to:
+--
+-- @
+-- element.addEventListener("eventName", function (e) {
+--   trigger(e)
+-- }
+-- @
+--
+-- See MDN: [@addEventListener@](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+addEventListener :: ( Reflex.TriggerEvent t m
+                    , Js.MakeObject (Dom.RawElement d)
+                    , Js.MonadJSM m
+                    )
+                 => Dom.Element er d t
+                 -> Text
+                 -> m (Reflex.Event t Js.JSVal)
+addEventListener element eventName = do
+  (event, trigger) <- Reflex.newTriggerEvent
+  let jsTrigger _f _this = \case
+        [e] -> liftIO $ trigger e
+        args ->
+          error $ printf "Event listener callback called with %d ≠ 1 args" (length args)
+
+  Js.liftJSM $ raw ^. Js.jsf ("addEventListener" :: Text) (eventName, Js.fun jsTrigger)
+  pure event
+  where raw = Dom._element_raw element
