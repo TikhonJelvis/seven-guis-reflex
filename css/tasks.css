@@ -190,10 +190,6 @@
 
 .circle-drawer .canvas {
   width: 100%;
-}
-
-.circle-drawer .canvas > svg {
-  width: 100%;
   height: 100%;
 
   border: 1px solid black;
@@ -207,4 +203,12 @@
   height: 3ex;
   width: 3ex;
   margin: 0 4px;
+}
+
+.circle-drawer circle {
+  fill: #fff0;
+}
+
+.circle-drawer circle.selected, .circle-drawer circle:hover {
+  fill: gray;
 }
