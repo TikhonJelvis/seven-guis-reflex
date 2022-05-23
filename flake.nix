@@ -21,7 +21,7 @@
               text-display = "0.0.2.0";
             };
 
-            overrides = self: super: with haskellPackages.lib; {
+            overrides = self: super: with pkgs.haskell.lib; {
             };
 
             modifier = drv:
@@ -30,7 +30,7 @@
                 ghcid
                 haskell-language-server
 
-                cabal-fmt
+                pkgs.haskellPackages.cabal-fmt
                 pkgs.nixpkgs-fmt
               ]);
           };
