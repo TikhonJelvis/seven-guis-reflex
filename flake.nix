@@ -21,8 +21,7 @@
               text-display = "0.0.2.0";
             };
 
-            overrides = self: super: with pkgs.haskell.lib; {
-            };
+            overrides = self: super: with pkgs.haskell.lib; { };
 
             modifier = drv:
               pkgs.haskell.lib.addBuildTools drv (with haskellPackages; [
@@ -34,10 +33,11 @@
                 pkgs.nixpkgs-fmt
               ]);
           };
-      in {
+      in
+      {
         defaultPackage = package;
         devShell = haskellPackages.shellFor {
-          packages = p: [package];
+          packages = p: [ package ];
 
           # HACK: temporary workaround for WebKit issue with graphic
           # acceleration
