@@ -7,9 +7,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.Timer where
 
-import           Seven.Element
-import           Seven.Widget
-
 import           Control.Lens           ((<&>))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 
@@ -21,6 +18,9 @@ import qualified Data.Time              as Time
 import           Reflex.Dom
 
 import           Text.Printf            (printf)
+
+import           UI.Element
+import           UI.Widget
 
 -- | A timer with a progress bar and a slider to control the total
 -- duration.

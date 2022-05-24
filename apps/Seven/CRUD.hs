@@ -8,11 +8,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.CRUD where
 
-import           Seven.Element
-import qualified Seven.PushMap     as PushMap
-import           Seven.PushMap     (PushMap)
-import           Seven.Widget
-
 import           Control.Lens
 import           Control.Monad     (void)
 
@@ -22,6 +17,11 @@ import qualified Data.Text         as Text
 import           Data.Text.Display
 
 import           Reflex.Dom        hiding (Delete)
+
+import           UI.Element
+import qualified UI.PushMap        as PushMap
+import           UI.PushMap        (PushMap)
+import           UI.Widget
 
 import qualified Witherable        (Filterable (filter))
 

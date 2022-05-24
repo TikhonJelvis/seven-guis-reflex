@@ -6,10 +6,10 @@
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Utilities for maintaining undo/redo history.
-module Seven.History where
+module UI.History where
 
-import           Seven.Element
-import           Seven.Widget
+import           UI.Element
+import           UI.Widget
 
 import           Control.Lens  ((&))
 

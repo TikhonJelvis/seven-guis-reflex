@@ -11,12 +11,12 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
-module Seven.SVG where
+module UI.SVG where
 
-import           Seven.Attributes       (ToAttributeValue (..),
+import           UI.Attributes       (ToAttributeValue (..),
                                          ToAttributes (..), with)
-import           Seven.Element          (Dom, elDynAttrNs')
-import           Seven.Event
+import           UI.Element          (Dom, elDynAttrNs')
+import           UI.Event
 
 import           Control.Lens           ((&), (.~), (?~))
 import           Control.Monad.Fix      (MonadFix)

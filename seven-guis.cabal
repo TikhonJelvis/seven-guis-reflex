@@ -14,20 +14,20 @@ executable guis
   default-language: Haskell2010
   main-is:          Main.hs
   other-modules:
-    Seven.Attributes
     Seven.CircleDrawer
     Seven.Counter
     Seven.CRUD
-    Seven.Dialog
-    Seven.Element
-    Seven.Event
     Seven.FlightBooker
-    Seven.History
-    Seven.PushMap
-    Seven.SVG
     Seven.TemperatureConverter
     Seven.Timer
-    Seven.Widget
+    UI.Attributes
+    UI.Dialog
+    UI.Element
+    UI.Event
+    UI.History
+    UI.PushMap
+    UI.SVG
+    UI.Widget
 
   build-depends:
     , base

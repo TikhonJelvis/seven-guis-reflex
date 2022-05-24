@@ -13,18 +13,6 @@
 {-# LANGUAGE TupleSections         #-}
 module Seven.CircleDrawer where
 
-import           Seven.Attributes    (ToAttributes (..))
-import           Seven.Dialog        (DialogElement (..), ModalState (..),
-                                      dialog)
-import           Seven.Element
-import           Seven.Event
-import qualified Seven.History       as History
-import           Seven.History       (Undos (..))
-import qualified Seven.PushMap       as PushMap
-import           Seven.PushMap       (PushMap)
-import           Seven.SVG
-import           Seven.Widget
-
 import           Control.Applicative ((<|>))
 import           Control.Lens        ((&), (<&>), (??))
 import           Control.Monad       (join, void)
@@ -45,6 +33,18 @@ import qualified Reflex.Dom          as Dom
 import           Reflex.Dom          (dynText)
 
 import qualified Text.Printf         as Text
+
+import           UI.Attributes       (ToAttributes (..))
+import           UI.Dialog           (DialogElement (..), ModalState (..),
+                                      dialog)
+import           UI.Element
+import           UI.Event
+import qualified UI.History          as History
+import           UI.History          (Undos (..))
+import qualified UI.PushMap          as PushMap
+import           UI.PushMap          (PushMap)
+import           UI.SVG
+import           UI.Widget
 
 import           Witherable          (Filterable (..), catMaybes, (<&?>))
 

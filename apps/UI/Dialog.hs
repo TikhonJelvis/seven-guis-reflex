@@ -8,11 +8,11 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
-module Seven.Dialog where
+module UI.Dialog where
 
-import           Seven.Element
-import           Seven.Event
-import           Seven.Widget
+import           UI.Element
+import           UI.Event
+import           UI.Widget
 
 import           Control.Lens                ((^.))
 import           Control.Monad               (unless, void, when)

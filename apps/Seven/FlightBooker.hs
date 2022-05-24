@@ -8,9 +8,6 @@
 {-# LANGUAGE TypeApplications    #-}
 module Seven.FlightBooker where
 
-import           Seven.Element
-import           Seven.Widget
-
 import           Control.Applicative    ((<|>))
 import           Control.Monad          (void)
 import           Control.Monad.Fix      (MonadFix)
@@ -27,6 +24,9 @@ import           Reflex
 import           Reflex.Dom
 
 import qualified Text.Printf            as Text
+
+import           UI.Element
+import           UI.Widget
 
 -- | A UI with three parts:
 --

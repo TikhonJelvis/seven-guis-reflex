@@ -14,12 +14,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
 -- | Widgets that I use throughout the seven example tasks.
-module Seven.Widget where
-
-import           Seven.Element
-import           Seven.Event
-import qualified Seven.PushMap     as PushMap
-import           Seven.PushMap     (PushMap)
+module UI.Widget where
 
 import           Control.Lens      ((<&>), (^.))
 import           Control.Monad     (join, void)
@@ -48,6 +43,11 @@ import           Reflex.Dom        hiding (EventResult, elDynAttr')
 
 import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
+
+import           UI.Element
+import           UI.Event
+import qualified UI.PushMap        as PushMap
+import           UI.PushMap        (PushMap)
 
 -- * Widgets
 

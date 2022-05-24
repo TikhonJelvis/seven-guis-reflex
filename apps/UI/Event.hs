@@ -9,7 +9,7 @@
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
-module Seven.Event where
+module UI.Event where
 
 import           Control.Lens                (element, (<&>), (^.))
 import           Control.Monad.IO.Class      (MonadIO (liftIO))

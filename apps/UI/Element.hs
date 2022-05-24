@@ -5,9 +5,9 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Seven.Element where
+module UI.Element where
 
-import           Seven.Event
+import           UI.Event
 
 import           Control.Monad.Fix           (MonadFix)
 import           Control.Monad.Reader        (runReaderT)

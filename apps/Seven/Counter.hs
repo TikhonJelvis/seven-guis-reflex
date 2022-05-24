@@ -5,15 +5,15 @@
 {-# LANGUAGE TypeApplications  #-}
 module Seven.Counter where
 
-import           Seven.Element
-import           Seven.Widget
-
 import           Control.Monad.Fix (MonadFix)
 
 import qualified Data.Text         as Text
 
 import           Reflex
 import           Reflex.Dom
+
+import           UI.Element
+import           UI.Widget
 
 -- | The Counter has a frame with two components:
 --

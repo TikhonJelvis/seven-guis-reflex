@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Seven.Attributes where
+module UI.Attributes where
 
 import           Data.Map  (Map)
 import qualified Data.Map  as Map

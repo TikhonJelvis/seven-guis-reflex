@@ -6,8 +6,8 @@
 {-# LANGUAGE RecursiveDo                #-}
 module Seven.TemperatureConverter where
 
-import           Seven.Element
-import           Seven.Widget
+import           UI.Element
+import           UI.Widget
 
 import           Control.Monad.Fix (MonadFix)
 

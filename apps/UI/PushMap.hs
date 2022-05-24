@@ -4,7 +4,7 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE TypeFamilies               #-}
-module Seven.PushMap where
+module UI.PushMap where
 
 import           Control.Lens   ((<&>))
 
