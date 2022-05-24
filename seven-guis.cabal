@@ -22,6 +22,7 @@ executable guis
     Seven.Element
     Seven.Event
     Seven.FlightBooker
+    Seven.History
     Seven.PushMap
     Seven.SVG
     Seven.TemperatureConverter

@@ -18,6 +18,8 @@ import           Seven.Dialog        (DialogElement (..), ModalState (..),
                                       dialog)
 import           Seven.Element
 import           Seven.Event
+import qualified Seven.History       as History
+import           Seven.History       (Undos (..))
 import qualified Seven.PushMap       as PushMap
 import           Seven.PushMap       (PushMap)
 import           Seven.SVG
@@ -30,6 +32,7 @@ import           Control.Monad       (join, void)
 import           Data.Bool           (bool)
 import qualified Data.ByteString     as BS
 import           Data.Default.Class  (def)
+import qualified Data.List           as List
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
 import           Data.Maybe          (fromMaybe, listToMaybe)
@@ -44,7 +47,6 @@ import           Reflex.Dom          (dynText)
 import qualified Text.Printf         as Text
 
 import           Witherable          (Filterable (..), catMaybes, (<&?>))
-import qualified Data.List as List
 
 main :: IO ()
 main = do
@@ -53,15 +55,13 @@ main = do
 
 widget :: forall m t. Dom t m => m ()
 widget = Dom.elClass "div" "circle-drawer" do
-  rec (doUndo, doRedo) <- Dom.elClass "div" "centered controls" do
-        doUndo <- button' (constDyn "↶") (enabledIf . hasUndo <$> history)
-        doRedo <- button' (constDyn "↷") (enabledIf . hasRedo <$> history)
-        pure (doUndo, doRedo)
+  rec Undos { undoActions, redoActions } <- Dom.elClass "div" "centered controls" $
+        History.undoControls modifies
 
       (canvas, clicked) <- circlesCanvas circles beingModified
 
       circles <- foldDyn doAction mempty $
-        leftmost [adds, previews, modifies, undos, redos]
+        leftmost [adds, previews, modifies, flipChange <$> undoActions, redoActions]
 
       let adds = mainClicks canvas <&> \ MouseEventResult { offset = (x, y) } ->
             AddCircle (fromIntegral x, fromIntegral y)
@@ -69,10 +69,6 @@ widget = Dom.elClass "div" "circle-drawer" do
             catMaybes $ changeRadius <$> current beingModified <@> setRadius
           previews =
             catMaybes $ previewChange <$> current targetCircle <@> updated previewRadius
-          undos =
-            attachWithMaybe (&) (current history) (toUndo <$ doUndo)
-          redos =
-            attachWithMaybe (&) (current history) (toRedo <$ doRedo)
 
       beingModified <- holdDyn Nothing $
         leftmost [Just <$> clicked, Nothing <$ setRadius]
@@ -81,9 +77,6 @@ widget = Dom.elClass "div" "circle-drawer" do
       (setRadius, previewRadius) <-
         circleDialog beingModified $ fmap snd <$> targetCircle
 
-      history <- foldDyn ($) emptyHistory $ leftmost
-        [save <$> modifies, undo <$ doUndo, redo <$ doRedo]
-
   pure ()
   where previewChange (Just (i, Circle { radius })) newRadius =
           Just $ ChangeRadius i Diff { before = radius, after = newRadius }
@@ -91,6 +84,11 @@ widget = Dom.elClass "div" "circle-drawer" do
 
         changeRadius :: Maybe Int -> (Double, Double) -> Maybe Action
         changeRadius i (old, new) = ChangeRadius <$> i ?? Diff old new
+
+        flipChange :: Action -> Action
+        flipChange (ChangeRadius i Diff { before, after }) =
+          ChangeRadius i Diff { before = after, after = before }
+        flipChange a = a
 
         getCircle (Just i) circles = (i,) <$> PushMap.lookup i circles
         getCircle Nothing _        = Nothing
@@ -205,85 +203,3 @@ doAction (ChangeRadius i radius) circles =
   case PushMap.lookup i circles of
     Just c  -> PushMap.insert i c { radius = after radius } circles
     Nothing -> circles
-
--- | Undo an action on the given state, if possible.
---
--- Currently, 'AddCircle' and 'ChangeRadius' for an id not in the map
--- cannot be undone. For those actions, this returns the input map
--- unchanged.
-undoAction :: Maybe Action -> PushMap Circle -> PushMap Circle
-undoAction Nothing circles                        = circles
-undoAction (Just AddCircle {}) circles            = circles
-undoAction (Just (ChangeRadius i radius)) circles =
-  case PushMap.lookup i circles of
-    Just c  -> PushMap.insert i c { radius = before radius } circles
-    Nothing -> circles
-
--- ** Undo and Redo
-
--- | The undo/redo history: actions taken by the user that can be
--- undone and/or redone.
-data History = History
-  { undos :: [Action]
-    -- ^ Past actions that can be undone.
-  , redos :: [Action]
-    -- ^ Actions that were undone but can be redone.
-  }
-  deriving stock (Show, Eq)
-
--- | A history with no actions to undo or redo.
-emptyHistory :: History
-emptyHistory = History { undos = [], redos = [] }
-
--- | "Save" an undoable action, allowing the user to undo it.
---
--- This pushes the action to the 'undos' stack and clears the 'redos'
--- stack.
-save :: Action -> History -> History
-save action history = history { undos = action : undos history, redos = [] }
-
--- | Update the 'History' to reflect undoing an action.
---
--- Pop the last action off the 'undo' stack (if any) and move it to
--- the top of the 'redo' stack.
---
--- If there is no action to undo, the 'History' is returned unchanged.
-undo :: History -> History
-undo history@History { undos, redos } = case undos of
-  []       -> history
-  (a : as) -> history { undos = as, redos = a : redos }
-
--- | Return the next action that can be undone.
---
--- If 'undos' is empty, return 'Nothing'.
-toUndo :: History -> Maybe Action
-toUndo History { undos } = flipAction <$> listToMaybe undos
-  where flipAction = \case
-          ChangeRadius i Diff { before, after } ->
-            ChangeRadius i Diff { before = after, after = before }
-          a -> a
-
--- | Update the history to reflect redoing an action.
---
--- Pop the last action of the 'redo' stack (if any) and move it to the
--- top of the 'undo' stack.
---
--- If there is no action to redo, the 'History' is returned unchanged.
-redo :: History -> History
-redo history@History { undos, redos } = case redos of
-  []       -> history
-  (a : as) -> history { undos = a : undos, redos = as }
-
--- | Return the next action that can be redone.
---
--- If 'redos' is empty, return 'Nothing'.
-toRedo :: History -> Maybe Action
-toRedo = listToMaybe . redos
-
--- | 'True' if there are actions available to undo, 'False' otherwise.
-hasUndo :: History -> Bool
-hasUndo = not . List.null . undos
-
--- | 'True' if there are actions available to redo, 'False' otherwise.
-hasRedo :: History -> Bool
-hasRedo = not . List.null . redos
