@@ -21,8 +21,6 @@ import           Data.Functor.Misc           (WrapArg (..))
 import           Data.Hashable               (Hashable)
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
-import           Data.Singletons             (Proxy (..), Sing, SingI,
-                                              SingKind (..), SomeSing, sing)
 import           Data.Text                   (Text)
 import           Data.Word                   (Word8)
 

@@ -14,6 +14,7 @@ executable guis
   default-language: Haskell2010
   main-is:          Main.hs
   other-modules:
+    RB.UI.Dom
     Seven.CircleDrawer
     Seven.Counter
     Seven.CRUD
@@ -41,6 +42,7 @@ executable guis
     , jsaddle
     , lens
     , mtl
+    , reactive-banana
     , reflex
     , reflex-dom
     , reflex-dom-core
