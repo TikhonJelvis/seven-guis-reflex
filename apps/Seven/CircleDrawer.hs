@@ -64,16 +64,17 @@ widget = Dom.elClass "div" "circle-drawer" do
       let adds = mainClicks canvas <&> \ MouseEventResult { offset = (x, y) } ->
             AddCircle (fromIntegral x, fromIntegral y)
           modifies =
-            changeRadius <$> current modifiedCircle <@> setRadius
+            changeRadius <$> current targetCircle <@> setRadius
           previews =
-            changeRadius <$> current modifiedCircle <@> updated previewRadius
+            changeRadius <$> current targetCircle <@> updated previewRadius
 
       beingModified <- holdDyn Nothing $
         leftmost [Just <$> clicked, Nothing <$ setRadius]
 
-      let modifiedCircle = zipDynWith getCircle beingModified circles
+      let targetCircle = zipDynWith getCircle beingModified circles
       (setRadius, previewRadius) <-
-        circleDialog beingModified $ fmap snd <$> modifiedCircle
+        circleDialog beingModified $ fmap snd <$> targetCircle
+
   pure ()
   where changeRadius (Just (i, Circle { radius })) newRadius =
           Just $ ChangeRadius i Diff { before = radius, after = newRadius }
@@ -98,7 +99,7 @@ circlesCanvas :: forall m t. Dom t m
               -- ^ Which circle, if any, should be highlighted.
               -> m ( Dom.Element EventResult Dom.GhcjsDomSpace t
                    , Event t Int )
-circlesCanvas circles highlighted = svg' "svg" do
+circlesCanvas circles highlighted = svgAttr' "svg" [("class", "canvas")] do
   rawClicks <- selectView highlighted circles (withId svgCircle)
   let clicks = rawClicks <&?> \ (MouseEventResult { button }, i) ->
         [i | button == Auxiliary]
@@ -131,14 +132,17 @@ svgCircle c isSelected = do
 --  * closed.
 circleDialog :: forall m t. Dom t m
              => Dynamic t (Maybe Int)
+             -- ^ The id of the circle being modified.
              -> Dynamic t (Maybe Circle)
              -- ^ The circle that the dialog controls.
              -> m (Event t Double, Dynamic t Double)
+             -- ^ The 'Event' fires when a modification is saved; the
+             -- 'Dynamic' is always up to date with the set radius.
 circleDialog beingModified targetCircle = do
   (dialogElement, newRadius) <- dialog showHide (constDyn []) do
     dynText $ message . center . fromMaybe blank <$> targetCircle
-    rec let baseRadius = current targetCircle <@ updated beingModified
-            setRadius = (/ maxRadius) . radius <$> catMaybes baseRadius
+    rec let baseRadius = catMaybes $ tagPromptlyDyn targetCircle showHide
+            setRadius = (/ maxRadius) . radius <$> baseRadius
         new <- fmap (* maxRadius) <$> range setRadius
     pure new
 
