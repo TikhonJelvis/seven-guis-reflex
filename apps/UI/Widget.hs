@@ -45,7 +45,7 @@ import           Text.Printf       (printf)
 import           Text.Read         (readMaybe)
 
 import           UI.Element
-import           UI.Event
+import           UI.Event          (EventResult)
 import qualified UI.PushMap        as PushMap
 import           UI.PushMap        (PushMap)
 
