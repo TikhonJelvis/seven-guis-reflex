@@ -251,6 +251,10 @@ progressBar progress = elClass "div" "progress-bar" do
 -- some visual indication that it is disabled.
 data Enabled = Enabled | Disabled deriving (Show, Eq)
 
+-- | 'Enabled' if 'True', 'Disabled' if 'False'.
+enabledIf :: Bool -> Enabled
+enabledIf = bool Disabled Enabled
+
 -- | Set the given element attributes to reflect the given 'Enabled'
 -- state.
 --
