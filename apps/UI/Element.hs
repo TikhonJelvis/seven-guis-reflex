@@ -43,6 +43,7 @@ el' :: forall a m t. Dom t m
     -> m a
     -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
 el' tag = elAttr' tag []
+{-# INLINABLE el' #-}
 
 -- | Create and return an element with the given class.
 elClass' :: forall a m t. Dom t m

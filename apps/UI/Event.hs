@@ -1,13 +1,16 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 module UI.Event where
 
@@ -15,10 +18,15 @@ import           Control.Lens                (element, (<&>), (^.))
 import           Control.Monad.IO.Class      (MonadIO (liftIO))
 
 import           Data.Functor.Misc           (WrapArg (..))
+import           Data.Hashable               (Hashable)
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
+import           Data.Singletons             (Proxy (..), Sing, SingI,
+                                              SingKind (..), SomeSing, sing)
 import           Data.Text                   (Text)
 import           Data.Word                   (Word8)
+
+import           GHC.Generics                (Generic)
 
 import qualified GHCJS.DOM.ClipboardEvent    as ClipboardEvent
 import qualified GHCJS.DOM.DataTransfer      as DataTransfer
@@ -38,6 +46,114 @@ import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (HasDomEvent, Reflex)
 
 import           Text.Printf                 (printf)
+
+-- * Types of Events
+
+type family EventResultType en where
+  EventResultType 'Dom.ClickTag       = MouseEventResult
+  EventResultType 'Dom.DblclickTag    = MouseEventResult
+  EventResultType 'Dom.KeypressTag    = KeyboardEventResult
+  EventResultType 'Dom.KeydownTag     = KeyboardEventResult
+  EventResultType 'Dom.KeyupTag       = KeyboardEventResult
+  EventResultType 'Dom.ScrollTag      = ScrollEventResult
+  EventResultType 'Dom.MousemoveTag   = MouseEventResult
+  EventResultType 'Dom.MousedownTag   = MouseEventResult
+  EventResultType 'Dom.MouseupTag     = MouseEventResult
+  EventResultType 'Dom.MouseenterTag  = MouseEventResult
+  EventResultType 'Dom.MouseleaveTag  = MouseEventResult
+  EventResultType 'Dom.FocusTag       = ()
+  EventResultType 'Dom.BlurTag        = ()
+  EventResultType 'Dom.ChangeTag      = ()
+  EventResultType 'Dom.DragTag        = MouseEventResult
+  EventResultType 'Dom.DragendTag     = MouseEventResult
+  EventResultType 'Dom.DragenterTag   = MouseEventResult
+  EventResultType 'Dom.DragleaveTag   = MouseEventResult
+  EventResultType 'Dom.DragoverTag    = MouseEventResult
+  EventResultType 'Dom.DragstartTag   = MouseEventResult
+  EventResultType 'Dom.DropTag        = MouseEventResult
+  EventResultType 'Dom.AbortTag       = ()
+  EventResultType 'Dom.ContextmenuTag = MouseEventResult
+  EventResultType 'Dom.ErrorTag       = ()
+  EventResultType 'Dom.InputTag       = ()
+  EventResultType 'Dom.InvalidTag     = ()
+  EventResultType 'Dom.LoadTag        = ()
+  EventResultType 'Dom.MouseoutTag    = MouseEventResult
+  EventResultType 'Dom.MouseoverTag   = MouseEventResult
+  EventResultType 'Dom.MousewheelTag  = MouseEventResult
+  EventResultType 'Dom.SelectTag      = ()
+  EventResultType 'Dom.SubmitTag      = ()
+  EventResultType 'Dom.BeforecutTag   = ()
+  EventResultType 'Dom.CutTag         = ()
+  EventResultType 'Dom.BeforecopyTag  = ()
+  EventResultType 'Dom.CopyTag        = ()
+  EventResultType 'Dom.BeforepasteTag = ()
+  EventResultType 'Dom.PasteTag       = Maybe Text
+  EventResultType 'Dom.ResetTag       = ()
+  EventResultType 'Dom.SearchTag      = ()
+  EventResultType 'Dom.SelectstartTag = ()
+  EventResultType 'Dom.TouchstartTag  = Dom.TouchEventResult
+  EventResultType 'Dom.TouchmoveTag   = Dom.TouchEventResult
+  EventResultType 'Dom.TouchendTag    = Dom.TouchEventResult
+  EventResultType 'Dom.TouchcancelTag = Dom.TouchEventResult
+  EventResultType 'Dom.WheelTag       = WheelEventResult
+
+newtype EventResult en = EventResult { unEventResult :: EventResultType en }
+
+domHandler :: Dom.EventName en
+           -> GHCJS.EventM e (Dom.EventType en) (Maybe (EventResult en))
+domHandler eventName = Just . EventResult <$> case eventName of
+  Dom.Click       -> getMouseEvent
+  Dom.Dblclick    -> getMouseEvent
+  Dom.Keypress    -> getKeyboardEvent
+  Dom.Scroll      -> getScrollEvent
+  Dom.Keydown     -> getKeyboardEvent
+  Dom.Keyup       -> getKeyboardEvent
+  Dom.Mousemove   -> getMouseEvent
+  Dom.Mouseup     -> getMouseEvent
+  Dom.Mousedown   -> getMouseEvent
+  Dom.Mouseenter  -> getMouseEvent
+  Dom.Mouseleave  -> getMouseEvent
+  Dom.Focus       -> pure ()
+  Dom.Blur        -> pure ()
+  Dom.Change      -> pure ()
+  Dom.Drag        -> getMouseEvent
+  Dom.Dragend     -> getMouseEvent
+  Dom.Dragenter   -> getMouseEvent
+  Dom.Dragleave   -> getMouseEvent
+  Dom.Dragover    -> getMouseEvent
+  Dom.Dragstart   -> getMouseEvent
+  Dom.Drop        -> getMouseEvent
+  Dom.Abort       -> pure ()
+  Dom.Contextmenu -> getMouseEvent
+  Dom.Error       -> pure ()
+  Dom.Input       -> pure ()
+  Dom.Invalid     -> pure ()
+  Dom.Load        -> pure ()
+  Dom.Mouseout    -> getMouseEvent
+  Dom.Mouseover   -> getMouseEvent
+  Dom.Select      -> pure ()
+  Dom.Submit      -> pure ()
+  Dom.Beforecut   -> pure ()
+  Dom.Cut         -> pure ()
+  Dom.Beforecopy  -> pure ()
+  Dom.Copy        -> pure ()
+  Dom.Beforepaste -> pure ()
+  Dom.Paste       -> getPasteText
+  Dom.Reset       -> pure ()
+  Dom.Search      -> pure ()
+  Dom.Selectstart -> pure ()
+  Dom.Touchstart  -> Dom.getTouchEvent
+  Dom.Touchmove   -> Dom.getTouchEvent
+  Dom.Touchend    -> Dom.getTouchEvent
+  Dom.Touchcancel -> Dom.getTouchEvent
+  Dom.Mousewheel  -> getMouseEvent
+  Dom.Wheel       -> getWheelEvent
+
+instance Reflex t => HasDomEvent t (Dom.Element EventResult d t) en where
+  type DomEventType (Dom.Element EventResult d t) en = EventResultType en
+  {-# INLINABLE domEvent #-}
+  domEvent en e =
+    Dom.coerceEvent $ Reflex.select (Dom._element_events e) (WrapArg en)
 
 -- * Modifier Keys
 
@@ -292,125 +408,33 @@ getPasteText = do
     Just dataTransfer -> Just <$> DataTransfer.getData dataTransfer ("text" :: Text)
     Nothing           -> pure Nothing
 
--- * Handling Events
-
-type family EventResultType en where
-  EventResultType 'Dom.ClickTag       = MouseEventResult
-  EventResultType 'Dom.DblclickTag    = MouseEventResult
-  EventResultType 'Dom.KeypressTag    = KeyboardEventResult
-  EventResultType 'Dom.KeydownTag     = KeyboardEventResult
-  EventResultType 'Dom.KeyupTag       = KeyboardEventResult
-  EventResultType 'Dom.ScrollTag      = ScrollEventResult
-  EventResultType 'Dom.MousemoveTag   = MouseEventResult
-  EventResultType 'Dom.MousedownTag   = MouseEventResult
-  EventResultType 'Dom.MouseupTag     = MouseEventResult
-  EventResultType 'Dom.MouseenterTag  = MouseEventResult
-  EventResultType 'Dom.MouseleaveTag  = MouseEventResult
-  EventResultType 'Dom.FocusTag       = ()
-  EventResultType 'Dom.BlurTag        = ()
-  EventResultType 'Dom.ChangeTag      = ()
-  EventResultType 'Dom.DragTag        = MouseEventResult
-  EventResultType 'Dom.DragendTag     = MouseEventResult
-  EventResultType 'Dom.DragenterTag   = MouseEventResult
-  EventResultType 'Dom.DragleaveTag   = MouseEventResult
-  EventResultType 'Dom.DragoverTag    = MouseEventResult
-  EventResultType 'Dom.DragstartTag   = MouseEventResult
-  EventResultType 'Dom.DropTag        = MouseEventResult
-  EventResultType 'Dom.AbortTag       = ()
-  EventResultType 'Dom.ContextmenuTag = MouseEventResult
-  EventResultType 'Dom.ErrorTag       = ()
-  EventResultType 'Dom.InputTag       = ()
-  EventResultType 'Dom.InvalidTag     = ()
-  EventResultType 'Dom.LoadTag        = ()
-  EventResultType 'Dom.MouseoutTag    = MouseEventResult
-  EventResultType 'Dom.MouseoverTag   = MouseEventResult
-  EventResultType 'Dom.MousewheelTag  = MouseEventResult
-  EventResultType 'Dom.SelectTag      = ()
-  EventResultType 'Dom.SubmitTag      = ()
-  EventResultType 'Dom.BeforecutTag   = ()
-  EventResultType 'Dom.CutTag         = ()
-  EventResultType 'Dom.BeforecopyTag  = ()
-  EventResultType 'Dom.CopyTag        = ()
-  EventResultType 'Dom.BeforepasteTag = ()
-  EventResultType 'Dom.PasteTag       = Maybe Text
-  EventResultType 'Dom.ResetTag       = ()
-  EventResultType 'Dom.SearchTag      = ()
-  EventResultType 'Dom.SelectstartTag = ()
-  EventResultType 'Dom.TouchstartTag  = Dom.TouchEventResult
-  EventResultType 'Dom.TouchmoveTag   = Dom.TouchEventResult
-  EventResultType 'Dom.TouchendTag    = Dom.TouchEventResult
-  EventResultType 'Dom.TouchcancelTag = Dom.TouchEventResult
-  EventResultType 'Dom.WheelTag       = WheelEventResult
-
-newtype EventResult en = EventResult { unEventResult :: EventResultType en }
-
-domHandler :: Dom.EventName en
-           -> GHCJS.EventM e (Dom.EventType en) (Maybe (EventResult en))
-domHandler eventName = Just . EventResult <$> case eventName of
-  Dom.Click       -> getMouseEvent
-  Dom.Dblclick    -> getMouseEvent
-  Dom.Keypress    -> getKeyboardEvent
-  Dom.Scroll      -> getScrollEvent
-  Dom.Keydown     -> getKeyboardEvent
-  Dom.Keyup       -> getKeyboardEvent
-  Dom.Mousemove   -> getMouseEvent
-  Dom.Mouseup     -> getMouseEvent
-  Dom.Mousedown   -> getMouseEvent
-  Dom.Mouseenter  -> getMouseEvent
-  Dom.Mouseleave  -> getMouseEvent
-  Dom.Focus       -> pure ()
-  Dom.Blur        -> pure ()
-  Dom.Change      -> pure ()
-  Dom.Drag        -> getMouseEvent
-  Dom.Dragend     -> getMouseEvent
-  Dom.Dragenter   -> getMouseEvent
-  Dom.Dragleave   -> getMouseEvent
-  Dom.Dragover    -> getMouseEvent
-  Dom.Dragstart   -> getMouseEvent
-  Dom.Drop        -> getMouseEvent
-  Dom.Abort       -> pure ()
-  Dom.Contextmenu -> getMouseEvent
-  Dom.Error       -> pure ()
-  Dom.Input       -> pure ()
-  Dom.Invalid     -> pure ()
-  Dom.Load        -> pure ()
-  Dom.Mouseout    -> getMouseEvent
-  Dom.Mouseover   -> getMouseEvent
-  Dom.Select      -> pure ()
-  Dom.Submit      -> pure ()
-  Dom.Beforecut   -> pure ()
-  Dom.Cut         -> pure ()
-  Dom.Beforecopy  -> pure ()
-  Dom.Copy        -> pure ()
-  Dom.Beforepaste -> pure ()
-  Dom.Paste       -> getPasteText
-  Dom.Reset       -> pure ()
-  Dom.Search      -> pure ()
-  Dom.Selectstart -> pure ()
-  Dom.Touchstart  -> Dom.getTouchEvent
-  Dom.Touchmove   -> Dom.getTouchEvent
-  Dom.Touchend    -> Dom.getTouchEvent
-  Dom.Touchcancel -> Dom.getTouchEvent
-  Dom.Mousewheel  -> getMouseEvent
-  Dom.Wheel       -> getWheelEvent
-
-instance Reflex t => HasDomEvent t (Dom.Element EventResult d t) en where
-  type DomEventType (Dom.Element EventResult d t) en = EventResultType en
-  {-# INLINABLE domEvent #-}
-  domEvent en e =
-    Dom.coerceEvent $ Reflex.select (Dom._element_events e) (WrapArg en)
-
 -- * Wrapping JS Events
 
 -- | Return an 'Event' that triggers based on an arbitrary JavaScript
 -- event on the given element.
---
 -- Conceptually, this is equvivalent to:
 --
 -- @
 -- element.addEventListener("eventName", function (e) {
 --   trigger(e)
 -- }
+-- @
+--
+-- For example, if you wanted to listen to the (IE-only)
+-- @MSGestureStart@, you could write:
+--
+-- @
+-- data MSGestureEvent = MSGestureEvent {- ... -}
+--
+-- toMSGestureEvent :: MonadJSM m => JSVal -> m MSGestureEvent
+-- toMSGestureEvent = {- ... -}
+--
+-- onGestureStart :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
+--                => Element er d t
+--                -> m (Event t MSGestureEvent)
+-- onGestureStart element = do
+--   rawEvent <- addEventListener element "MSGestureChange"
+--   toMSGestureEvent rawEvent
 -- @
 --
 -- See MDN: [@addEventListener@](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
