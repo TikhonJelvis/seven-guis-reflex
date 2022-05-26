@@ -56,6 +56,19 @@
   margin-top: 2ex;
 }
 
+.draggable {
+  position: absolute;
+
+  cursor: grab;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.draggable.dragged {
+  cursor: grabbing;
+}
+
 /* Counter  */
 .counter {
   padding: 1px;
@@ -211,4 +224,35 @@
 
 .circle-drawer circle.selected, .circle-drawer circle:hover {
   fill: gray;
+}
+
+/* Drag and Drop Demo */
+
+.field {
+  position: relative;
+
+  height: 90%;
+  width: 90%;
+
+  overflow: hidden;
+
+  border: 4px solid black;
+  padding: 10px;
+  
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.field .card {
+  height: 300px;
+  width: 200px;
+
+  border: 2px solid black;
+  border-radius: 10px;
+}
+
+.field .card.dragged {
+  border: 3px solid black;
+
+  /* transform: scale(1.005) rotate(2deg); */
 }

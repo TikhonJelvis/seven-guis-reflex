@@ -34,13 +34,14 @@ import           Reflex.Dom          (dynText)
 
 import qualified Text.Printf         as Text
 
-import           UI.Attributes       (ToAttributes (..))
+import           UI.Attributes       (ToAttributes (..), setClass)
 import           UI.Dialog           (DialogElement (..), ModalState (..),
                                       dialog)
-import           UI.Element
+import           UI.Element          (Dom)
 import           UI.Event
 import qualified UI.History          as History
 import           UI.History          (Undos (..))
+import           UI.Point
 import qualified UI.PushMap          as PushMap
 import           UI.PushMap          (PushMap)
 import           UI.SVG
@@ -63,8 +64,7 @@ widget = Dom.elClass "div" "circle-drawer" do
       circles <- foldDyn doAction mempty $
         leftmost [adds, previews, modifies, flipChange <$> undoActions, redoActions]
 
-      let adds = mainClicks canvas <&> \ MouseEventResult { offset = (x, y) } ->
-            AddCircle (fromIntegral x, fromIntegral y)
+      let adds = mainClicks canvas <&> \ event -> AddCircle (offset event)
           modifies =
             catMaybes $ changeRadius <$> current beingModified <@> setRadius
           previews =
@@ -168,15 +168,15 @@ circleDialog beingModified targetCircle = do
         maxRadius = 500
         message = Text.pack . Text.printf "Adjust diameter of circle at %s" . show
 
-        blank = Circle { center = (0, 0), radius = 0 }
+        blank = Circle { center = Point { x = 0, y = 0 }, radius = 0 }
 
 -- * Editing Actions
 
 -- | Editing actions we can take in the UI
-data Action = AddCircle (Double, Double)
+data Action = AddCircle !Point
             -- ^ Add a circle with the standard radius at the given
             -- point.
-            | ChangeRadius Int (Diff Double)
+            | ChangeRadius !Int !(Diff Double)
             --              ↑        ↑
             --             id      radius
             -- ^ Change the radius of the circle with the given id.
@@ -186,8 +186,8 @@ data Action = AddCircle (Double, Double)
 -- | An atomic change to a value, recording the value before and after
 -- the change.
 data Diff a = Diff
-  { before :: a
-  , after  :: a
+  { before :: !a
+  , after  :: !a
   }
   deriving stock (Show, Eq)
 

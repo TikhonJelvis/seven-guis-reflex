@@ -13,11 +13,6 @@
 {-# LANGUAGE TypeFamilies          #-}
 module UI.SVG where
 
-import           UI.Attributes       (ToAttributeValue (..),
-                                         ToAttributes (..), with)
-import           UI.Element          (Dom, elDynAttrNs')
-import           UI.Event
-
 import           Control.Lens           ((&), (.~), (?~))
 import           Control.Monad.Fix      (MonadFix)
 import           Control.Monad.Reader   (ReaderT (runReaderT))
@@ -45,6 +40,12 @@ import qualified Numeric
 import           Reflex.Dom             hiding (EventResult, EventResultType)
 
 import           Text.Printf            (printf)
+
+import           UI.Attributes          (ToAttributeValue (..),
+                                         ToAttributes (..), with)
+import           UI.Element             (Dom, elDynAttrNs')
+import           UI.Event
+import           UI.Point               hiding (toCss)
 
 -- * SVG Elements
 
@@ -229,15 +230,15 @@ instance ToAttributeValue Linejoin where
 
 -- | A circle.
 data Circle = Circle
-  { center :: (Double, Double)
+  { center :: !Point
   -- ^ The (x, y) coordinates for the circle's center.
-  , radius :: Double
+  , radius :: !Double
   -- ^ The circle's radius.
   }
   deriving stock (Show, Eq)
 
 instance ToAttributes Circle where
-  toAttributes Circle { center = (cx, cy), radius = r } =
+  toAttributes Circle { center = Point cx cy, radius = r } =
     [ ("cx", toAttributeValue cx)
     , ("cy", toAttributeValue cy)
     , ("r", toAttributeValue r)

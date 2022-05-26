@@ -22,9 +22,11 @@ executable guis
     Seven.Timer
     UI.Attributes
     UI.Dialog
+    UI.DragAndDrop
     UI.Element
     UI.Event
     UI.History
+    UI.Point
     UI.PushMap
     UI.SVG
     UI.Widget

@@ -10,6 +10,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 module UI.Event where
@@ -36,7 +37,10 @@ import qualified GHCJS.DOM.MouseEvent        as MouseEvent
 import qualified GHCJS.DOM.Types             as GHCJS
 import qualified GHCJS.DOM.UIEvent           as UIEvent
 import qualified GHCJS.DOM.WheelEvent        as WheelEvent
+import qualified GHCJS.Types                 as GHCJS
 
+import           Language.Javascript.JSaddle (liftJSM, showJSValue, valToNumber,
+                                              (!))
 import qualified Language.Javascript.JSaddle as Js
 
 import qualified Reflex
@@ -44,6 +48,8 @@ import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (HasDomEvent, Reflex)
 
 import           Text.Printf                 (printf)
+
+import           UI.Point
 
 -- * Types of Events
 
@@ -191,17 +197,20 @@ data MouseButton = Main
 
 -- | Information from when the event triggered.
 data MouseEventResult = MouseEventResult
-  { screen    :: !(Int, Int)
+  { screen    :: !Point
   -- ^ The cursor position in global (screen) coordinates.
 
-  , client    :: !(Int, Int)
+  , client    :: !Point
   -- ^ The cursor position in local (DOM content) coordinates.
 
-  , movement  :: !(Int, Int)
+  , movement  :: !Point
   -- ^ The cursor position relative to the last 'Dom.Mousemove'
   -- event.
+  --
+  -- Warning: this currently does not seem to work correctly on
+  -- WebkitGtk, instead providing the same numbers as 'client'.
 
-  , offset    :: !(Int, Int)
+  , offset    :: !Point
   -- ^ The cursor position relative to the element of the event's
   -- target node. The relative position is calculated relative to the
   -- position of the padding edge of the target node.
@@ -226,10 +235,12 @@ getMouseEvent :: GHCJS.EventM e MouseEvent.MouseEvent MouseEventResult
 getMouseEvent = do
   e <- GHCJS.event
 
-  screen   <- (,) <$> MouseEvent.getScreenX e   <*> MouseEvent.getScreenY e
-  client   <- (,) <$> MouseEvent.getClientX e   <*> MouseEvent.getClientY e
-  movement <- (,) <$> MouseEvent.getMovementX e <*> MouseEvent.getMovementY e
-  offset   <- (,) <$> MouseEvent.getOffsetX e   <*> MouseEvent.getOffsetY e
+  val <- GHCJS.liftJSM $ GHCJS.toJSVal e
+
+  screen   <- point <$> MouseEvent.getScreenX e   <*> MouseEvent.getScreenY e
+  client   <- point <$> MouseEvent.getClientX e   <*> MouseEvent.getClientY e
+  movement <- point <$> MouseEvent.getMovementX e <*> MouseEvent.getMovementY e
+  offset   <- point <$> MouseEvent.getOffsetX e   <*> MouseEvent.getOffsetY e
 
   ctrl  <- MouseEvent.getCtrlKey e
   shift <- MouseEvent.getShiftKey e
@@ -424,15 +435,22 @@ getPasteText = do
 -- @
 -- data MSGestureEvent = MSGestureEvent {- ... -}
 --
--- toMSGestureEvent :: MonadJSM m => JSVal -> m MSGestureEvent
+-- toMSGestureEvent :: JSVal -> JSM MSGestureEvent
 -- toMSGestureEvent = {- ... -}
 --
 -- onGestureStart :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
 --                => Element er d t
 --                -> m (Event t MSGestureEvent)
--- onGestureStart element = do
---   rawEvent <- addEventListener element "MSGestureChange"
---   toMSGestureEvent rawEvent
+-- onGestureStart element =
+--   addEventListener element "MSGestureChange" toMSGestureEvent
+-- @
+--
+-- If you don't care about the value at each event, you can use @\ _
+-- -> pure ()@ to ignore it:
+--
+-- @
+-- events :: _ => m (Event t ())
+-- events = addEventListener element "onsomeevent" (\ _ -> pure ())
 -- @
 --
 -- See MDN: [@addEventListener@](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
@@ -442,11 +460,16 @@ addEventListener :: ( Reflex.TriggerEvent t m
                     )
                  => Dom.Element er d t
                  -> Text
-                 -> m (Reflex.Event t Js.JSVal)
-addEventListener element eventName = do
+                 -> (Js.JSVal -> Js.JSM a)
+                 -- ^ Function to transform the type of the object at
+                 -- each event.
+                 -> m (Reflex.Event t a)
+addEventListener element eventName f = do
   (event, trigger) <- Reflex.newTriggerEvent
   let jsTrigger _f _this = \case
-        [e] -> liftIO $ trigger e
+        [e] -> do
+          e' <- f e
+          liftIO $ trigger e'
         args ->
           error $ printf "Event listener callback called with %d ≠ 1 args" (length args)
 
