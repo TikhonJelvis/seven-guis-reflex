@@ -254,5 +254,5 @@
 .field .card.dragged {
   border: 3px solid black;
 
-  /* transform: scale(1.005) rotate(2deg); */
+  transform: scale(1.005) rotate(2deg);
 }

@@ -15,14 +15,14 @@ import           Data.Text       (Text)
 import qualified Data.Text       as Text
 
 import           Reflex          (Dynamic, attachWith, constDyn, current, gate,
-                                  holdDyn, leftmost, zipDynWith)
+                                  holdDyn, leftmost, performEvent, zipDynWith)
 import qualified Reflex.Dom      as Dom
 
 import qualified Text.Printf     as Text
 
 import           UI.Attributes   (addClass, setClass, setProperty)
-import           UI.Element      (Dom, elClass', elDynAttr')
-import           UI.Event        (EventResult, MouseButton (..), button, client, offset)
+import           UI.Element      (Dom, elClass', elDynAttr', offsetPosition)
+import           UI.Event        (EventResult, MouseButton (..), button, client)
 import           UI.Point        (Point (..))
 
 import qualified Witherable
@@ -49,7 +49,7 @@ widget = do
 --     draggable container "div" (constDyn []) (pure ())
 --   pure ()
 -- @
-draggable :: forall a m t. Dom t m
+draggable :: forall a m t. (Dom t m)
           => Dom.Element EventResult (Dom.DomBuilderSpace m) t
           -- ^ The element will only be draggable while the mouse is
           -- within this container.
@@ -72,20 +72,20 @@ draggable container tag attributes body = do
       held <- holdDyn False $
         leftmost [False <$ mouseup, True <$ mousedown]
 
-      -- the element and cursor position when drag starts
-      elementStart <- holdDyn (Point 0 0) $ elementPosition <$> mousedown
-      dragStart    <- holdDyn (Point 0 0) $ client <$> mousedown
+      -- note: this fires /after/ mousedown
+      offsets <- performEvent (offsetPosition element <$ mousedown)
+
+      startPosition <- holdDyn (Point 0 0) offsets
+      dragStart     <- holdDyn (Point 0 0) $ client <$> mousedown
 
       let moves = attachWith (-) (current dragStart) $ client <$> mousemove
-          resets = Point 0 0 <$ mousedown
+          resets = Point 0 0 <$ offsets
       delta <- holdDyn (Point 0 0) $
         leftmost [resets, gate (current held) moves]
-      let position = zipDynWith (-) elementStart delta
+      let position = zipDynWith (-) startPosition delta
 
   pure (element, result)
-  where elementPosition e = client e - offset e
-
-        setClasses dragged = addClass "draggable" . setClass "dragged" dragged
+  where setClasses dragged = addClass "draggable" . setClass "dragged" dragged
 
         setPosition Point { x, y } =
           setProperty "left" (px x) . setProperty "top" (px y)

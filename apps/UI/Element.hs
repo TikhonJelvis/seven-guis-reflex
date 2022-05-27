@@ -19,27 +19,34 @@ import           Data.Text                   (Text)
 
 import qualified GHCJS.DOM.DOMRect           as GHCJS
 import qualified GHCJS.DOM.Element           as GHCJS
+import qualified GHCJS.DOM.HTMLElement       as GHCJS
 import qualified GHCJS.DOM.Node              as GHCJS
+import           GHCJS.DOM.Types             (castTo)
 
 import           Language.Javascript.JSaddle (MonadJSM)
 
 import           Reflex
 import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
-                                              ElementConfig (..))
+                                              ElementConfig (..), RawElement)
 
 import           UI.Event
 import           UI.Point
 
+type PerformJS d m = ( MonadFix m
+                     , MonadJSM m
+                     , RawElement d ~ GHCJS.Element
+                     )
+
 type Dom t m = ( MonadFix m
                , MonadHold t m
-               , PerformEvent t m
-               , MonadJSM (Performable m)
                , TriggerEvent t m
+               , PerformEvent t m
                , PostBuild t m
                , DomBuilder t m
                , DomBuilderSpace m ~ Dom.GhcjsDomSpace
                , MonadJSM m
+               , PerformJS (DomBuilderSpace m) (Performable m)
                )
 
 -- * Creating Elements
@@ -138,8 +145,8 @@ data Rectangle = Rectangle
 --
 -- See: MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-bounds :: forall m er t. Dom t m
-       => Dom.Element er (DomBuilderSpace m) t
+bounds :: forall m d er t. PerformJS d m
+       => Dom.Element er d t
        -> m Rectangle
 bounds element = do
   rect <- GHCJS.getBoundingClientRect raw
@@ -157,8 +164,8 @@ bounds element = do
 --
 -- See: MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-dimensions :: forall m er t. Dom t m
-           => Dom.Element er (DomBuilderSpace m) t
+dimensions :: forall m d er t. PerformJS d m
+           => Dom.Element er d t
            -> m (Double, Double)
            -- ^ The width and height of the element in px,
            -- respectively.
@@ -170,30 +177,41 @@ dimensions element = do
 --
 -- See: MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-viewportPosition :: forall m er t. Dom t m
-                 => Dom.Element er (DomBuilderSpace m) t
+viewportPosition :: forall m d er t. PerformJS d m
+                 => Dom.Element er d t
                  -> m Point
 viewportPosition element = position <$> bounds element
 
 -- | Get the position of an element /relative to its parent element/.
 --
--- If the element doesn't have a parent, this is relative to the
--- viewport.
+-- For HTML elements, this uses @offsetLeft@ and @offsetTop@.
 --
--- This is calculated by subtracting the parent's 'viewportPosition'
--- from the element's 'viewportPosition'.
-offsetPosition :: forall m er t. Dom t m
-               => Dom.Element er (DomBuilderSpace m) t
+-- For other elements, this approximates by subtracting /this/
+-- element's viewport position from its parent's viewport position (as
+-- returned by 'viewportPosition').
+--
+-- See:
+--  * [HTMLElement.offsetLeft](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetLeft)
+--  * [HTMLElement.offsetLeft](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetTop)
+offsetPosition :: forall m d er t. PerformJS d m
+               => Dom.Element er d t
                -> m Point
-offsetPosition element = do
-  elementPosition <- viewportPosition element
-  GHCJS.getParentElement raw >>= \case
-    Nothing     -> pure elementPosition
-    Just parent -> do
-      parentRect <- GHCJS.getBoundingClientRect parent
-
-      parentX <- GHCJS.getX parentRect
-      parentY <- GHCJS.getY parentRect
-
-      pure $ elementPosition - Point { x = parentX, y = parentY }
+offsetPosition element = castTo GHCJS.HTMLElement raw >>= \case
+  Just htmlElement -> do
+    x <- GHCJS.getOffsetLeft htmlElement
+    y <- GHCJS.getOffsetTop htmlElement
+    pure Point { x, y }
+  Nothing -> elementOffset
   where raw = Dom._element_raw element
+
+        elementOffset = do
+          elementPosition <- viewportPosition element
+          GHCJS.getParentElement raw >>= \case
+            Nothing -> pure elementPosition
+            Just parent -> do
+              parentRect <- GHCJS.getBoundingClientRect parent
+
+              parentX <- GHCJS.getX parentRect
+              parentY <- GHCJS.getY parentRect
+
+              pure $ elementPosition - Point { x = parentX, y = parentY }
