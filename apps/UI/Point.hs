@@ -5,7 +5,6 @@
 {-# LANGUAGE ViewPatterns        #-}
 module UI.Point where
 
-import           Data.Text         (Text)
 import           Data.Text.Display
 
 -- | A point in 2D space, measured in px.

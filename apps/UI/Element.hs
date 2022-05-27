@@ -25,8 +25,7 @@ import           Language.Javascript.JSaddle (MonadJSM)
 
 import           Reflex
 import qualified Reflex.Dom                  as Dom
-import           Reflex.Dom                  (DomBuilder (..),
-                                              DomSpace (EventSpec),
+import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
                                               ElementConfig (..))
 
 import           UI.Event
@@ -49,7 +48,7 @@ el' :: forall a m t. Dom t m
     => Text
     -> m a
     -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
-el' tag = elAttr' tag []
+el' tagName = elAttr' tagName []
 {-# INLINABLE el' #-}
 
 -- | Create and return an element with the given class.
@@ -58,7 +57,7 @@ elClass' :: forall a m t. Dom t m
          -> Text
          -> m a
          -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
-elClass' tag class_ = elAttr' tag [("class", class_)]
+elClass' tagName class_ = elAttr' tagName [("class", class_)]
 {-# INLINABLE elClass' #-}
 
 -- | Create and return an element with the given attributes.
@@ -67,7 +66,7 @@ elAttr' :: forall a m t. Dom t m
         -> Map Text Text
         -> m a
         -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
-elAttr' tag attr = elDynAttr' tag (constDyn attr)
+elAttr' tagName attr = elDynAttr' tagName (constDyn attr)
 {-# INLINABLE elAttr' #-}
 
 -- | Create and return an elment with a dynamically changing set of
@@ -91,7 +90,7 @@ elDynAttrNs' :: forall a m t. Dom t m
              -> m a
              -- ^ Body
              -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
-elDynAttrNs' namespace tag attrs body = do
+elDynAttrNs' namespace tagName attrs body = do
   modifyAttrs <- Dom.dynamicAttributesToModifyAttributes attrs
   let config = ElementConfig
         { _elementConfig_namespace = namespace
@@ -100,7 +99,7 @@ elDynAttrNs' namespace tag attrs body = do
           Just $ fmapCheap Dom.mapKeysToAttributeName modifyAttrs
         , _elementConfig_eventSpec = eventSpec
         }
-  result <- element tag config body
+  result <- Dom.element tagName config body
   postBuild <- getPostBuild
   notReadyUntil postBuild
   pure result

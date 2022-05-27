@@ -10,23 +10,15 @@
 {-# LANGUAGE TypeApplications      #-}
 module UI.Dialog where
 
-import           UI.Element
-import           UI.Event
-import           UI.Widget
-
 import           Control.Lens                ((^.))
 import           Control.Monad               (unless, void, when)
-import           Control.Monad.Fix           (MonadFix)
-import           Control.Monad.IO.Class      (liftIO)
 
 import qualified Data.ByteString             as BS
 import           Data.Map                    (Map)
 import           Data.Text                   (Text)
 
-import qualified GHCJS.DOM.Element           as GHCJS
-
-import           Language.Javascript.JSaddle (JSVal, MakeObject, MonadJSM, fun,
-                                              js, jsf, liftJSM, valToBool, (!))
+import           Language.Javascript.JSaddle (MakeObject, MonadJSM, jsf,
+                                              liftJSM, valToBool, (!))
 
 import           Reflex
 import qualified Reflex.Dom                  as Dom hiding (element)
@@ -34,7 +26,9 @@ import           Reflex.Dom                  hiding (EventResult,
                                               EventResultType, button,
                                               elDynAttr', element)
 
-import qualified Witherable
+import           UI.Element
+import           UI.Event
+import           UI.Widget
 
 -- | HTML modal dialogs can either be hidden or shown in two ways:
 --
@@ -147,13 +141,13 @@ setDialogState :: (MonadJSM m, MakeObject (RawElement d))
                => Element er d t
                -> ModalState
                -> m ()
-setDialogState dialog state = liftJSM do
+setDialogState element state = liftJSM do
   open <- valToBool =<< raw ! ("open" :: Text)
   case state of
     Show      -> unless open $ void $ raw ^. jsf ("show" :: Text) ()
     ShowModal -> unless open $ void $ raw ^. jsf ("showModal" :: Text) ()
     Hide      -> when open   $ void $ raw ^. jsf ("hide" :: Text) ()
-  where raw = _element_raw dialog
+  where raw = _element_raw element
 
 -- | An 'Event' that triggers when the given @dialog@ element is
 -- closed.
@@ -162,7 +156,7 @@ setDialogState dialog state = liftJSM do
 onClose :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
         => Element er d t
         -> m (Event t ())
-onClose dialog = void <$> dialog `on` "close"
+onClose element = void <$> element `on` "close"
 
 -- | An 'Event' that triggers when the given @dialog@ element is
 -- closed.
@@ -171,7 +165,7 @@ onClose dialog = void <$> dialog `on` "close"
 onCancel :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
          => Element er d t
          -> m (Event t ())
-onCancel dialog = void <$> dialog `on` "cancel"
+onCancel element = void <$> element `on` "cancel"
 
 
 main :: IO ()

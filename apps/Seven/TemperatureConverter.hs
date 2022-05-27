@@ -6,19 +6,15 @@
 {-# LANGUAGE RecursiveDo                #-}
 module Seven.TemperatureConverter where
 
-import           UI.Element
-import           UI.Widget
-
-import           Control.Monad.Fix (MonadFix)
-
-import           Data.Maybe        (fromJust)
-import           Data.Text         (Text)
-import qualified Data.Text         as Text
+import           Data.Text   (Text)
 
 import           Reflex
 import           Reflex.Dom
 
-import           Text.Printf       (printf)
+import           Text.Printf (printf)
+
+import           UI.Element
+import           UI.Widget
 
 -- | The Temperature Converter has a frame with two text fields (°C
 -- and °F) that convert automatically.

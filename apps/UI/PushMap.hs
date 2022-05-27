@@ -6,8 +6,6 @@
 {-# LANGUAGE TypeFamilies               #-}
 module UI.PushMap where
 
-import           Control.Lens   ((<&>))
-
 import           Data.Bifunctor (second)
 import           Data.Map       (Map)
 import qualified Data.Map       as Map
@@ -16,7 +14,7 @@ import           GHC.Exts       (IsList (..))
 
 import           Prelude        hiding (lookup)
 
-import           Witherable     (Filterable, Witherable)
+import           Witherable     (Filterable)
 
 -- | A container that assigns increasing 'Int' indices when a value is
 -- pushed to it.
@@ -33,7 +31,7 @@ instance IsList (PushMap a) where
   type Item (PushMap a) = (Int, a)
 
   fromList xs = PushMap $ Map.fromList xs
-  toList (PushMap map) = Map.toList map
+  toList (PushMap m) = Map.toList m
 
 -- | Push a new value onto the map, giving it a larger index than any
 -- of the existing elements.
@@ -44,9 +42,9 @@ instance IsList (PushMap a) where
 -- >>> push "bar" [(5, "foo")]
 -- PushMap {toMap = fromList [(5,"foo"),(6,"bar")]}
 push :: a -> PushMap a -> PushMap a
-push a (PushMap map)
-  | Map.null map = PushMap [(0, a)]
-  | otherwise    = PushMap $ Map.insert (fst (Map.findMax map) + 1) a map
+push a (PushMap m)
+  | Map.null m = PushMap [(0, a)]
+  | otherwise  = PushMap $ Map.insert (fst (Map.findMax m) + 1) a m
 
 -- | Delete and return the value at the largest index in the map.
 --
@@ -58,7 +56,7 @@ push a (PushMap map)
 -- >>> pop []
 -- Nothing
 pop :: PushMap a -> Maybe (a, PushMap a)
-pop (PushMap map) = second PushMap <$> Map.maxView map
+pop (PushMap m) = second PushMap <$> Map.maxView m
 
 -- | Set the value associated with the given key.
 --
@@ -68,7 +66,7 @@ pop (PushMap map) = second PushMap <$> Map.maxView map
 -- >>> insert 4 "bar" [(4, "foo")]
 -- PushMap {toMap = fromList [(4,"bar")]}
 insert :: Int -> a -> PushMap a -> PushMap a
-insert k a (PushMap map) = PushMap $ Map.insert k a map
+insert k a (PushMap m) = PushMap $ Map.insert k a m
 
 -- | Returns the largest 'Int' key assigned to a value in the given
 -- 'PushMap'.
@@ -79,9 +77,9 @@ insert k a (PushMap map) = PushMap $ Map.insert k a map
 -- >>> maxKey [(0, "foo"), (100, "bar")]
 -- Just 100
 maxKey :: PushMap a -> Maybe Int
-maxKey (PushMap map)
-  | Map.null map = Nothing
-  | otherwise    = Just $ fst $ Map.findMax map
+maxKey (PushMap m)
+  | Map.null m = Nothing
+  | otherwise  = Just $ fst $ Map.findMax m
 
 -- | Look up the value assigned to the given 'Int' key, if any.
 --
@@ -91,7 +89,7 @@ maxKey (PushMap map)
 -- >>> lookup 1 [(0, "foo"), (1, "bar")]
 -- Just "bar"
 lookup :: Int -> PushMap a -> Maybe a
-lookup i (PushMap map) = Map.lookup i map
+lookup i (PushMap m) = Map.lookup i m
 
 -- | Remove the item at the given index from the map.
 --
@@ -105,4 +103,4 @@ lookup i (PushMap map) = Map.lookup i map
 -- >>> delete 1 [(0, "foo")]
 -- PushMap {toMap = fromList [(0,"foo")]}
 delete :: Int -> PushMap a -> PushMap a
-delete i (PushMap map) = PushMap $ Map.delete i map
+delete i (PushMap m) = PushMap $ Map.delete i m

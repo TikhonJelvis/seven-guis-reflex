@@ -3,8 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module UI.Attributes where
 
-import           Control.Lens  (both)
-
 import           Data.Bool     (bool)
 import qualified Data.Foldable as Foldable
 import           Data.Map      (Map)

@@ -12,6 +12,7 @@ data-files:    css/tasks.css
 executable guis
   hs-source-dirs:   apps
   default-language: Haskell2010
+  ghc-options:      -Wall -Wno-unused-do-bind -Wno-type-defaults
   main-is:          Main.hs
   other-modules:
     Seven.CircleDrawer

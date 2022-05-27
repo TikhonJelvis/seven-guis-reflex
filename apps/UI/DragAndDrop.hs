@@ -8,32 +8,22 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module UI.DragAndDrop where
 
-import           Control.Monad               (void)
 
-import qualified Data.ByteString             as BS
-import           Data.Map                    (Map)
-import           Data.Text                   (Text)
-import qualified Data.Text                   as Text
+import qualified Data.ByteString as BS
+import           Data.Map        (Map)
+import           Data.Text       (Text)
+import qualified Data.Text       as Text
 
-import           Language.Javascript.JSaddle (liftJSM, valToNumber, (!))
+import           Reflex          (Dynamic, attachWith, constDyn, current, gate,
+                                  holdDyn, leftmost, zipDynWith)
+import qualified Reflex.Dom      as Dom
 
-import           Reflex                      (Dynamic, attachPromptlyDyn,
-                                              attachPromptlyDynWith, attachWith,
-                                              constDyn, current, foldDyn, gate,
-                                              holdDyn, leftmost, traceEvent,
-                                              zipDynWith)
-import qualified Reflex.Dom                  as Dom
+import qualified Text.Printf     as Text
 
-import qualified Text.Printf                 as Text
-
-import           UI.Attributes               (addClass, setClass, setProperty)
-import           UI.Element                  (Dom, elClass', elDynAttr',
-                                              offsetPosition)
-import           UI.Event                    (EventResult, MouseButton (..),
-                                              button, client, movement, offset)
-import qualified UI.Point                    as Point
-import           UI.Point                    (Point (..))
-import           UI.Widget                   (output)
+import           UI.Attributes   (addClass, setClass, setProperty)
+import           UI.Element      (Dom, elClass', elDynAttr')
+import           UI.Event        (EventResult, MouseButton (..), button, client, offset)
+import           UI.Point        (Point (..))
 
 import qualified Witherable
 

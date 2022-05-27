@@ -10,10 +10,8 @@ module Seven.FlightBooker where
 
 import           Control.Applicative    ((<|>))
 import           Control.Monad          (void)
-import           Control.Monad.Fix      (MonadFix)
 import           Control.Monad.IO.Class (MonadIO (liftIO))
 
-import qualified Data.Text              as Text
 import           Data.Text.Display      (Display (..))
 import qualified Data.Text.Display      as Display
 import qualified Data.Text.Lazy.Builder as Text
@@ -47,26 +45,18 @@ import           UI.Widget
 -- from <date> to <date>").
 widget :: forall m t. (MonadIO m, Dom t m) => m ()
 widget = elClass "div" "flight-booker" do
-  mode   <- selectEnum @Mode
-  oneWay <- dateInput (constDyn Enabled)
-  return <- dateInput (enableIfReturn <$> mode)
+  mode  <- selectEnum @Mode
+  there <- dateInput (constDyn Enabled)
+  back  <- dateInput (enabledIf . (== Return) <$> mode)
 
-  let canBook = enableButton <$> mode <*> oneWay <*> return
+  let canBook = enableButton <$> mode <*> there <*> back
   bookClick <- button' "Book" canBook
 
-  let trip = toTrip <$> mode <*> oneWay <*> return
+  let trip = toTrip <$> mode <*> there <*> back
   booked <- foldDyn (<|>) Nothing (tag (current trip) bookClick)
 
   void $ dyn $ confirmationMessage <$> booked
-  where enableIfReturn = \case
-          Return -> Enabled
-          OneWay -> Disabled
-
-        enableIfJust = \case
-          Just _  -> Enabled
-          Nothing -> Disabled
-
-        enableButton OneWay Just{} _ = Enabled
+  where enableButton OneWay Just{} _ = Enabled
         enableButton Return (Just start) (Just end)
           | start <= end = Enabled
         enableButton _ _ _ = Disabled

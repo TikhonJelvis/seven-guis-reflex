@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes   #-}
+{-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -12,7 +13,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 module UI.Event where
 
@@ -39,8 +39,7 @@ import qualified Language.Javascript.JSaddle as Js
 
 import qualified Reflex
 import qualified Reflex.Dom                  as Dom
-import           Reflex.Dom                  (GhcjsDomSpace, HasDomEvent,
-                                              Reflex)
+import           Reflex.Dom                  (HasDomEvent, Reflex)
 
 import           Text.Printf                 (printf)
 

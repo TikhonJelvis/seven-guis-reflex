@@ -15,7 +15,13 @@ import           Data.Maybe             (fromMaybe, isJust)
 import qualified Data.Text              as Text
 import qualified Data.Time              as Time
 
-import           Reflex.Dom
+import           Reflex.Dom             (MonadHold (holdDyn),
+                                         PerformEvent (Performable),
+                                         Reflex (current, never),
+                                         TickInfo (_tickInfo_lastUTC),
+                                         TriggerEvent, constDyn, elClass,
+                                         mainWidgetWithCss, tag, text,
+                                         tickLossy, zipDynWith)
 
 import           Text.Printf            (printf)
 
@@ -36,9 +42,9 @@ widget = elClass "div" "timer" do
   time <- holdDyn now (_tickInfo_lastUTC <$> ticks)
 
   text "Elapsed time:"
-  rec let remaining _ Nothing               = 0
-          remaining 0 _                     = 1
-          remaining duration (Just elapsed) = realToFrac (elapsed / duration)
+  rec let remaining _ Nothing         = 0
+          remaining 0 _               = 1
+          remaining total (Just part) = realToFrac (part / total)
       progressBar $ remaining <$> duration <*> elapsed
       output $ renderSeconds . fromMaybe 0 <$> elapsed
 
@@ -51,7 +57,7 @@ widget = elClass "div" "timer" do
           buttonLabel = elapsed <&> \ e -> if isJust e then "Reset" else "Start"
 
           diff :: Time.UTCTime -> Maybe Time.UTCTime -> Maybe Time.NominalDiffTime
-          diff time start = Time.diffUTCTime time <$> start
+          diff t start = Time.diffUTCTime t <$> start
 
   pure ()
     where renderSeconds t = Text.pack $ printf "%.1f s" (realToFrac t :: Double)

@@ -5,10 +5,6 @@
 {-# LANGUAGE TypeApplications  #-}
 module Seven.Counter where
 
-import           Control.Monad.Fix (MonadFix)
-
-import qualified Data.Text         as Text
-
 import           Reflex
 import           Reflex.Dom
 

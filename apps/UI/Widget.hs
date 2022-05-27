@@ -16,39 +16,32 @@
 -- | Widgets that I use throughout the seven example tasks.
 module UI.Widget where
 
-import           Control.Lens      ((<&>), (^.))
-import           Control.Monad     (join, void)
-import           Control.Monad.Fix (MonadFix)
+import           Control.Lens       ((&), (.~), (<&>))
+import           Control.Monad      (void)
+import           Control.Monad.Fix  (MonadFix)
 
-import           Data.Bool         (bool)
-import qualified Data.Foldable     as Foldable
-import           Data.IntMap       (IntMap)
-import           Data.IntSet       (IntSet)
-import           Data.Map          (Map)
-import qualified Data.Map          as Map
-import           Data.Maybe        (fromMaybe, listToMaybe)
-import           Data.Set          (Set)
-import qualified Data.Set          as Set
-import           Data.Text         (Text)
-import qualified Data.Text         as Text
-import           Data.Text.Display (Display)
-import qualified Data.Text.Display as Display
-import           Data.Vector       (Vector)
-import qualified Data.Vector       as Vector
-
-import           GHC.Exts          (IsList (..))
+import           Data.Bool          (bool)
+import           Data.Default.Class (def)
+import           Data.Map           (Map)
+import qualified Data.Map           as Map
+import           Data.Maybe         (fromMaybe)
+import           Data.Text          (Text)
+import qualified Data.Text          as Text
+import           Data.Text.Display  (Display)
+import qualified Data.Text.Display  as Display
 
 import           Reflex
-import           Reflex.Dom        hiding (EventResult, elDynAttr')
+import qualified Reflex.Dom         as Dom
+import           Reflex.Dom         (DomBuilder, DomBuilderSpace, (=:))
 
-import           Text.Printf       (printf)
-import           Text.Read         (readMaybe)
+import           Text.Printf        (printf)
+import           Text.Read          (readMaybe)
 
-import           UI.Attributes     (addClass)
+import           UI.Attributes      (addClass)
 import           UI.Element
-import           UI.Event          (EventResult)
-import qualified UI.PushMap        as PushMap
-import           UI.PushMap        (PushMap)
+import           UI.Event           (EventResult)
+import qualified UI.PushMap         as PushMap
+import           UI.PushMap         (PushMap)
 
 -- * Widgets
 
@@ -56,14 +49,14 @@ import           UI.PushMap        (PushMap)
 
 -- | A static label with some text. Has the CSS class @label@.
 label :: forall m t. DomBuilder t m => Text -> m ()
-label = elClass "div" "label" . text
+label = Dom.elClass "div" "label" . Dom.text
 
 -- | A label that displays a dynamically updating value.
 --
 -- These outputs can all be styled with @div.output@.
 output :: forall a m t. (Display a, Dom t m) => Dynamic t a -> m ()
-output value = elClass "div" "output" do
-  dynText $ Display.display <$> value
+output value = Dom.elClass "div" "output" do
+  Dom.dynText $ Display.display <$> value
 
 -- | A label displaying the given value. Has the CSS class @output@.
 --
@@ -74,8 +67,8 @@ output' :: forall a m t. (Display a, Dom t m)
         -> Dynamic t a
         -- ^ Dynamically changing value to display.
         -> m ()
-output' attributes value = elDynAttr "div" (addClass "output" <$> attributes) do
-  dynText $ Display.display <$> value
+output' attributes value = Dom.elDynAttr "div" (addClass "output" <$> attributes) do
+  Dom.dynText $ Display.display <$> value
 
 -- | A progress bar that fills up left-to-right.
 --
@@ -85,8 +78,8 @@ progressBar :: forall m t. Dom t m
             -- ^ Progress between 0 and 1. Values < 0 are treated as
             -- 0, values > 1 are treated as 1.
             -> m ()
-progressBar progress = elClass "div" "progress-bar" do
-  elDynAttr "div" (addClass "bar" . toWidth <$> progress) $ pure ()
+progressBar progress = Dom.elClass "div" "progress-bar" do
+  Dom.elDynAttr "div" (addClass "bar" . toWidth <$> progress) $ pure ()
   where toWidth :: Double -> Map Text Text
         toWidth (toPercent -> p) =
           [("style", Text.pack $ printf "width: %.2f%%" p)]
@@ -116,15 +109,15 @@ setEnabled Disabled attributes = Map.insert "disabled" "true" attributes
 -- with a label that can change dynamically.
 --
 -- Returns a stream of button press events.
-button' :: forall a m t. (Dom t m)
+button' :: forall m t. (Dom t m)
         => Dynamic t Text
         -- ^ The button label.
         -> Dynamic t Enabled
         -- ^ Whether the button is enabled or disabled.
         -> m (Event t ())
-button' label enabled = do
-  (e, _) <- elDynAttr' "button" attrs $ dynText label
-  pure $ void $ domEvent Click e
+button' l enabled = do
+  (e, _) <- elDynAttr' "button" attrs $ Dom.dynText l
+  pure $ void $ Dom.domEvent Dom.Click e
   where attrs = enabled <&> \case
           Enabled  -> []
           Disabled -> [("disabled", "true")]
@@ -151,16 +144,16 @@ readInput :: forall a m t. (Dom t m, Read a, Show a)
           -- @constDyn Enabled@ to always keep it enabled.
           -> m (Dynamic t (Maybe a))
 readInput initial setEvents enabled = do
-  modify <- dynamicAttributesToModifyAttributes $ toAttributes <$> enabled
-  input <- inputElement (config modify)
-  holdDyn (Just initial) $ read' <$> _inputElement_input input
+  modify <- Dom.dynamicAttributesToModifyAttributes $ toAttributes <$> enabled
+  input <- Dom.inputElement (config modify)
+  holdDyn (Just initial) $ read' <$> Dom._inputElement_input input
   where read' = readMaybe . Text.unpack
         show' = Text.pack . show
 
         config modify =
-          def & inputElementConfig_initialValue .~ show' initial
-              & inputElementConfig_setValue .~ (show' <$> setEvents)
-              & modifyAttributes .~ modify
+          def & Dom.inputElementConfig_initialValue .~ show' initial
+              & Dom.inputElementConfig_setValue .~ (show' <$> setEvents)
+              & Dom.modifyAttributes .~ modify
 
         toAttributes Enabled  = Map.empty
         toAttributes Disabled = Map.fromList [("disabled", "true")]
@@ -175,14 +168,14 @@ readInput initial setEvents enabled = do
 selectEnum :: forall a m t. (DomBuilder t m, Enum a, Bounded a, Display a)
            => m (Dynamic t a)
 selectEnum = do
-  (select, _) <- selectElement config options
-  pure $ toEnum . read . Text.unpack <$> _selectElement_value select
+  (element, _) <- Dom.selectElement config options
+  pure $ toEnum . read . Text.unpack <$> Dom._selectElement_value element
   where options = mapM @[] toOption [minBound @a .. maxBound]
         toOption value =
-          elAttr "option" ("value" =: showEnum value) $
-            text (Display.display value)
+          Dom.elAttr "option" ("value" =: showEnum value) $
+            Dom.text (Display.display value)
 
-        config = def & selectElementConfig_initialValue .~ showEnum (minBound @a)
+        config = def & Dom.selectElementConfig_initialValue .~ showEnum (minBound @a)
 
         showEnum = Text.pack . show . fromEnum
 
@@ -199,16 +192,16 @@ selectEnum = do
 -- @
 --
 -- Returns the position as a 'Double' between 0 and 1.
-range :: forall a m t. Dom t m => Event t Double -> m (Dynamic t Double)
+range :: forall m t. Dom t m => Event t Double -> m (Dynamic t Double)
 range (fmap (Text.pack . show) -> setEvents) = do
-  e <- inputElement config
-  pure $ readValue <$> value e
-  where config = def & inputElementConfig_initialValue .~ "0.5"
-                     & inputElementConfig_setValue .~ setEvents
-                     & initialAttributes .~ [ ("type", "range")
-                                            , ("min", "0.0")
-                                            , ("max", "1.0")
-                                            , ("step", "any") ]
+  e <- Dom.inputElement config
+  pure $ readValue <$> Dom.value e
+  where config = def & Dom.inputElementConfig_initialValue .~ "0.5"
+                     & Dom.inputElementConfig_setValue .~ setEvents
+                     & Dom.initialAttributes .~ [ ("type", "range")
+                                                , ("min", "0.0")
+                                                , ("max", "1.0")
+                                                , ("step", "any") ]
 
         -- This should only be Nothing if somebody is manually
         -- screwing around with the DOM or something...
@@ -222,17 +215,17 @@ range (fmap (Text.pack . show) -> setEvents) = do
 listbox :: forall a m t. (Display a, Dom t m)
         => Dynamic t (PushMap a)
         -> m (Dynamic t (Maybe Int))
-listbox elements = elClass "div" "listbox" do
+listbox elements = Dom.elClass "div" "listbox" do
   rec selected <- holdDyn Nothing =<< selectView selected elements row
   pure selected
-  where row k a selected = do
-          let isSelected is = if is then "row selected" else "row"
-          (element, _) <- elDynClass' "div" (isSelected <$> selected) $
-            dynText (Display.display <$> a)
+  where row k a isSelected = do
+          let class_ = bool "row" "selected row"
+          (element, _) <- Dom.elDynClass' "div" (class_ <$> isSelected) $
+            Dom.dynText (Display.display <$> a)
 
-          let select   = Just k  <$ domEvent Click element
-              unselect = Nothing <$ domEvent Dblclick element
-          pure $ leftmost [unselect, select]
+          let selected   = Just k  <$ Dom.domEvent Dom.Click element
+              unselected = Nothing <$ Dom.domEvent Dom.Dblclick element
+          pure $ leftmost [unselected, selected]
 
 -- * Element Interaction
 
@@ -250,11 +243,11 @@ hovering :: Dom t m
          -- is over a given element in JavaScript is surpringly
          -- fiddly, so pushing it to the caller seems like the best
          -- option right now...
-         -> Element EventResult (DomBuilderSpace m) t
+         -> Dom.Element EventResult (DomBuilderSpace m) t
          -> m (Dynamic t Bool)
 hovering start element = holdDyn start $ leftmost [over, leave]
-  where over  = True  <$ domEvent Mouseover element
-        leave = False <$ domEvent Mouseleave element
+  where over  = True  <$ Dom.domEvent Dom.Mouseover element
+        leave = False <$ Dom.domEvent Dom.Mouseleave element
 
 
 -- * FRP Utilities

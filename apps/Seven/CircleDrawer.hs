@@ -13,41 +13,34 @@
 {-# LANGUAGE TupleSections         #-}
 module Seven.CircleDrawer where
 
-import           Control.Applicative ((<|>))
-import           Control.Lens        ((&), (<&>), (??))
-import           Control.Monad       (join, void)
+import           Control.Lens       ((<&>), (??))
 
-import           Data.Bool           (bool)
-import qualified Data.ByteString     as BS
-import           Data.Default.Class  (def)
-import qualified Data.List           as List
-import           Data.Map            (Map)
-import qualified Data.Map            as Map
-import           Data.Maybe          (fromMaybe, listToMaybe)
-import           Data.Text           (Text)
-import qualified Data.Text           as Text
-import           Data.Text.Display   (Display, ShowInstance (..))
+import qualified Data.ByteString    as BS
+import           Data.Default.Class (def)
+import           Data.Maybe         (fromMaybe)
+import qualified Data.Text          as Text
+import           Data.Text.Display  (Display, ShowInstance (..))
 
 import           Reflex
-import qualified Reflex.Dom          as Dom
-import           Reflex.Dom          (dynText)
+import qualified Reflex.Dom         as Dom
+import           Reflex.Dom         (dynText)
 
-import qualified Text.Printf         as Text
+import qualified Text.Printf        as Text
 
-import           UI.Attributes       (ToAttributes (..), setClass)
-import           UI.Dialog           (DialogElement (..), ModalState (..),
-                                      dialog)
-import           UI.Element          (Dom)
+import           UI.Attributes      (ToAttributes (..), setClass)
+import           UI.Dialog          (DialogElement (..), ModalState (..),
+                                     dialog)
+import           UI.Element         (Dom)
 import           UI.Event
-import qualified UI.History          as History
-import           UI.History          (Undos (..))
+import qualified UI.History         as History
+import           UI.History         (Undos (..))
 import           UI.Point
-import qualified UI.PushMap          as PushMap
-import           UI.PushMap          (PushMap)
+import qualified UI.PushMap         as PushMap
+import           UI.PushMap         (PushMap)
 import           UI.SVG
 import           UI.Widget
 
-import           Witherable          (Filterable (..), catMaybes, (<&?>))
+import           Witherable         (Filterable (..), catMaybes, (<&?>))
 
 main :: IO ()
 main = do
