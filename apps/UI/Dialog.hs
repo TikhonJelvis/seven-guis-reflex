@@ -162,7 +162,7 @@ setDialogState dialog state = liftJSM do
 onClose :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
         => Element er d t
         -> m (Event t ())
-onClose dialog = addEventListener dialog "close" (\ _ -> pure ())
+onClose dialog = void <$> dialog `on` "close"
 
 -- | An 'Event' that triggers when the given @dialog@ element is
 -- closed.
@@ -171,7 +171,7 @@ onClose dialog = addEventListener dialog "close" (\ _ -> pure ())
 onCancel :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
          => Element er d t
          -> m (Event t ())
-onCancel dialog = addEventListener dialog "cancel" (\ _ -> pure ())
+onCancel dialog = void <$> dialog `on` "cancel"
 
 
 main :: IO ()
