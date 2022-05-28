@@ -45,6 +45,30 @@ import           UI.PushMap         (PushMap)
 
 -- * Widgets
 
+-- ** Structure
+
+-- | An ordered list, with the given widgets as list items.
+--
+-- Each item is automatically wrapped in an @li@ element.
+ol :: forall a m t. Dom t m
+   => Dynamic t (Map Text Text)
+   -- ^ Attributes
+   -> [m a]
+   -- ^ List items
+   -> m (Element (DomBuilderSpace m) t, [a])
+ol attributes = elDynAttr' "ol" attributes . mapM (Dom.el "li")
+
+-- | An unordered list, with the given widgets as list items.
+--
+-- Each item is automatically wrapped in an @li@ element.
+ul :: forall a m t. Dom t m
+   => Dynamic t (Map Text Text)
+   -- ^ Attributes
+   -> [m a]
+   -- ^ List items
+   -> m (Element (DomBuilderSpace m) t, [a])
+ul attributes = elDynAttr' "ul" attributes . mapM (Dom.el "li")
+
 -- ** Outputs
 
 -- | A static label with some text. Has the CSS class @label@.

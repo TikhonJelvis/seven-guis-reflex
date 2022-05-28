@@ -9,7 +9,6 @@
 module Seven.CRUD where
 
 import           Control.Lens
-import           Control.Monad     (void)
 
 import qualified Data.ByteString   as BS
 import           Data.Text         (Text)
@@ -20,7 +19,6 @@ import           Reflex.Dom        hiding (Delete)
 
 import           UI.Element
 import qualified UI.PushMap        as PushMap
-import           UI.PushMap        (PushMap)
 import           UI.Widget
 
 import qualified Witherable        (Filterable (filter))
@@ -30,13 +28,13 @@ widget = elClass "div" "crud" do
   rec let updates = current (zipDynWith act selected entered) <@> action
       names <- foldDynMaybe ($) mempty updates
 
-      prefix   <- filter
+      prefix   <- prefixEntry
       selected <- listbox $ zipDynWith filterPrefix prefix names
       entered  <- elClass "div" "name-input" nameInput
       action   <- crud
   pure ()
   where
-    filter = elClass "div" "filter" do
+    prefixEntry = elClass "div" "filter" do
       label "Filter prefix: "
       value <$> inputElement def
 

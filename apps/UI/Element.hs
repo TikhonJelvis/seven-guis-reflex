@@ -1,13 +1,14 @@
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE DerivingStrategies  #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 module UI.Element where
 
 import           Control.Monad.Fix           (MonadFix)
@@ -48,6 +49,8 @@ type Dom t m = ( MonadFix m
                , MonadJSM m
                , PerformJS (DomBuilderSpace m) (Performable m)
                )
+
+type Element d t = Dom.Element EventResult d t
 
 -- * Creating Elements
 

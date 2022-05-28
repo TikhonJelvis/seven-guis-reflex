@@ -21,10 +21,8 @@ import           Language.Javascript.JSaddle (MakeObject, MonadJSM, jsf,
                                               liftJSM, valToBool, (!))
 
 import           Reflex
-import qualified Reflex.Dom                  as Dom hiding (element)
-import           Reflex.Dom                  hiding (EventResult,
-                                              EventResultType, button,
-                                              elDynAttr', element)
+import qualified Reflex.Dom                  as Dom
+import           Reflex.Dom                  (DomBuilderSpace)
 
 import           UI.Element
 import           UI.Event
@@ -60,7 +58,7 @@ data ModalState = Show | ShowModal | Hide
 --   * [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/cancel_event)
 --   * [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
 data DialogElement d t = DialogElement
-  { element  :: Element EventResult d t
+  { element  :: Element d t
   , closed   :: Event t ()
   , canceled :: Event t ()
   }
@@ -118,8 +116,8 @@ alert :: forall m t. (Dom t m)
 alert trigger = do
   (element, _) <- dialog (ShowModal <$ trigger) attrs do
     message <- holdDyn "" trigger
-    dynText message
-    elAttr "form" [("method", "dialog")] $ Dom.button "Ok"
+    Dom.dynText message
+    Dom.elAttr "form" [("method", "dialog")] $ Dom.button "Ok"
   pure element
   where attrs = constDyn [("class", "alert")]
 
@@ -137,8 +135,8 @@ alert trigger = do
 -- Note that the dialog can be closed through user actions outside of
 -- Haskell code, so it /is/ possible for two 'Show'/'ShowModal' events
 -- in a row to both have an effect.
-setDialogState :: (MonadJSM m, MakeObject (RawElement d))
-               => Element er d t
+setDialogState :: (MonadJSM m, MakeObject (Dom.RawElement d))
+               => Element d t
                -> ModalState
                -> m ()
 setDialogState element state = liftJSM do
@@ -147,14 +145,14 @@ setDialogState element state = liftJSM do
     Show      -> unless open $ void $ raw ^. jsf ("show" :: Text) ()
     ShowModal -> unless open $ void $ raw ^. jsf ("showModal" :: Text) ()
     Hide      -> when open   $ void $ raw ^. jsf ("hide" :: Text) ()
-  where raw = _element_raw element
+  where raw = Dom._element_raw element
 
 -- | An 'Event' that triggers when the given @dialog@ element is
 -- closed.
 --
 -- See MDN: [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-onClose :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
-        => Element er d t
+onClose :: (TriggerEvent t m, MakeObject (Dom.RawElement d), MonadJSM m, Reflex t)
+        => Element d t
         -> m (Event t ())
 onClose element = void <$> element `on` "close"
 
@@ -162,8 +160,8 @@ onClose element = void <$> element `on` "close"
 -- closed.
 --
 -- See MDN: [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-onCancel :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
-         => Element er d t
+onCancel :: (TriggerEvent t m, MakeObject (Dom.RawElement d), MonadJSM m, Reflex t)
+         => Element d t
          -> m (Event t ())
 onCancel element = void <$> element `on` "cancel"
 
@@ -171,7 +169,7 @@ onCancel element = void <$> element `on` "cancel"
 main :: IO ()
 main = do
   css <- BS.readFile "css/tasks.css"
-  mainWidgetWithCss css do
+  Dom.mainWidgetWithCss css do
     press <- Dom.button "Hello"
     DialogElement { closed, canceled } <- alert ("Hello, World!" <$ press)
     countClose <- count closed

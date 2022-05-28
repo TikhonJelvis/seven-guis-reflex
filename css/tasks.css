@@ -228,11 +228,11 @@
 
 /* Drag and Drop Demo */
 
-.field {
+.drag-demo .drag-example {
   position: relative;
 
-  height: 90%;
-  width: 90%;
+  height: 200px;
+  width: 400px;
 
   overflow: hidden;
 
@@ -243,16 +243,12 @@
   user-select: none;
 }
 
-.field .card {
-  height: 300px;
-  width: 200px;
+.drag-example > div {
+  height: 50px;
+  width: 50px;
 
   border: 2px solid black;
   border-radius: 10px;
-}
 
-.field .card.dragged {
-  border: 3px solid black;
-
-  transform: scale(1.005) rotate(2deg);
+  background-color: blue;
 }

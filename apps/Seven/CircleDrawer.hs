@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DerivingVia           #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
