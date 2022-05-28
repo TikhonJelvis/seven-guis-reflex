@@ -1,6 +1,7 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedLists   #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedLists    #-}
+{-# LANGUAGE OverloadedStrings  #-}
 module UI.Attributes where
 
 import           Data.Bool     (bool)
@@ -214,6 +215,35 @@ setProperty property value attributes = case Map.lookup "style" attributes of
   Nothing       -> Map.insert "style" (joinStyles [(property, value)]) attributes
   Just existing -> Map.insert "style" (joinStyles $ update existing) attributes
   where update = Map.insert property value . styles
+
+-- | Use the given function to combine the old value of a property
+-- with the given new value.
+--
+-- If the property is not set, this will set it to the given value.
+--
+-- This is handy for properties that can take a sequence of values
+-- like @transform@:
+--
+-- >>> let app b a = a <> " " <> b
+-- >>> let translate = "translate(10px, 10px)"
+--
+-- >>> updateProperty app "transform" translate []
+-- fromList [("style","transform: translate(10px, 10px)")]
+--
+-- >>> updateProperty app "transform" translate [("style", "transform: rotate(10deg)")]
+-- fromList [("style","transform: rotate(10deg) translate(10px, 10px)")]
+updateProperty :: (Text -> Text -> Text)
+               -- ^ Function to combine values: @f new old@
+               -> Text
+               -- ^ Property name
+               -> Text
+               -- ^ New property value
+               -> Map Text Text
+               -> Map Text Text
+updateProperty f property value attributes = case Map.lookup "style" attributes of
+  Nothing       -> Map.insert "style" (joinStyles [(property, value)]) attributes
+  Just existing -> Map.insert "style" (joinStyles $ update existing) attributes
+  where update = Map.insertWith f property value . styles
 
 -- * Attribute Parsing
 

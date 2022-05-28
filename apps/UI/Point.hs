@@ -18,6 +18,7 @@ data Point = Point
   --
   -- Starts with 0 at the left and goes right, or, in RTL mode, starts
   -- with 0 at the right and goes left.
+
   , y :: !Double
   -- ^ The y coordinate of the point in px. Starts with 0 at the top
   -- and goes down.
