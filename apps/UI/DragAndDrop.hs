@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns        #-}
 module UI.DragAndDrop where
 
 
@@ -14,31 +13,41 @@ import           Control.Monad     (void)
 import           Control.Monad.Fix (MonadFix)
 
 import qualified Data.ByteString   as BS
-import           Data.Map          (Map)
-import           Data.Maybe        (fromMaybe, isJust)
-import           Data.Text         (Text)
-import qualified Data.Text         as Text
+import           Data.Maybe        (fromMaybe)
 
 import qualified Reflex
 import           Reflex            (Dynamic, Reflex)
 import qualified Reflex.Dom        as Dom
 
-import qualified Text.Printf       as Text
-
-import           UI.Attributes     (addClass, setClass, translate,
-                                    updateProperty)
+import           UI.Attributes     (Angle (..), rotate, scale, translate)
 import           UI.Element        (Dom, elClass', elDynAttr')
 import           UI.Event          (EventResult, MouseButton (..), button,
                                     client)
-import           UI.Point          (Point (..))
+import           UI.Point          (Point (..), distance)
 import           UI.Widget         (label, ul)
 
 import qualified Witherable
 
 demo :: forall m t. Dom t m => m ()
 demo = void $ ul (Reflex.constDyn [("class", "drag-demo")])
-  [ example "Follow cursor exactly." translate ]
-  where example description doDrag = mdo
+  [ example "Follow cursor exactly" translate
+  , example "Horizontal only" xOnly
+  , example "Vertical only" yOnly
+  , example "Snap to 50px grid" (snapTo 50)
+  , example "Rotate" rotateByDistance
+  , example "Scale" scaleByDistance
+  ]
+  where xOnly Point { x } = translate (Point x 0)
+        yOnly Point { y } = translate (Point 0 y)
+
+        snapTo n Point { x, y } = translate (Point (toGrid n x) (toGrid n y))
+        toGrid n x = x - fromInteger (round x `mod` n)
+
+        rotateByDistance p = rotate (Turn $ distance p 0 / 100)
+
+        scaleByDistance p = scale (1 + distance p 0 / 250)
+
+        example description doDrag = mdo
           label description
           (container, _) <- elClass' "div" "drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
@@ -46,44 +55,6 @@ demo = void $ ul (Reflex.constDyn [("class", "drag-demo")])
             Drags { total } <- drags container element
             pure ()
           pure ()
-
--- | Create an element draggable within the given container.
---
--- We need a containing element because using @mousemove@ events from
--- a container is more robust than using @mousemove@ events from the
--- element being dragged.
---
--- Ideally, the container should be the parent of the draggable
--- element. You can do this using @RecursiveDo@:
---
--- @
--- widget = do
---   rec (container, _) <- elClass' "div" "container" $
---     draggable container "div" (constDyn []) (pure ())
---   pure ()
--- @
-draggable :: forall a m t. (Dom t m)
-          => Dom.Element EventResult (Dom.DomBuilderSpace m) t
-          -- ^ The element will only be draggable while the mouse is
-          -- within this container.
-          -> Text
-          -- ^ The tag for the draggable element
-          -> Dynamic t (Map Text Text)
-          -- ^ Attributes for the draggable element
-          -> m a
-          -- ^ Body of the draggable element
-          -> m (Dom.Element EventResult (Dom.DomBuilderSpace m) t, a)
-draggable container tag attributes body = do
-  rec (element, result) <- elDynAttr' tag attributes' body
-      let attributes' = setClasses <$> current <*> (translate <$> total <*> attributes)
-      Drags { current, total } <- drags container element
-  pure (element, result)
-  where setClasses (isJust -> dragged) =
-          addClass "draggable" . setClass "dragged" dragged
-
-        translate Point {x, y} = updateProperty append "transform" $
-          Text.pack $ Text.printf "translate(%fpx, %fpx)" x y
-        append a b = b <> " " <> a
 
 -- | Information about how a user interacts with an element by
 -- dragging.
@@ -149,13 +120,14 @@ data Drags t = Drags
 -- Snap to a 10px grid:
 --
 -- @
--- doDrag Point { x, y } = translate (Point (x `mod` 10) (y `mod` 10))
+-- doDrag Point { x, y } = translate (Point (toGrid x) (toGrid y))
+--   where toGrid n = fromInteger $ round n `mod` 10
 -- @
 --
 -- Rotate based on the Euclidean distance the user drags:
 --
 -- @
--- doDrag p = rotate (Deg $ distance p 0 / 1000)
+-- doDrag p = rotate (Turn $ distance p 0 / 100)
 -- @
 drags :: (Reflex t, Reflex.MonadHold t m, MonadFix m)
       => Dom.Element EventResult d t
