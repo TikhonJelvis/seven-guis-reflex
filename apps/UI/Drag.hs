@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -27,7 +28,8 @@ import qualified Reflex
 import           Reflex                          (Dynamic, Event)
 import qualified Reflex.Dom                      as Dom
 
-import           UI.Attributes                   (Angle (..), rotate, scale,
+import           UI.Attributes                   (Angle (..), Transition (..),
+                                                  rotate, s, scale, transition,
                                                   translate)
 import           UI.Element                      (Dom, Element, elClass',
                                                   elDynAttr')
@@ -51,6 +53,8 @@ demo = void do
     , example "Rotate" def rotateByDistance
     , example "Scale" def scaleByDistance
     , example "Middle mouse button while holding @shift@" shiftConfig translate
+
+    , snapBack
     ]
   dragAnywhere
   where xOnly Point { x } = translate (Point x 0)
@@ -82,6 +86,19 @@ demo = void do
             Drags { total } <- drags config { container = Just container } element
             pure ()
           pure ()
+
+        snapBack = mdo
+          label "Snap back after each drag."
+          (container, _) <- elClass' "div" "drag-example" mdo
+            (element, _) <- elDynAttr' "div" attributes (pure ())
+            let attributes = dragOrSnap <$> current <*> Reflex.constDyn []
+            Drags { current } <- drags def { container = Just container } element
+            pure ()
+          pure ()
+        dragOrSnap = \case
+          Just d  -> translate d
+          Nothing -> transition snap . translate (Point 0 0)
+        snap = def { property = "transform", duration = s 1 }
 
 -- | Information about how a user interacts with an element by
 -- dragging.

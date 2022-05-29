@@ -1,25 +1,27 @@
-{-# LANGUAGE DerivingStrategies    #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE OverloadedLists       #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DuplicateRecordFields      #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ViewPatterns               #-}
 module UI.Attributes where
 
-import           Data.Bool     (bool)
-import           Data.Foldable (toList)
-import qualified Data.Foldable as Foldable
-import           Data.Map      (Map)
-import qualified Data.Map      as Map
-import           Data.Set      (Set)
-import qualified Data.Set      as Set
-import           Data.Text     (Text)
-import qualified Data.Text     as Text
-import           Data.Vector   (Vector)
+import           Data.Bool          (bool)
+import           Data.Default.Class (Default (..))
+import           Data.Foldable      (toList)
+import qualified Data.Foldable      as Foldable
+import           Data.Map           (Map)
+import qualified Data.Map           as Map
+import           Data.Set           (Set)
+import qualified Data.Set           as Set
+import           Data.Text          (Text)
+import qualified Data.Text          as Text
+import           Data.Vector        (Vector)
 
-import           UI.Point      (Point (..), Point3D (..))
+import           UI.Point           (Point (..), Point3D (..))
 
 -- * Attribute Sets
 
@@ -231,6 +233,37 @@ instance ToCss Angle where
     Rad d  -> toCss d <> "rad"
     Turn d -> toCss d <> "turn"
 
+-- | A duration, stored in milliseconds.
+newtype Duration = Duration Double
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (Read, Num, Real, Fractional, Floating)
+
+instance ToCss Duration where
+  toCss (Duration d) = toCss d <> "ms"
+
+    -- TODO: Structured representation for easing functions?
+-- | An @<easing-function>@ specifying how to interpolate between
+-- values.
+--
+-- See MDN:
+-- [<easing-function>](https://developer.mozilla.org/en-US/docs/Web/CSS/easing-function)
+type EasingFunction = Text
+
+-- | A duration in milliseconds.
+--
+-- >>> toCss (ms 1000)
+-- "1000.0ms"
+ms :: Double -> Duration
+ms = Duration
+
+-- | A duration in seconds. This is converted to milliseconds in the
+-- generated CSS.
+--
+-- >>> toCss (s 10.5)
+-- "10500.0ms"
+s :: Double -> Duration
+s = Duration . (* 1000)
+
 -- *** Style Attribute
 
 -- | Parse out the CSS declarations defined in a style attribute
@@ -385,7 +418,7 @@ data Transform = Matrix3D !(Vector Double)
                --
                -- See MDN:
                -- [scale3](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/scale3)
-               
+
                | Scale3D !Point3D
                -- ^ Scale the element by the given factor along the X,
                -- Y and Z axes respectively.
@@ -493,6 +526,45 @@ rotate = addTransform . Rotate
 -- | Uniformly scale an element.
 scale :: Double -> Map Text Text -> Map Text Text
 scale n = addTransform $ Scale (toCss n) (toCss n)
+
+-- *** CSS Transitions
+
+-- | The CSS @transition@ property lets us animate changes in values
+-- of other properties like colors, sizes and positions.
+data Transition = Transition
+  { property :: Text
+    -- ^ The name of the CSS property to transition. The animation
+    -- will be applied when the given property changes.
+
+  , duration :: Duration
+    -- ^ How long the transition takes.
+
+  , timing   :: EasingFunction
+    -- ^ An easing function for computing the intermediate values
+    -- during a transition.
+    --
+    -- See MDN
+    -- [<easing-function>](https://developer.mozilla.org/en-US/docs/Web/CSS/easing-function)
+
+           -- TODO: support global values like "revert" and "unset"
+  , delay    :: Duration
+    -- ^ How long to wait before starting a transition. During the
+    -- initial delay, the corresponding property will not change.
+  }
+  deriving stock (Show, Eq)
+
+instance ToCss Transition where
+  toCss Transition { property, duration, timing, delay } =
+    Text.intercalate " " [toCss property, toCss duration, toCss timing, toCss delay]
+
+instance Default Transition where
+  def = Transition { property = "all", duration = s 0, timing = "ease", delay = s 0 }
+
+-- | Add a transition for the given property, without overriding any
+-- existing transitions on the element.
+transition :: Transition -> Map Text Text -> Map Text Text
+transition = updateProperty after "transition" . toCss
+  where after new existing = existing <> ", " <> new
 
 -- * Attribute Parsing
 
