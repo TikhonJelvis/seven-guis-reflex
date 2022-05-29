@@ -55,7 +55,7 @@ ol :: forall a m t. Dom t m
    -- ^ Attributes
    -> [m a]
    -- ^ List items
-   -> m (Element (DomBuilderSpace m) t, [a])
+   -> m (Element t, [a])
 ol attributes = elDynAttr' "ol" attributes . mapM (Dom.el "li")
 
 -- | An unordered list, with the given widgets as list items.
@@ -66,7 +66,7 @@ ul :: forall a m t. Dom t m
    -- ^ Attributes
    -> [m a]
    -- ^ List items
-   -> m (Element (DomBuilderSpace m) t, [a])
+   -> m (Element t, [a])
 ul attributes = elDynAttr' "ul" attributes . mapM (Dom.el "li")
 
 -- ** Outputs

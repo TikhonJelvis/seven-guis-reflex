@@ -31,7 +31,7 @@ import qualified Text.Printf        as Text
 import           UI.Attributes      (ToAttributes (..), setClass)
 import           UI.Dialog          (DialogElement (..), ModalState (..),
                                      dialog)
-import           UI.Element         (Dom)
+import           UI.Element         (Dom, Element)
 import           UI.Event
 import qualified UI.History         as History
 import           UI.History         (Undos (..))
@@ -101,8 +101,7 @@ circlesCanvas :: forall m t. Dom t m
               -- ^ The full set of circles to render.
               -> Dynamic t (Maybe Int)
               -- ^ Which circle, if any, should be highlighted.
-              -> m ( Dom.Element EventResult Dom.GhcjsDomSpace t
-                   , Event t Int )
+              -> m (Element t , Event t Int)
 circlesCanvas circles highlighted = svgAttr' "svg" [("class", "canvas")] do
   rawClicks <- selectView highlighted circles (withId svgCircle)
   let clicks = rawClicks <&?> \ (MouseEventResult { button }, i) ->

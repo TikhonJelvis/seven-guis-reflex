@@ -27,6 +27,7 @@ executable guis
     UI.Element
     UI.Event
     UI.History
+    UI.IsElement
     UI.Point
     UI.PushMap
     UI.SVG

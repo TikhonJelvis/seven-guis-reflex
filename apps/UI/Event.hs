@@ -14,25 +14,26 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 module UI.Event where
 
 import           Control.Lens                ((<&>), (^.))
 import           Control.Monad.IO.Class      (MonadIO (liftIO))
+import           Control.Monad.Reader        (ReaderT (..))
 
 import           Data.Functor.Misc           (WrapArg (..))
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
+import qualified Data.Text                   as Text
 
 import qualified GHCJS.DOM.ClipboardEvent    as ClipboardEvent
 import qualified GHCJS.DOM.DataTransfer      as DataTransfer
 import qualified GHCJS.DOM.Element           as Element
 import qualified GHCJS.DOM.Event             as Event
-import qualified GHCJS.DOM.EventM            as GHCJS
 import qualified GHCJS.DOM.KeyboardEvent     as KeyboardEvent
 import qualified GHCJS.DOM.MouseEvent        as MouseEvent
 import qualified GHCJS.DOM.Types             as GHCJS
-import qualified GHCJS.DOM.UIEvent           as UIEvent
 import qualified GHCJS.DOM.WheelEvent        as WheelEvent
 
 import qualified Language.Javascript.JSaddle as Js
@@ -43,6 +44,7 @@ import           Reflex.Dom                  (HasDomEvent, Reflex)
 
 import           Text.Printf                 (printf)
 
+import           UI.IsElement                (IsElement (..))
 import           UI.Point
 
 -- * Types of Events
@@ -98,37 +100,38 @@ type family EventResultType en where
 newtype EventResult en = EventResult { unEventResult :: EventResultType en }
 
 domHandler :: Dom.EventName en
-           -> GHCJS.EventM e (Dom.EventType en) (Maybe (EventResult en))
-domHandler eventName = Just . EventResult <$> case eventName of
-  Dom.Click       -> getMouseEvent
-  Dom.Dblclick    -> getMouseEvent
-  Dom.Keypress    -> getKeyboardEvent
-  Dom.Scroll      -> getScrollEvent
-  Dom.Keydown     -> getKeyboardEvent
-  Dom.Keyup       -> getKeyboardEvent
-  Dom.Mousemove   -> getMouseEvent
-  Dom.Mouseup     -> getMouseEvent
-  Dom.Mousedown   -> getMouseEvent
-  Dom.Mouseenter  -> getMouseEvent
-  Dom.Mouseleave  -> getMouseEvent
+           -> Dom.EventType en
+           -> GHCJS.DOM (Maybe (EventResult en))
+domHandler eventName e = Just . EventResult <$> case eventName of
+  Dom.Click       -> mouseEvent e
+  Dom.Dblclick    -> mouseEvent e
+  Dom.Keypress    -> keyboardEvent e
+  Dom.Scroll      -> scrollEvent e
+  Dom.Keydown     -> keyboardEvent e
+  Dom.Keyup       -> keyboardEvent e
+  Dom.Mousemove   -> mouseEvent e
+  Dom.Mouseup     -> mouseEvent e
+  Dom.Mousedown   -> mouseEvent e
+  Dom.Mouseenter  -> mouseEvent e
+  Dom.Mouseleave  -> mouseEvent e
   Dom.Focus       -> pure ()
   Dom.Blur        -> pure ()
   Dom.Change      -> pure ()
-  Dom.Drag        -> getMouseEvent
-  Dom.Dragend     -> getMouseEvent
-  Dom.Dragenter   -> getMouseEvent
-  Dom.Dragleave   -> getMouseEvent
-  Dom.Dragover    -> getMouseEvent
-  Dom.Dragstart   -> getMouseEvent
-  Dom.Drop        -> getMouseEvent
+  Dom.Drag        -> mouseEvent e
+  Dom.Dragend     -> mouseEvent e
+  Dom.Dragenter   -> mouseEvent e
+  Dom.Dragleave   -> mouseEvent e
+  Dom.Dragover    -> mouseEvent e
+  Dom.Dragstart   -> mouseEvent e
+  Dom.Drop        -> mouseEvent e
   Dom.Abort       -> pure ()
-  Dom.Contextmenu -> getMouseEvent
+  Dom.Contextmenu -> mouseEvent e
   Dom.Error       -> pure ()
   Dom.Input       -> pure ()
   Dom.Invalid     -> pure ()
   Dom.Load        -> pure ()
-  Dom.Mouseout    -> getMouseEvent
-  Dom.Mouseover   -> getMouseEvent
+  Dom.Mouseout    -> mouseEvent e
+  Dom.Mouseover   -> mouseEvent e
   Dom.Select      -> pure ()
   Dom.Submit      -> pure ()
   Dom.Beforecut   -> pure ()
@@ -136,16 +139,16 @@ domHandler eventName = Just . EventResult <$> case eventName of
   Dom.Beforecopy  -> pure ()
   Dom.Copy        -> pure ()
   Dom.Beforepaste -> pure ()
-  Dom.Paste       -> getPasteText
+  Dom.Paste       -> pasteText e
   Dom.Reset       -> pure ()
   Dom.Search      -> pure ()
   Dom.Selectstart -> pure ()
-  Dom.Touchstart  -> Dom.getTouchEvent
-  Dom.Touchmove   -> Dom.getTouchEvent
-  Dom.Touchend    -> Dom.getTouchEvent
-  Dom.Touchcancel -> Dom.getTouchEvent
-  Dom.Mousewheel  -> getMouseEvent
-  Dom.Wheel       -> getWheelEvent
+  Dom.Touchstart  -> runReaderT Dom.getTouchEvent e
+  Dom.Touchmove   -> runReaderT Dom.getTouchEvent e
+  Dom.Touchend    -> runReaderT Dom.getTouchEvent e
+  Dom.Touchcancel -> runReaderT Dom.getTouchEvent e
+  Dom.Mousewheel  -> mouseEvent e
+  Dom.Wheel       -> wheelEvent e
 
 instance Reflex t => HasDomEvent t (Dom.Element EventResult d t) en where
   type DomEventType (Dom.Element EventResult d t) en = EventResultType en
@@ -225,10 +228,8 @@ data MouseEventResult = MouseEventResult
   }
 
 -- | Build a 'MouseEvent' out of a raw JS mouse event.
-getMouseEvent :: GHCJS.EventM e MouseEvent.MouseEvent MouseEventResult
-getMouseEvent = do
-  e <- GHCJS.event
-
+mouseEvent :: Js.MonadJSM m => MouseEvent.MouseEvent -> m MouseEventResult
+mouseEvent e = do
   screen   <- point <$> MouseEvent.getScreenX e   <*> MouseEvent.getScreenY e
   client   <- point <$> MouseEvent.getClientX e   <*> MouseEvent.getClientY e
   movement <- point <$> MouseEvent.getMovementX e <*> MouseEvent.getMovementY e
@@ -275,10 +276,8 @@ data DeltaMode = Delta_Line
 
 -- TODO: Get MouseEvent properties for WheelEvent too?
 -- | Build a 'WheelEventResult' from a JS event.
-getWheelEvent :: GHCJS.EventM e WheelEvent.WheelEvent WheelEventResult
-getWheelEvent = do
-  e <- GHCJS.event
-
+wheelEvent :: Js.MonadJSM m => WheelEvent.WheelEvent -> m WheelEventResult
+wheelEvent e = do
   x <- WheelEvent.getDeltaX e
   y <- WheelEvent.getDeltaY e
   z <- WheelEvent.getDeltaZ e
@@ -310,9 +309,8 @@ data ScrollEventResult = ScrollEventResult
 -- This works fine for any 'UIEvent.UIEvent', so it's only
 -- scroll-specific because it returns information on how the target
 -- element is scrolled.
-getScrollEvent :: GHCJS.EventM e UIEvent.UIEvent ScrollEventResult
-getScrollEvent = do
-  e <- GHCJS.event
+scrollEvent :: (Js.MonadJSM m, GHCJS.IsEvent e) => e -> m ScrollEventResult
+scrollEvent e = do
   element <- GHCJS.uncheckedCastTo Element.Element <$> Event.getTargetUnchecked e
 
   scrollLeft <- fromIntegral <$> Element.getScrollLeft element
@@ -374,10 +372,8 @@ data KeyLocation = KeyLocation_Standard
                  -- ^ A location code that is not standard.
 
 -- | Build a 'KeyboardEventResult' from the native JS event object.
-getKeyboardEvent :: GHCJS.EventM e KeyboardEvent.KeyboardEvent KeyboardEventResult
-getKeyboardEvent = do
-  e <- GHCJS.event
-
+keyboardEvent :: Js.MonadJSM m => KeyboardEvent.KeyboardEvent -> m KeyboardEventResult
+keyboardEvent e = do
   key <- Key <$> KeyboardEvent.getKey e
 
   location <- KeyboardEvent.getLocation e <&> \case
@@ -403,14 +399,13 @@ getKeyboardEvent = do
 
 -- | Get the clipboard data that was pasted in as 'Text', if it's
 -- available.
-getPasteText :: GHCJS.EventM e ClipboardEvent.ClipboardEvent (Maybe Text)
-getPasteText = do
-  e <- GHCJS.event
+pasteText :: Js.MonadJSM m => ClipboardEvent.ClipboardEvent -> m (Maybe Text)
+pasteText e = do
   ClipboardEvent.getClipboardData e >>= \case
     Just dataTransfer -> Just <$> DataTransfer.getData dataTransfer ("text" :: Text)
     Nothing           -> pure Nothing
 
--- * Wrapping JS Events
+-- * Arbitrary JS Events
 
 -- | Return an 'Event' that triggers based on an arbitrary JavaScript
 -- event on the given element.
@@ -419,23 +414,28 @@ getPasteText = do
 --
 -- @
 -- clicks :: (Reflex t, Dom.TriggerEvent t m, Js.MonadJSM m) => m (Event t ())
--- clicks = void <$> element `on` click
+-- clicks = element `on` click
 -- @
 --
--- You can use 'Dom.performEvent' to apply a 'Js.JSM' function to an
--- event. Example: getting the @relatedTarget@ for a click event:
+-- @()@ has a @Js.FromJSVal@ instance that is always safe to use, so
+-- getting an @Event t()@ from 'on' always works.
+--
+-- Example: using 'performJs' to extract information from the raw
+-- JavaScript event object:
 --
 -- @
--- clicks = do
---   events <- e' `on` "click"
---   let relatedTarget e = liftJSM do
---         mouseEvent <- fromJSValUnchecked @MouseEvent e
---         getRelatedTarget mouseEvent
---   performEvent (relatedTarget <$> events)
+-- clickTargets element = do
+--   events <- element `on` "click"
+--   let relatedTarget (e :: MouseEvent) = MouseEvent.getRelatedTarget e
+--   performJs relatedTarget events
 -- @
 --
--- For example, if you wanted to listen to the (IE-only)
--- @MSGestureStart@, you could write:
+-- Note: we need the type signature on @(e :: MouseEvent)@ because
+-- otherwise the @IsMouseEvent m@ from @MouseEvent.getRelatedTarget@
+-- is ambiguous.
+--
+-- Example: high-level binding for the (non-standard, IE-only)
+-- "MSGestureEvent" event:
 --
 -- @
 -- data MSGestureEvent = MSGestureEvent {- ... -}
@@ -443,29 +443,49 @@ getPasteText = do
 -- toMSGestureEvent :: JSVal -> JSM MSGestureEvent
 -- toMSGestureEvent = {- ... -}
 --
--- onGestureStart :: (TriggerEvent t m, MakeObject (RawElement d), MonadJSM m, Reflex t)
---                => Element er d t
+-- onGestureStart :: (TriggerEvent t m, MonadJSM m)
+--                => Element t
 --                -> m (Event t MSGestureEvent)
 -- onGestureStart element =
---   performEvent $ toMSGestureEvent <$> element `on` "MSGestureChange"
+--   performJs toMSGestureEvent $ element `on` "MSGestureChange"
 -- @
 --
 -- See MDN: [@addEventListener@](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
-on :: ( Reflex.TriggerEvent t m
-      , Js.MakeObject (Dom.RawElement d)
-      , Js.MonadJSM m
-      )
-   => Dom.Element er d t
+on :: forall event e m t.
+  ( Reflex.TriggerEvent t m
+  , Js.MonadJSM m
+  , IsElement e
+  , Js.FromJSVal event
+  )
+   => e
+   -- ^ element
    -> Text
-   -> m (Reflex.Event t Js.JSVal)
-on element eventName = do
+   -- ^ event name
+   -> m (Reflex.Event t event)
+on (rawElement -> raw) eventName = do
   (event, trigger) <- Reflex.newTriggerEvent
   let jsTrigger _f _this = \case
-        [e]  -> liftIO $ trigger e
-        args ->
-          error $ printf "Event listener callback called with %d ≠ 1 args" (length args)
+        [e]  -> Js.fromJSVal e >>= \case
+          Just e' -> liftIO $ trigger e'
+          Nothing -> do
+            eToString <- Js.valToText e
+            rawToString <- Js.valToText raw
+            error $ printf "%s listener on %s called with incompatible type:\n%s"
+              (Text.unpack eventName) (Text.unpack rawToString) (Text.unpack eToString)
+        args -> error $
+          printf "Event listener callback called with %d ≠ 1 args" (length args)
 
   Js.liftJSM $ raw ^. Js.jsf ("addEventListener" :: Text) (eventName, Js.fun jsTrigger)
   pure event
-  where raw = Dom._element_raw element
 infixl 5 `on`
+
+-- | Call a JavaScript function when the input event changes, firing a
+-- new event right afterwards.
+--
+-- Note: the new event may fire /after/ the input event—see
+-- 'Reflex.performEvent' for details.
+performJs :: (Reflex.PerformEvent t m, Js.MonadJSM (Reflex.Performable m))
+          => (a -> Js.JSM b)
+          -> Reflex.Event t a
+          -> m (Reflex.Event t b)
+performJs f events = Reflex.performEvent $ Js.liftJSM . f <$> events

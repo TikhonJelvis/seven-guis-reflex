@@ -13,15 +13,11 @@
 {-# LANGUAGE TypeFamilies          #-}
 module UI.SVG where
 
-import           Control.Lens           ((&), (.~), (?~))
-import           Control.Monad.Fix      (MonadFix)
-import           Control.Monad.Reader   (ReaderT (runReaderT))
 
 import           Data.Colour            (AlphaColour, Colour, ColourOps (over))
 import qualified Data.Colour            as Colour
 import qualified Data.Colour.SRGB       as Colour
 import           Data.Default.Class     (Default, def)
-import           Data.Functor.Misc      (WrapArg (..))
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.String            (IsString (..))
@@ -31,21 +27,17 @@ import           Data.Text.Display      (Display (..))
 import qualified Data.Text.Lazy.Builder as Builder
 import           Data.Word              (Word8)
 
-import qualified GHCJS.DOM.Element      as Element
-import qualified GHCJS.DOM.Event        as Event
-import qualified GHCJS.DOM.MouseEvent   as MouseEvent
-
 import qualified Numeric
 
-import           Reflex.Dom             hiding (EventResult, EventResultType)
+import           Reflex                 (Dynamic, constDyn, zipDynWith)
+import           Reflex.Dom             (AttributeName (..))
 
 import           Text.Printf            (printf)
 
 import           UI.Attributes          (ToAttributeValue (..),
                                          ToAttributes (..), with)
-import           UI.Element             (Dom, elDynAttrNs')
-import           UI.Event
-import           UI.Point               hiding (toCss)
+import           UI.Element             (Dom, Element, elDynAttrNs')
+import           UI.Point
 
 -- * SVG Elements
 
@@ -93,7 +85,7 @@ svg' :: forall a m t. Dom t m
      -- ^ Tag name
      -> m a
      -- ^ Body
-     -> m (Element EventResult (DomBuilderSpace m) t, a)
+     -> m (Element t, a)
 svg' tag = svgAttr' tag []
 {-# INLINABLE svg' #-}
 
@@ -105,7 +97,7 @@ svgAttr' :: forall a m t. Dom t m
          -- ^ Static attributes
          -> m a
          -- ^ Body
-         -> m (Element EventResult (DomBuilderSpace m) t, a)
+         -> m (Element t, a)
 svgAttr' tag = svgDynAttr' tag . constDyn
 {-# INLINABLE svgAttr' #-}
 
@@ -117,7 +109,7 @@ svgDynAttr' :: forall a m t. Dom t m
             -- ^ Attributes
             -> m a
             -- ^ Body
-            -> m (Element EventResult (DomBuilderSpace m) t, a)
+            -> m (Element t, a)
 svgDynAttr' = elDynAttrNs' (Just svgNamespace)
 {-# INLINABLE svgDynAttr' #-}
 
@@ -134,9 +126,9 @@ instance IsString Color where
     fromString ['#', r, r, g, g, b, b]
   fromString ['#', r, g, b, a] =
     fromString ['#', r, r, g, g, b, b, a, a]
-  fromString s@['#', r1, r2, g1, g2, b1, b2] =
+  fromString s@['#', _r1, _r2, _g1, _g2, _b1, _b2] =
     fromColour $ Colour.sRGB24read s
-  fromString s@['#', r1, r2, g1, g2, b1, b2, a1, a2] =
+  fromString s@['#', _r1, _r2, _g1, _g2, _b1, _b2, a1, a2] =
     let base = Colour.sRGB24read (take 7 s) in
     Color $ Colour.withOpacity base (toDouble $ readHex [a1, a2])
     where readHex = fst . head . Numeric.readHex
@@ -262,7 +254,7 @@ circle :: forall m t. Dom t m
        -> Dynamic t (Map Text Text)
        -- ^ Additional attributes. The 'Circle' argument will override
        -- @cx@, @cy@ and @r@ in this map.
-       -> m (Element EventResult (DomBuilderSpace m) t)
+       -> m (Element t)
 circle c attrs =
   fst <$> svgDynAttr' "circle" (zipDynWith with c attrs) (pure ())
 

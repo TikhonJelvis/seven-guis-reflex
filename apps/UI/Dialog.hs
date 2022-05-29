@@ -8,6 +8,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE ViewPatterns          #-}
 module UI.Dialog where
 
 import           Control.Lens                ((^.))
@@ -17,15 +18,15 @@ import qualified Data.ByteString             as BS
 import           Data.Map                    (Map)
 import           Data.Text                   (Text)
 
-import           Language.Javascript.JSaddle (MakeObject, MonadJSM, jsf,
-                                              liftJSM, valToBool, (!))
+import           Language.Javascript.JSaddle (MonadJSM, jsf, liftJSM, valToBool,
+                                              (!))
 
 import           Reflex
 import qualified Reflex.Dom                  as Dom
-import           Reflex.Dom                  (DomBuilderSpace)
 
 import           UI.Element
-import           UI.Event
+import           UI.Event                    (on)
+import           UI.IsElement                (IsElement (..))
 import           UI.Widget
 
 -- | HTML modal dialogs can either be hidden or shown in two ways:
@@ -57,11 +58,26 @@ data ModalState = Show | ShowModal | Hide
 --   * [@HTMLDialogElement@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement)
 --   * [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/cancel_event)
 --   * [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-data DialogElement d t = DialogElement
-  { element  :: Element d t
+data DialogElement t = DialogElement
+  { element  :: Element t
+  -- ^ The @dialog@ HTML element itself.
+
   , closed   :: Event t ()
+  -- ^ An 'Event' that triggers when the given @dialog@ element is
+  -- closed.
+  --
+  -- See MDN:
+  -- [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
+
   , canceled :: Event t ()
+  -- ^ An 'Event' that triggers when the given @dialog@ element is
+  -- canceled.
+  --
+  -- See MDN:
+  -- [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
   }
+
+instance IsElement (DialogElement t) where rawElement = rawElement . element
 
 -- | Create a floating dialog using the HTML5 @dialog@ element.
 --
@@ -83,13 +99,13 @@ dialog :: forall a m t. (Dom t m)
        -- ^ Dynamic attributes
        -> m a
        -- ^ The dialog body
-       -> m (DialogElement (DomBuilderSpace m) t, a)
+       -> m (DialogElement t, a)
 dialog states attrs body = do
   (element, result) <- elDynAttr' "dialog" attrs body
   performEvent_ $ setDialogState element <$> states
 
-  canceled <- onCancel element
-  closed   <- onClose element
+  canceled <- element `on` "cancel"
+  closed   <- element `on` "close"
 
   pure (DialogElement { element, closed, canceled }, result)
 {-# INLINABLE dialog #-}
@@ -112,7 +128,7 @@ dialog states attrs body = do
 -- @
 alert :: forall m t. (Dom t m)
       => Event t Text
-      -> m (DialogElement (DomBuilderSpace m) t)
+      -> m (DialogElement t)
 alert trigger = do
   (element, _) <- dialog (ShowModal <$ trigger) attrs do
     message <- holdDyn "" trigger
@@ -135,36 +151,16 @@ alert trigger = do
 -- Note that the dialog can be closed through user actions outside of
 -- Haskell code, so it /is/ possible for two 'Show'/'ShowModal' events
 -- in a row to both have an effect.
-setDialogState :: (MonadJSM m, MakeObject (Dom.RawElement d))
-               => Element d t
+setDialogState :: (MonadJSM m, IsElement e)
+               => e
                -> ModalState
                -> m ()
-setDialogState element state = liftJSM do
+setDialogState (rawElement -> raw) state = liftJSM do
   open <- valToBool =<< raw ! ("open" :: Text)
   case state of
     Show      -> unless open $ void $ raw ^. jsf ("show" :: Text) ()
     ShowModal -> unless open $ void $ raw ^. jsf ("showModal" :: Text) ()
     Hide      -> when open   $ void $ raw ^. jsf ("hide" :: Text) ()
-  where raw = Dom._element_raw element
-
--- | An 'Event' that triggers when the given @dialog@ element is
--- closed.
---
--- See MDN: [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-onClose :: (TriggerEvent t m, MakeObject (Dom.RawElement d), MonadJSM m, Reflex t)
-        => Element d t
-        -> m (Event t ())
-onClose element = void <$> element `on` "close"
-
--- | An 'Event' that triggers when the given @dialog@ element is
--- closed.
---
--- See MDN: [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
-onCancel :: (TriggerEvent t m, MakeObject (Dom.RawElement d), MonadJSM m, Reflex t)
-         => Element d t
-         -> m (Event t ())
-onCancel element = void <$> element `on` "cancel"
-
 
 main :: IO ()
 main = do

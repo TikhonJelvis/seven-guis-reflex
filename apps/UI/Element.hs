@@ -3,16 +3,39 @@
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-module UI.Element where
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
+module UI.Element
+  ( PerformJS
+  , Dom
+
+  , IsElement
+  , Element
+
+  , el'
+  , elClass'
+  , elAttr'
+  , elDynAttr'
+  , elDynAttrNs'
+
+  , Rectangle
+  , bounds
+  , dimensions
+  , viewportPosition
+  , offsetPosition
+  )
+where
 
 import           Control.Monad.Fix           (MonadFix)
-import           Control.Monad.Reader        (runReaderT)
 
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
@@ -29,9 +52,11 @@ import           Language.Javascript.JSaddle (MonadJSM)
 import           Reflex
 import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
-                                              ElementConfig (..), RawElement)
+                                              ElementConfig (..), HasDocument,
+                                              RawElement)
 
 import           UI.Event
+import           UI.IsElement                (IsElement (..))
 import           UI.Point
 
 type PerformJS d m = ( MonadFix m
@@ -48,16 +73,24 @@ type Dom t m = ( MonadFix m
                , DomBuilderSpace m ~ Dom.GhcjsDomSpace
                , MonadJSM m
                , PerformJS (DomBuilderSpace m) (Performable m)
+               , HasDocument m
                )
 
-type Element d t = Dom.Element EventResult d t
+newtype Element t = Element (Dom.Element EventResult Dom.GhcjsDomSpace t)
+
+instance IsElement (Element t) where
+  rawElement (Element e) = Dom._element_raw e
+
+instance Reflex t => Dom.HasDomEvent t (Element t) en where
+  type DomEventType (Element t) en = EventResultType en
+  domEvent eventName (Element e) = Dom.domEvent eventName e
 
 -- * Creating Elements
 
 el' :: forall a m t. Dom t m
     => Text
     -> m a
-    -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
+    -> m (Element t, a)
 el' tagName = elAttr' tagName []
 {-# INLINABLE el' #-}
 
@@ -66,7 +99,7 @@ elClass' :: forall a m t. Dom t m
          => Text
          -> Text
          -> m a
-         -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
+         -> m (Element t, a)
 elClass' tagName class_ = elAttr' tagName [("class", class_)]
 {-# INLINABLE elClass' #-}
 
@@ -75,7 +108,7 @@ elAttr' :: forall a m t. Dom t m
         => Text
         -> Map Text Text
         -> m a
-        -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
+        -> m (Element t, a)
 elAttr' tagName attr = elDynAttr' tagName (constDyn attr)
 {-# INLINABLE elAttr' #-}
 
@@ -85,7 +118,7 @@ elDynAttr' :: forall a m t. Dom t m
            => Text
            -> Dynamic t (Map Text Text)
            -> m a
-           -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
+           -> m (Element t, a)
 elDynAttr' = elDynAttrNs' Nothing
 {-# INLINABLE elDynAttr' #-}
 
@@ -99,7 +132,7 @@ elDynAttrNs' :: forall a m t. Dom t m
              -- ^ Dynamic attributes
              -> m a
              -- ^ Body
-             -> m (Dom.Element EventResult (DomBuilderSpace m) t, a)
+             -> m (Element t, a)
 elDynAttrNs' namespace tagName attrs body = do
   modifyAttrs <- Dom.dynamicAttributesToModifyAttributes attrs
   let config = ElementConfig
@@ -109,14 +142,14 @@ elDynAttrNs' namespace tagName attrs body = do
           Just $ fmapCheap Dom.mapKeysToAttributeName modifyAttrs
         , _elementConfig_eventSpec = eventSpec
         }
-  result <- Dom.element tagName config body
+  (element, result) <- Dom.element tagName config body
   postBuild <- getPostBuild
   notReadyUntil postBuild
-  pure result
+  pure (Element element, result)
   where eventSpec = Dom.GhcjsEventSpec filters handler
         filters = mempty
         handler = Dom.GhcjsEventHandler \ (eventName, event) ->
-          runReaderT (domHandler eventName) (Dom.unGhcjsDomEvent event)
+          domHandler eventName $ Dom.unGhcjsDomEvent event
 {-# INLINABLE elDynAttrNs' #-}
 
 -- * Element Properties
@@ -148,10 +181,10 @@ data Rectangle = Rectangle
 --
 -- See: MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-bounds :: forall m d er t. PerformJS d m
-       => Dom.Element er d t
+bounds :: forall e m. (IsElement e, MonadJSM m)
+       => e
        -> m Rectangle
-bounds element = do
+bounds (rawElement -> raw) = do
   rect <- GHCJS.getBoundingClientRect raw
 
   x <- GHCJS.getX rect
@@ -161,14 +194,13 @@ bounds element = do
   height <- GHCJS.getHeight rect
 
   pure Rectangle { position = Point { x, y }, width, height }
-  where raw = Dom._element_raw element
 
 -- | The width and height of the element in px.
 --
 -- See: MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-dimensions :: forall m d er t. PerformJS d m
-           => Dom.Element er d t
+dimensions :: forall e m. (IsElement e, MonadJSM m)
+           => e
            -> m (Double, Double)
            -- ^ The width and height of the element in px,
            -- respectively.
@@ -180,11 +212,13 @@ dimensions element = do
 --
 -- See: MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-viewportPosition :: forall m d er t. PerformJS d m
-                 => Dom.Element er d t
+viewportPosition :: forall e m. (IsElement e, MonadJSM m)
+                 => e
                  -> m Point
 viewportPosition element = position <$> bounds element
 
+                           -- TODO: Does this work as expected with
+                           -- transforms and so on?
 -- | Get the position of an element /relative to its parent element/.
 --
 -- For HTML elements, this uses @offsetLeft@ and @offsetTop@.
@@ -196,25 +230,20 @@ viewportPosition element = position <$> bounds element
 -- See:
 --  * [HTMLElement.offsetLeft](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetLeft)
 --  * [HTMLElement.offsetLeft](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetTop)
-offsetPosition :: forall m d er t. PerformJS d m
-               => Dom.Element er d t
+offsetPosition :: forall e m. (IsElement e, MonadJSM m)
+               => e
                -> m Point
-offsetPosition element = castTo GHCJS.HTMLElement raw >>= \case
-  Just htmlElement -> do
-    x <- GHCJS.getOffsetLeft htmlElement
-    y <- GHCJS.getOffsetTop htmlElement
-    pure Point { x, y }
-  Nothing -> elementOffset
-  where raw = Dom._element_raw element
-
-        elementOffset = do
+offsetPosition element =
+  castTo GHCJS.HTMLElement (rawElement element) >>= \case
+    Just htmlElement -> do
+      x <- GHCJS.getOffsetLeft htmlElement
+      y <- GHCJS.getOffsetTop htmlElement
+      pure Point { x, y }
+    Nothing -> elementOffset
+  where elementOffset = do
           elementPosition <- viewportPosition element
-          GHCJS.getParentElement raw >>= \case
-            Nothing -> pure elementPosition
+          GHCJS.getParentElement (rawElement element) >>= \case
+            Nothing     -> pure elementPosition
             Just parent -> do
-              parentRect <- GHCJS.getBoundingClientRect parent
-
-              parentX <- GHCJS.getX parentRect
-              parentY <- GHCJS.getY parentRect
-
-              pure $ elementPosition - Point { x = parentX, y = parentY }
+              parentPosition <- viewportPosition parent
+              pure $ elementPosition - parentPosition

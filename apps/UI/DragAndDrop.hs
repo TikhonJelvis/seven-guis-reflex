@@ -4,38 +4,43 @@
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module UI.DragAndDrop where
 
 
-import           Control.Monad     (void)
-import           Control.Monad.Fix (MonadFix)
+import           Control.Monad      (void)
 
-import qualified Data.ByteString   as BS
-import           Data.Maybe        (fromMaybe)
+import qualified Data.ByteString    as BS
+import           Data.Default.Class (Default (..))
+import           Data.Maybe         (fromMaybe)
+
+import qualified GHCJS.DOM.Document as GHCJS
 
 import qualified Reflex
-import           Reflex            (Dynamic, Reflex)
-import qualified Reflex.Dom        as Dom
+import           Reflex             (Dynamic)
+import qualified Reflex.Dom         as Dom
 
-import           UI.Attributes     (Angle (..), rotate, scale, translate)
-import           UI.Element        (Dom, elClass', elDynAttr')
-import           UI.Event          (EventResult, MouseButton (..), button,
-                                    client)
-import           UI.Point          (Point (..), distance)
-import           UI.Widget         (label, ul)
+import           UI.Attributes      (Angle (..), rotate, scale, translate)
+import           UI.Element         (Dom, Element, elClass', elDynAttr')
+import           UI.Event           (Modifier (Shift), MouseButton (..),
+                                     MouseEventResult (..), button, client,
+                                     mouseEvent, on, performJs)
+import           UI.Point           (Point (..), distance)
+import           UI.Widget          (label, ul)
 
 import qualified Witherable
 
-demo :: forall m t. Dom t m => m ()
+demo :: forall m t. (Dom t m) => m ()
 demo = void $ ul (Reflex.constDyn [("class", "drag-demo")])
-  [ example "Follow cursor exactly" translate
-  , example "Horizontal only" xOnly
-  , example "Vertical only" yOnly
-  , example "Snap to 50px grid" (snapTo 50)
-  , example "Rotate" rotateByDistance
-  , example "Scale" scaleByDistance
+  [ example "Follow cursor exactly" def translate
+  , example "Horizontal only" def xOnly
+  , example "Vertical only" def yOnly
+  , example "Snap to 50px grid" def (snapTo 50)
+  , example "Rotate" def rotateByDistance
+  , example "Scale" def scaleByDistance
+  , example "Middle mouse button while holding @shift@" shiftConfig translate
   ]
   where xOnly Point { x } = translate (Point x 0)
         yOnly Point { y } = translate (Point 0 y)
@@ -47,12 +52,16 @@ demo = void $ ul (Reflex.constDyn [("class", "drag-demo")])
 
         scaleByDistance p = scale (1 + distance p 0 / 250)
 
-        example description doDrag = mdo
+        shiftConfig = def { mouseEventFilter = \ e ->
+                              (button e == Auxiliary) && (Shift `elem` modifiers e )
+                          }
+
+        example description config doDrag = mdo
           label description
           (container, _) <- elClass' "div" "drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
             let attributes = doDrag <$> total <*> Reflex.constDyn []
-            Drags { total } <- drags container element
+            Drags { total } <- drags config { container = Just container } element
             pure ()
           pure ()
 
@@ -80,6 +89,44 @@ data Drags t = Drags
     -- ^ The total x and y distance moved by the mouse counting /both/
     -- 'finished' and, if applicable, 'current'.
   }
+
+-- | Configure how to measure drags for an item.
+data DragConfig d t = DragConfig
+  { container        :: Maybe (Element t)
+  -- ^ Restrict the dragging to a container. Events outside the
+  -- container do not count for the drag distance and don't end a
+  -- drag.
+  --
+  -- If not specified, events on the entire document body will
+  -- contribute to drags.
+
+  , mouseEventFilter :: MouseEventResult -> Bool
+  -- ^ A function to specify which mouse events can /start/ drags.
+  --
+  -- By default, this restricts to the main (usually left) mouse
+  -- button:
+  --
+  -- @
+  -- \ e -> button e == Main
+  -- @
+  --
+  -- __Example__:
+  --
+  -- An interaction that only works when the user shift-clicks with
+  -- the auxiliary (middle) mouse button:
+  --
+  -- @
+  -- let mouseEventFilter e =
+  --   (button e == Auxiliary) && (Shift `elem` modifiers e)
+  -- in drags def { mouseEventFilter } draggableElement
+  -- @
+  }
+
+instance Default (DragConfig d t) where
+  def = DragConfig
+    { container        = Nothing
+    , mouseEventFilter = \ e -> button e == Main
+    }
 
 -- | Keeps track of how a user drags an element.
 --
@@ -129,11 +176,10 @@ data Drags t = Drags
 -- @
 -- doDrag p = rotate (Turn $ distance p 0 / 100)
 -- @
-drags :: (Reflex t, Reflex.MonadHold t m, MonadFix m)
-      => Dom.Element EventResult d t
-      -- ^ A container element that restricts where the element
-      -- can be dragged.
-      -> Dom.Element EventResult d t
+drags :: forall m d t. Dom t m
+      => DragConfig d t
+      -- ^ Configuration for how to measure drags.
+      -> Element t
       -- ^ The element that can be dragged.
       -> m (Drags t)
       -- ^ Two dynamics that combine to get the net move across /all/
@@ -144,15 +190,22 @@ drags :: (Reflex t, Reflex.MonadHold t m, MonadFix m)
       --
       --  2. The net movement from all /finished/ drags, /not/
       --  including the current drag.
-drags container element = do
+drags DragConfig { container, mouseEventFilter } element = do
+  (mouseup, mousemove) <- case container of
+    Just e  ->
+      pure (Dom.domEvent Dom.Mouseup e, Dom.domEvent Dom.Mousemove e)
+    Nothing -> do
+      -- TODO: Better error handling?
+      body <- GHCJS.getBodyUnsafe =<< Dom.askDocument
+      up   <- performJs mouseEvent =<< body `on` "mouseup"
+      move <- performJs mouseEvent =<< body `on` "mousemove"
+      pure (up, move)
   rec let start = gate (not <$> isDragged) (client <$> mousedown)
           end   = gate isDragged           (client <$> mouseup)
           move  = gate isDragged           (client <$> mousemove)
 
-          mousedown = Witherable.filter (\ e -> button e == Main) $
+          mousedown = Witherable.filter mouseEventFilter $
             Dom.domEvent Dom.Mousedown element
-          mouseup   = Dom.domEvent Dom.Mouseup container
-          mousemove = Dom.domEvent Dom.Mousemove container
 
       isDragged <- Reflex.holdDyn False $ Reflex.leftmost [False <$ end, True <$ start]
 
