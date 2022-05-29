@@ -24,7 +24,7 @@ import qualified GHCJS.DOM.ElementCSSInlineStyle as Element
 import qualified Language.Javascript.JSaddle     as Js
 
 import qualified Reflex
-import           Reflex                          (Dynamic)
+import           Reflex                          (Dynamic, Event)
 import qualified Reflex.Dom                      as Dom
 
 import           UI.Attributes                   (Angle (..), rotate, scale,
@@ -106,6 +106,14 @@ data Drags t = Drags
   , total    :: Dynamic t Point
     -- ^ The total x and y distance moved by the mouse counting /both/
     -- 'finished' and, if applicable, 'current'.
+
+  , start    :: Event t Point
+    -- ^ The user started dragging the element at the given client X
+    -- and Y coordinates.
+
+  , end      :: Event t Point
+    -- ^ The user stopped dragging the element at the given client X
+    -- and Y coordinates.
   }
 
 -- | Configure how to measure drags for an item.
@@ -227,10 +235,11 @@ drags DragConfig { container, mouseEventFilter } element = do
 
       isDragged <- Reflex.holdDyn False $ Reflex.leftmost [False <$ end, True <$ start]
 
-      -- toggle user-select: none for the document body when drags
-      -- start and end
+      -- without user-select: none, dragging an element can also
+      -- highlight text/images/etc—really distracting!
       Reflex.performEvent_ (setUserSelect body "none" <$ start)
       Reflex.performEvent_ (setUserSelect body "auto" <$ end)
+      -- TODO: save + restore previous state of body.style.user-select
 
       -- current drag
       startPosition <- Reflex.holdDyn (Point 0 0) start
@@ -245,7 +254,7 @@ drags DragConfig { container, mouseEventFilter } element = do
 
       let total = Reflex.zipDynWith (+) (fromMaybe 0 <$> current) finished
 
-  pure Drags { current, finished, total }
+  pure Drags { current, finished, total, start, end }
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
 
