@@ -243,12 +243,20 @@
   user-select: none;
 }
 
-.drag-example > div {
+.drag-example > div, .drag-me {
   height: 50px;
   width: 50px;
 
   border: 2px solid black;
   border-radius: 10px;
 
+  color: white;
   background-color: blue;
+}
+
+.drag-me {
+  position: absolute;
+
+  top: 40px;
+  left: 500px;
 }

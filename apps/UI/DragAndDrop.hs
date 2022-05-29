@@ -7,41 +7,53 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 module UI.DragAndDrop where
 
 
-import           Control.Monad      (void)
+import           Control.Monad                   (void)
 
-import qualified Data.ByteString    as BS
-import           Data.Default.Class (Default (..))
-import           Data.Maybe         (fromMaybe)
+import qualified Data.ByteString                 as BS
+import           Data.Default.Class              (Default (..))
+import           Data.Maybe                      (fromMaybe)
+import           Data.Text                       (Text)
 
-import qualified GHCJS.DOM.Document as GHCJS
+import qualified GHCJS.DOM.CSSStyleDeclaration   as Style
+import qualified GHCJS.DOM.Document              as Document
+import qualified GHCJS.DOM.ElementCSSInlineStyle as Element
+
+import qualified Language.Javascript.JSaddle     as Js
 
 import qualified Reflex
-import           Reflex             (Dynamic)
-import qualified Reflex.Dom         as Dom
+import           Reflex                          (Dynamic)
+import qualified Reflex.Dom                      as Dom
 
-import           UI.Attributes      (Angle (..), rotate, scale, translate)
-import           UI.Element         (Dom, Element, elClass', elDynAttr')
-import           UI.Event           (Modifier (Shift), MouseButton (..),
-                                     MouseEventResult (..), button, client,
-                                     mouseEvent, on, performJs)
-import           UI.Point           (Point (..), distance)
-import           UI.Widget          (label, ul)
+import           UI.Attributes                   (Angle (..), rotate, scale,
+                                                  translate)
+import           UI.Element                      (Dom, Element, elClass',
+                                                  elDynAttr')
+import           UI.Event                        (Modifier (Shift),
+                                                  MouseButton (..),
+                                                  MouseEventResult (..), button,
+                                                  client, mouseEvent, on,
+                                                  performJs)
+import           UI.Point                        (Point (..), distance)
+import           UI.Widget                       (label, ul)
 
 import qualified Witherable
 
 demo :: forall m t. (Dom t m) => m ()
-demo = void $ ul (Reflex.constDyn [("class", "drag-demo")])
-  [ example "Follow cursor exactly" def translate
-  , example "Horizontal only" def xOnly
-  , example "Vertical only" def yOnly
-  , example "Snap to 50px grid" def (snapTo 50)
-  , example "Rotate" def rotateByDistance
-  , example "Scale" def scaleByDistance
-  , example "Middle mouse button while holding @shift@" shiftConfig translate
-  ]
+demo = void do
+  ul (Reflex.constDyn [("class", "drag-demo")])
+    [ example "Follow cursor exactly" def translate
+    , example "Horizontal only" def xOnly
+    , example "Vertical only" def yOnly
+    , example "Snap to 50px grid" def (snapTo 50)
+    , example "Rotate" def rotateByDistance
+    , example "Scale" def scaleByDistance
+    , example "Middle mouse button while holding @shift@" shiftConfig translate
+    ]
+  dragAnywhere
   where xOnly Point { x } = translate (Point x 0)
         yOnly Point { y } = translate (Point 0 y)
 
@@ -52,9 +64,16 @@ demo = void $ ul (Reflex.constDyn [("class", "drag-demo")])
 
         scaleByDistance p = scale (1 + distance p 0 / 250)
 
-        shiftConfig = def { mouseEventFilter = \ e ->
-                              (button e == Auxiliary) && (Shift `elem` modifiers e )
-                          }
+        shiftConfig = def
+          { mouseEventFilter = \ e ->
+              (button e == Auxiliary) && (Shift `elem` modifiers e ) }
+
+        dragAnywhere = mdo
+          (element, _) <- elDynAttr' "div" attributes $
+            Dom.text "drag me!"
+          let attributes = translate <$> total <*> Reflex.constDyn [("class", "drag-me")]
+          Drags { total } <- drags def element
+          pure ()
 
         example description config doDrag = mdo
           label description
@@ -191,12 +210,12 @@ drags :: forall m d t. Dom t m
       --  2. The net movement from all /finished/ drags, /not/
       --  including the current drag.
 drags DragConfig { container, mouseEventFilter } element = do
+  -- TODO: Better error handling?
+  body <- Document.getBodyUnsafe =<< Dom.askDocument
   (mouseup, mousemove) <- case container of
     Just e  ->
       pure (Dom.domEvent Dom.Mouseup e, Dom.domEvent Dom.Mousemove e)
     Nothing -> do
-      -- TODO: Better error handling?
-      body <- GHCJS.getBodyUnsafe =<< Dom.askDocument
       up   <- performJs mouseEvent =<< body `on` "mouseup"
       move <- performJs mouseEvent =<< body `on` "mousemove"
       pure (up, move)
@@ -208,6 +227,11 @@ drags DragConfig { container, mouseEventFilter } element = do
             Dom.domEvent Dom.Mousedown element
 
       isDragged <- Reflex.holdDyn False $ Reflex.leftmost [False <$ end, True <$ start]
+
+      -- toggle user-select: none for the document body when drags
+      -- start and end
+      Reflex.performEvent_ (setUserSelect body "none" <$ start)
+      Reflex.performEvent_ (setUserSelect body "auto" <$ end)
 
       -- current drag
       startPosition <- Reflex.holdDyn (Point 0 0) start
@@ -225,6 +249,11 @@ drags DragConfig { container, mouseEventFilter } element = do
   pure Drags { current, finished, total }
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
+
+        setUserSelect e (value :: Text) = do
+          style <- Element.getStyle e
+          Style.setProperty style ("user-select" :: Text) value (Nothing @Text)
+          Style.setProperty style ("-webkit-user-select" :: Text) value (Nothing @Text)
 
 main :: IO ()
 main = do

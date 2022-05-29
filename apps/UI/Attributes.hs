@@ -321,6 +321,16 @@ updateProperty f property value attributes = case Map.lookup "style" attributes 
   Just existing -> Map.insert "style" (joinStyles $ update existing) attributes
   where update = Map.insertWith f property value . styles
 
+-- ***
+
+-- | Set the @user-select@ and @-webkit-user-select@ properties.
+--
+-- While WebKit /should/ support @user-select@ with no prefix, only
+-- the prefixed version worked for me in WebKitGTK.
+setUserSelect :: Text -> Map Text Text -> Map Text Text
+setUserSelect value =
+  setProperty "user-select" value . setProperty "-webkit-user-select" value
+
 -- *** CSS Transforms
 
 -- $ The CSS @transform@ property lets you translate, scale, rotate
@@ -399,7 +409,8 @@ data Transform = Matrix3D !(Vector Double)
                -- See MDN:
                -- [translate3d](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/translate3d)
 
--- |
+-- | To the corresponding @<transform-function>@.
+--
 -- >>> toCss (Matrix3D [1..16])
 -- "matrix3d(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0)"
 --
