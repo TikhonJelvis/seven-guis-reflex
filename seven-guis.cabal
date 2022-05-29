@@ -30,6 +30,7 @@ executable guis
     UI.IsElement
     UI.Point
     UI.PushMap
+    UI.Style
     UI.SVG
     UI.Widget
 
