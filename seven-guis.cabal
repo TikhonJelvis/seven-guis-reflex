@@ -23,7 +23,7 @@ executable guis
     Seven.Timer
     UI.Attributes
     UI.Dialog
-    UI.DragAndDrop
+    UI.Drag
     UI.Element
     UI.Event
     UI.History

@@ -8,8 +8,7 @@
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
-module UI.DragAndDrop where
-
+module UI.Drag where
 
 import           Control.Monad                   (void)
 
@@ -116,8 +115,8 @@ data DragConfig d t = DragConfig
   -- container do not count for the drag distance and don't end a
   -- drag.
   --
-  -- If not specified, events on the entire document body will
-  -- contribute to drags.
+  -- The default is 'Nothing', which will use events from the entire
+  -- document body.
 
   , mouseEventFilter :: MouseEventResult -> Bool
   -- ^ A function to specify which mouse events can /start/ drags.
