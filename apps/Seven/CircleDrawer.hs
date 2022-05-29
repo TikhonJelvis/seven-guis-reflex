@@ -14,34 +14,36 @@
 {-# LANGUAGE TupleSections         #-}
 module Seven.CircleDrawer where
 
-import           Control.Lens       ((<&>), (??))
+import           Control.Applicative (liftA2)
+import           Control.Lens        ((<&>), (??))
 
-import qualified Data.ByteString    as BS
-import           Data.Default.Class (def)
-import           Data.Maybe         (fromMaybe)
-import qualified Data.Text          as Text
-import           Data.Text.Display  (Display, ShowInstance (..))
+import qualified Data.ByteString     as BS
+import           Data.Default.Class  (def)
+import           Data.Maybe          (fromMaybe)
+import qualified Data.Text           as Text
+import           Data.Text.Display   (Display, ShowInstance (..))
 
-import           Reflex
-import qualified Reflex.Dom         as Dom
-import           Reflex.Dom         (dynText)
+import qualified Reflex
+import           Reflex              (Dynamic, Event, (<@), (<@>))
+import qualified Reflex.Dom          as Dom
+import           Reflex.Dom          (dynText)
 
-import qualified Text.Printf        as Text
+import qualified Text.Printf         as Text
 
-import           UI.Attributes      (ToAttributes (..), setClass)
-import           UI.Dialog          (DialogElement (..), ModalState (..),
-                                     dialog)
-import           UI.Element         (Dom, Element)
+import           UI.Attributes       (ToAttributes (..), setClass)
+import           UI.Dialog           (DialogElement (..), ModalState (..),
+                                      dialog)
+import           UI.Element          (Dom, Element)
 import           UI.Event
-import qualified UI.History         as History
-import           UI.History         (Undos (..))
+import qualified UI.History          as History
+import           UI.History          (Undos (..))
 import           UI.Point
-import qualified UI.PushMap         as PushMap
-import           UI.PushMap         (PushMap)
+import qualified UI.PushMap          as PushMap
+import           UI.PushMap          (PushMap)
 import           UI.SVG
 import           UI.Widget
 
-import           Witherable         (Filterable (..), catMaybes, (<&?>))
+import           Witherable          (Filterable (..), catMaybes, (<&?>))
 
 main :: IO ()
 main = do
@@ -55,19 +57,20 @@ widget = Dom.elClass "div" "circle-drawer" do
 
       (canvas, clicked) <- circlesCanvas circles beingModified
 
-      circles <- foldDyn doAction mempty $
-        leftmost [adds, previews, modifies, flipChange <$> undoActions, redoActions]
+      circles <- Reflex.foldDyn doAction mempty $
+        Reflex.leftmost [adds, previews, modifies, flipChange <$> undoActions, redoActions]
 
       let adds = mainClicks canvas <&> \ event -> AddCircle (offset event)
           modifies =
-            catMaybes $ changeRadius <$> current beingModified <@> setRadius
+            catMaybes $ changeRadius <$> Reflex.current beingModified <@> setRadius
           previews =
-            catMaybes $ previewChange <$> current targetCircle <@> updated previewRadius
+            catMaybes $ previewChange <$> Reflex.current targetCircle
+                                      <@> Reflex.updated previewRadius
 
-      beingModified <- holdDyn Nothing $
-        leftmost [Just <$> clicked, Nothing <$ setRadius]
+      beingModified <- Reflex.holdDyn Nothing $
+        Reflex.leftmost [Just <$> clicked, Nothing <$ setRadius]
 
-      let targetCircle = zipDynWith getCircle beingModified circles
+      let targetCircle = liftA2 getCircle beingModified circles
       (setRadius, previewRadius) <-
         circleDialog beingModified $ fmap snd <$> targetCircle
 
@@ -116,7 +119,7 @@ svgCircle :: forall m t. Dom t m
           -> Dynamic t Bool
           -> m (Event t MouseEventResult)
 svgCircle c isSelected = do
-  element <- circle c $ class_ <*> constDyn defaults
+  element <- circle c $ class_ <*> pure defaults
   pure $ Dom.domEvent Dom.Click element
   where class_ = setClass "selected" <$> isSelected
         defaults = toAttributes def { width = 2 }
@@ -142,19 +145,19 @@ circleDialog :: forall m t. Dom t m
              -- ^ The 'Event' fires when a modification is saved; the
              -- 'Dynamic' is always up to date with the set radius.
 circleDialog beingModified targetCircle = do
-  (dialogElement, (old, new)) <- dialog showHide (constDyn []) do
+  (dialogElement, (old, new)) <- dialog showHide (pure []) do
     dynText $ message . center . fromMaybe blank <$> targetCircle
 
-    let oldCircle = tagPromptlyDyn targetCircle showHide
+    let oldCircle = Reflex.tagPromptlyDyn targetCircle showHide
         oldRadius = radius <$> catMaybes oldCircle
     newRadius <- fmap (* maxRadius) <$> range ((/ maxRadius) <$> oldRadius)
 
     pure (oldRadius, newRadius)
 
-  old' <- holdDyn 0 old
-  let both = zipDyn old' new
-  pure (current both <@ closed dialogElement, new)
-  where showHide = updated beingModified <&> \case
+  old' <- Reflex.holdDyn 0 old
+  let both = liftA2 (,) old' new
+  pure (Reflex.current both <@ closed dialogElement, new)
+  where showHide = Reflex.updated beingModified <&> \case
           Just _  -> ShowModal
           Nothing -> Hide
 

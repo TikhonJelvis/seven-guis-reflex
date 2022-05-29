@@ -8,35 +8,39 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seven.CRUD where
 
+import           Control.Applicative (liftA2)
 import           Control.Lens
 
-import qualified Data.ByteString   as BS
-import           Data.Text         (Text)
-import qualified Data.Text         as Text
+import qualified Data.ByteString     as BS
+import           Data.Default.Class  (def)
+import           Data.Text           (Text)
+import qualified Data.Text           as Text
 import           Data.Text.Display
 
-import           Reflex.Dom        hiding (Delete)
+import qualified Reflex
+import           Reflex              (Dynamic, Event, (<@>))
+import qualified Reflex.Dom          as Dom
 
 import           UI.Element
-import qualified UI.PushMap        as PushMap
+import qualified UI.PushMap          as PushMap
 import           UI.Widget
 
-import qualified Witherable        (Filterable (filter))
+import qualified Witherable          (Filterable (filter))
 
 widget :: forall m t. Dom t m => m ()
-widget = elClass "div" "crud" do
-  rec let updates = current (zipDynWith act selected entered) <@> action
-      names <- foldDynMaybe ($) mempty updates
+widget = Dom.elClass "div" "crud" do
+  rec let updates = Reflex.current (liftA2 act selected entered) <@> action
+      names <- Reflex.foldDynMaybe ($) mempty updates
 
       prefix   <- prefixEntry
-      selected <- listbox $ zipDynWith filterPrefix prefix names
-      entered  <- elClass "div" "name-input" nameInput
+      selected <- listbox $ liftA2 filterPrefix prefix names
+      entered  <- Dom.elClass "div" "name-input" nameInput
       action   <- crud
   pure ()
   where
-    prefixEntry = elClass "div" "filter" do
+    prefixEntry = Dom.elClass "div" "filter" do
       label "Filter prefix: "
-      value <$> inputElement def
+      Dom.value <$> Dom.inputElement def
 
     act selected entered action names = case action of
       Create -> pure $ PushMap.push entered names
@@ -56,11 +60,11 @@ data Crud = Create | Update | Delete
 --  2. Update
 --  3. Delete
 crud :: Dom t m => m (Event t Crud)
-crud = elClass "div" "crud-controls" do
-  create <- button "Create"
-  update <- button "Update"
-  delete <- button "Delete"
-  pure $ leftmost [Create <$ create, Update <$ update, Delete <$ delete]
+crud = Dom.elClass "div" "crud-controls" do
+  create <- Dom.button "Create"
+  update <- Dom.button "Update"
+  delete <- Dom.button "Delete"
+  pure $ Reflex.leftmost [Create <$ create, Update <$ update, Delete <$ delete]
 
 -- * Names
 
@@ -78,14 +82,14 @@ instance Display Name where
 -- | Two textboxes: one for first name, one for surname. Either part
 -- can be blank—no validation on the names the user enters.
 nameInput :: Dom t m => m (Dynamic t Name)
-nameInput = el "div" do
+nameInput = Dom.el "div" do
   label "Name: "
-  first <- value <$> inputElement def
+  first <- Dom.value <$> Dom.inputElement def
 
   label "Surname: "
-  surname <- value <$> inputElement def
+  surname <- Dom.value <$> Dom.inputElement def
 
-  pure (zipDynWith Name first surname)
+  pure (liftA2 Name first surname)
 
 -- | Filter a collection of names, keeping only those where 'last' has
 -- the given prefix.
@@ -95,4 +99,4 @@ filterPrefix prefix = Witherable.filter (Text.isPrefixOf prefix . surname)
 main :: IO ()
 main = do
   css <- BS.readFile "css/tasks.css"
-  mainWidgetWithCss css widget
+  Dom.mainWidgetWithCss css widget

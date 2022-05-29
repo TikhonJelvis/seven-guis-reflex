@@ -8,15 +8,16 @@
 -- | Utilities for maintaining undo/redo history.
 module UI.History where
 
+import           Control.Lens ((&))
+
+import qualified Data.List    as List
+import           Data.Maybe   (listToMaybe)
+
+import qualified Reflex
+import           Reflex       (Dynamic, Event)
+
 import           UI.Element
 import           UI.Widget
-
-import           Control.Lens  ((&))
-
-import qualified Data.List     as List
-import           Data.Maybe    (listToMaybe)
-
-import           Reflex
 
 -- * History
 
@@ -93,8 +94,8 @@ undoButton :: forall a m t. Dom t m
            -> m (Event t a)
            -- ^ Event with the action to undo
 undoButton history = do
-  pressed <- button' (constDyn "↶") (enabledIf . hasUndo <$> history)
-  pure $ attachWithMaybe (&) (current history) (toUndo <$ pressed)
+  pressed <- button' (pure "↶") (enabledIf . hasUndo <$> history)
+  pure $ Reflex.attachWithMaybe (&) (Reflex.current history) (toUndo <$ pressed)
 
 -- | A button with the label @"↷"@ that fires an event with the action
 -- to redo when pressed.
@@ -104,8 +105,8 @@ redoButton :: forall a m t. Dom t m
            -> m (Event t a)
            -- ^ Event with the action to undo
 redoButton history = do
-  pressed <- button' (constDyn "↷") (enabledIf . hasRedo <$> history)
-  pure $ attachWithMaybe (&) (current history) (toRedo <$ pressed)
+  pressed <- button' (pure "↷") (enabledIf . hasRedo <$> history)
+  pure $ Reflex.attachWithMaybe (&) (Reflex.current history) (toRedo <$ pressed)
 
 -- | A control pane with an undo button and a redo button that manage
 -- history based on the given input events. Each input event that
@@ -117,7 +118,7 @@ undoControls :: forall a m t. Dom t m
 undoControls actions = do
   rec undoActions <- undoButton history
       redoActions <- redoButton history
-      history <- foldDyn ($) empty $ leftmost
+      history <- Reflex.foldDyn ($) empty $ Reflex.leftmost
         [save <$> actions, undo <$ undoActions, redo <$ redoActions]
   pure Undos { undoActions, redoActions, history }
 

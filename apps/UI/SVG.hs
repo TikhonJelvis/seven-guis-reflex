@@ -14,6 +14,8 @@
 module UI.SVG where
 
 
+import           Control.Applicative    (liftA2)
+
 import           Data.Colour            (AlphaColour, Colour, ColourOps (over))
 import qualified Data.Colour            as Colour
 import qualified Data.Colour.SRGB       as Colour
@@ -29,7 +31,7 @@ import           Data.Word              (Word8)
 
 import qualified Numeric
 
-import           Reflex                 (Dynamic, constDyn, zipDynWith)
+import           Reflex                 (Dynamic)
 import           Reflex.Dom             (AttributeName (..))
 
 import           Text.Printf            (printf)
@@ -98,7 +100,7 @@ svgAttr' :: forall a m t. Dom t m
          -> m a
          -- ^ Body
          -> m (Element t, a)
-svgAttr' tag = svgDynAttr' tag . constDyn
+svgAttr' tag = svgDynAttr' tag . pure
 {-# INLINABLE svgAttr' #-}
 
 -- | Create and return an SVG element with a dynamic set of attributes.
@@ -256,7 +258,7 @@ circle :: forall m t. Dom t m
        -- @cx@, @cy@ and @r@ in this map.
        -> m (Element t)
 circle c attrs =
-  fst <$> svgDynAttr' "circle" (zipDynWith with c attrs) (pure ())
+  fst <$> svgDynAttr' "circle" (liftA2 with c attrs) (pure ())
 
 -- * SVG Namespace
 

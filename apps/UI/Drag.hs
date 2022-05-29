@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeApplications    #-}
 module UI.Drag where
 
+import           Control.Applicative             (liftA2)
 import           Control.Monad                   (void)
 
 import qualified Data.ByteString                 as BS
@@ -45,7 +46,7 @@ import qualified Witherable
 
 demo :: forall m t. (Dom t m) => m ()
 demo = void do
-  ul (Reflex.constDyn [("class", "drag-demo")])
+  ul (pure [("class", "drag-demo")])
     [ example "Follow cursor exactly" def translate
     , example "Horizontal only" def xOnly
     , example "Vertical only" def yOnly
@@ -74,7 +75,7 @@ demo = void do
         dragAnywhere = mdo
           (element, _) <- elDynAttr' "div" attributes $
             Dom.text "drag me!"
-          let attributes = translate <$> total <*> Reflex.constDyn [("class", "drag-me")]
+          let attributes = translate <$> total <*> pure [("class", "drag-me")]
           Drags { total } <- drags def element
           pure ()
 
@@ -82,23 +83,23 @@ demo = void do
           label description
           (container, _) <- elClass' "div" "drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
-            let attributes = doDrag <$> total <*> Reflex.constDyn []
+            let attributes = doDrag <$> total <*> pure []
             Drags { total } <- drags config { container = Just container } element
             pure ()
           pure ()
 
         snapBack = mdo
-          label "Snap back after each drag."
+          label "Snap back after each drag"
           (container, _) <- elClass' "div" "drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
-            let attributes = dragOrSnap <$> current <*> Reflex.constDyn []
+            let attributes = dragOrSnap <$> current <*> pure []
             Drags { current } <- drags def { container = Just container } element
             pure ()
           pure ()
         dragOrSnap = \case
           Just d  -> translate d
           Nothing -> transition snap . translate (Point 0 0)
-        snap = def { property = "transform", duration = s 1 }
+        snap = def { property = "transform", duration = s 100 }
 
 -- | Information about how a user interacts with an element by
 -- dragging.
@@ -132,6 +133,9 @@ data Drags t = Drags
     -- ^ The user stopped dragging the element at the given client X
     -- and Y coordinates.
   }
+             -- TODO: Does it make more sense for start and end to
+             -- have the distance moved, just like the behaviors? If
+             -- so, what distance: current or total?
 
 -- | Configure how to measure drags for an item.
 data DragConfig d t = DragConfig
@@ -189,7 +193,7 @@ instance Default (DragConfig d t) where
 --
 -- @
 -- draggable = do
---   rec let attributes = doDrag <$> total <*> constDyn []
+--   rec let attributes = doDrag <$> total <*> pure []
 --       (element, ()) <- elDynAttr' "div" attributes (pure ())
 --       Drags { total } <- drags container element
 --   pure ()
@@ -269,7 +273,7 @@ drags DragConfig { container, mouseEventFilter } element = do
       let endDelta = Reflex.attachWith (flip (-)) (Reflex.current startPosition) end
       finished <- Reflex.foldDyn (+) (Point 0 0) endDelta
 
-      let total = Reflex.zipDynWith (+) (fromMaybe 0 <$> current) finished
+      let total = liftA2 (+) (fromMaybe 0 <$> current) finished
 
   pure Drags { current, finished, total, start, end }
   where toMaybe dragged delta = if dragged then delta else Nothing

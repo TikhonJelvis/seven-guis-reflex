@@ -8,8 +8,8 @@ module Seven.TemperatureConverter where
 
 import           Data.Text   (Text)
 
-import           Reflex
-import           Reflex.Dom
+import qualified Reflex
+import qualified Reflex.Dom  as Dom
 
 import           Text.Printf (printf)
 
@@ -19,12 +19,12 @@ import           UI.Widget
 -- | The Temperature Converter has a frame with two text fields (°C
 -- and °F) that convert automatically.
 widget :: Dom t m => m ()
-widget = elClass "div" "converter" $ do
+widget = Dom.elClass "div" "converter" $ do
   rec f <- temperature "°F" (-32) updateF
-      text "="
+      Dom.text "="
       c <- temperature "°C" 0 updateC
-      let updateF = toF <$> updated c
-          updateC = toC <$> updated f
+      let updateF = toF <$> Reflex.updated c
+          updateC = toC <$> Reflex.updated f
   pure ()
   where toF c = c * (9/5) + 32
         toC f = (f - 32) * (5/9)
@@ -45,10 +45,10 @@ temperature :: Dom t m
             -- ^ Unit label (eg @"°C"@)
             -> Temperature
             -- ^ Starting temperature.
-            -> Event t Temperature
+            -> Reflex.Event t Temperature
             -- ^ Updates to the displayed temperature.
-            -> m (Dynamic t Temperature)
-temperature unit start updates = elClass "div" "temperature" $ do
-  t <- readInput start updates (constDyn Enabled)
+            -> m (Reflex.Dynamic t Temperature)
+temperature unit start updates = Dom.elClass "div" "temperature" $ do
+  t <- readInput start updates (pure Enabled)
   label unit
   ignoreNothing start t

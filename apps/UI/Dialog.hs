@@ -21,7 +21,8 @@ import           Data.Text                   (Text)
 import           Language.Javascript.JSaddle (MonadJSM, jsf, liftJSM, valToBool,
                                               (!))
 
-import           Reflex
+import qualified Reflex
+import           Reflex                      (Dynamic, Event)
 import qualified Reflex.Dom                  as Dom
 
 import           UI.Element
@@ -90,7 +91,7 @@ instance IsElement (DialogElement t) where rawElement = rawElement . element
 -- @
 -- mainWidget do
 --   press <- button "Hello"
---   void $ dialog (Show <$ press) (constDyn []) (text "Hello, World!")
+--   void $ dialog (Show <$ press) (pure []) (text "Hello, World!")
 -- @
 dialog :: forall a m t. (Dom t m)
        => Event t ModalState
@@ -102,7 +103,7 @@ dialog :: forall a m t. (Dom t m)
        -> m (DialogElement t, a)
 dialog states attrs body = do
   (element, result) <- elDynAttr' "dialog" attrs body
-  performEvent_ $ setDialogState element <$> states
+  Reflex.performEvent_ $ setDialogState element <$> states
 
   canceled <- element `on` "cancel"
   closed   <- element `on` "close"
@@ -131,11 +132,11 @@ alert :: forall m t. (Dom t m)
       -> m (DialogElement t)
 alert trigger = do
   (element, _) <- dialog (ShowModal <$ trigger) attrs do
-    message <- holdDyn "" trigger
+    message <- Reflex.holdDyn "" trigger
     Dom.dynText message
     Dom.elAttr "form" [("method", "dialog")] $ Dom.button "Ok"
   pure element
-  where attrs = constDyn [("class", "alert")]
+  where attrs = pure [("class", "alert")]
 
 -- ** JS API
 
@@ -168,8 +169,8 @@ main = do
   Dom.mainWidgetWithCss css do
     press <- Dom.button "Hello"
     DialogElement { closed, canceled } <- alert ("Hello, World!" <$ press)
-    countClose <- count closed
-    countCancel <- count canceled
+    countClose <- Reflex.count closed
+    countCancel <- Reflex.count canceled
     output @Int countClose
     output @Int countCancel
     pure ()

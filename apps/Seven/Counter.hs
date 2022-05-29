@@ -5,8 +5,8 @@
 {-# LANGUAGE TypeApplications  #-}
 module Seven.Counter where
 
-import           Reflex
-import           Reflex.Dom
+import qualified Reflex
+import qualified Reflex.Dom as Dom
 
 import           UI.Element
 import           UI.Widget
@@ -18,7 +18,7 @@ import           UI.Widget
 --
 -- Each time the button is pressed, the label goes up by 1.
 widget :: Dom t m => m ()
-widget = elClass "div" "counter" $ do
-  rec output @Integer =<< count clicks
-      clicks <- button "count"
+widget = Dom.elClass "div" "counter" $ do
+  rec output @Integer =<< Reflex.count clicks
+      clicks <- Dom.button "count"
   pure ()

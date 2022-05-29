@@ -49,7 +49,8 @@ import           GHCJS.DOM.Types             (castTo)
 
 import           Language.Javascript.JSaddle (MonadJSM)
 
-import           Reflex
+import qualified Reflex
+import           Reflex                      (Dynamic, Reflex)
 import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
                                               ElementConfig (..), HasDocument,
@@ -65,14 +66,14 @@ type PerformJS d m = ( MonadFix m
                      )
 
 type Dom t m = ( MonadFix m
-               , MonadHold t m
-               , TriggerEvent t m
-               , PerformEvent t m
-               , PostBuild t m
+               , Reflex.MonadHold t m
+               , Reflex.TriggerEvent t m
+               , Reflex.PerformEvent t m
+               , Reflex.PostBuild t m
                , DomBuilder t m
                , DomBuilderSpace m ~ Dom.GhcjsDomSpace
                , MonadJSM m
-               , PerformJS (DomBuilderSpace m) (Performable m)
+               , PerformJS (DomBuilderSpace m) (Reflex.Performable m)
                , HasDocument m
                )
 
@@ -109,7 +110,7 @@ elAttr' :: forall a m t. Dom t m
         -> Map Text Text
         -> m a
         -> m (Element t, a)
-elAttr' tagName attr = elDynAttr' tagName (constDyn attr)
+elAttr' tagName attr = elDynAttr' tagName (pure attr)
 {-# INLINABLE elAttr' #-}
 
 -- | Create and return an elment with a dynamically changing set of
@@ -139,12 +140,12 @@ elDynAttrNs' namespace tagName attrs body = do
         { _elementConfig_namespace = namespace
         , _elementConfig_initialAttributes = Map.empty
         , _elementConfig_modifyAttributes =
-          Just $ fmapCheap Dom.mapKeysToAttributeName modifyAttrs
+          Just $ Reflex.fmapCheap Dom.mapKeysToAttributeName modifyAttrs
         , _elementConfig_eventSpec = eventSpec
         }
   (element, result) <- Dom.element tagName config body
-  postBuild <- getPostBuild
-  notReadyUntil postBuild
+  postBuild <- Reflex.getPostBuild
+  Reflex.notReadyUntil postBuild
   pure (Element element, result)
   where eventSpec = Dom.GhcjsEventSpec filters handler
         filters = mempty

@@ -30,7 +30,8 @@ import qualified Data.Text          as Text
 import           Data.Text.Display  (Display)
 import qualified Data.Text.Display  as Display
 
-import           Reflex
+import qualified Reflex
+import           Reflex             (Dynamic, Event, Reflex)
 import qualified Reflex.Dom         as Dom
 import           Reflex.Dom         (DomBuilder, DomBuilderSpace, (=:))
 
@@ -165,12 +166,12 @@ readInput :: forall a m t. (Dom t m, Read a, Show a)
           -- you don't want to update the input, use 'never'.
           -> Dynamic t Enabled
           -- ^ Whether the input should be enabled or disabled. Use
-          -- @constDyn Enabled@ to always keep it enabled.
+          -- @pure Enabled@ to always keep it enabled.
           -> m (Dynamic t (Maybe a))
 readInput initial setEvents enabled = do
   modify <- Dom.dynamicAttributesToModifyAttributes $ toAttributes <$> enabled
   input <- Dom.inputElement (config modify)
-  holdDyn (Just initial) $ read' <$> Dom._inputElement_input input
+  Reflex.holdDyn (Just initial) $ read' <$> Dom._inputElement_input input
   where read' = readMaybe . Text.unpack
         show' = Text.pack . show
 
@@ -240,7 +241,7 @@ listbox :: forall a m t. (Display a, Dom t m)
         => Dynamic t (PushMap a)
         -> m (Dynamic t (Maybe Int))
 listbox elements = Dom.elClass "div" "listbox" do
-  rec selected <- holdDyn Nothing =<< selectView selected elements row
+  rec selected <- Reflex.holdDyn Nothing =<< selectView selected elements row
   pure selected
   where row k a isSelected = do
           let class_ = bool "row" "selected row"
@@ -249,7 +250,7 @@ listbox elements = Dom.elClass "div" "listbox" do
 
           let selected   = Just k  <$ Dom.domEvent Dom.Click element
               unselected = Nothing <$ Dom.domEvent Dom.Dblclick element
-          pure $ leftmost [unselected, selected]
+          pure $ Reflex.leftmost [unselected, selected]
 
 -- * Element Interaction
 
@@ -269,7 +270,7 @@ hovering :: Dom t m
          -- option right now...
          -> Dom.Element EventResult (DomBuilderSpace m) t
          -> m (Dynamic t Bool)
-hovering start element = holdDyn start $ leftmost [over, leave]
+hovering start element = Reflex.holdDyn start $ Reflex.leftmost [over, leave]
   where over  = True  <$ Dom.domEvent Dom.Mouseover element
         leave = False <$ Dom.domEvent Dom.Mouseleave element
 
@@ -281,20 +282,20 @@ hovering start element = holdDyn start $ leftmost [over, leave]
 --
 -- The resulting 'Dynamic' will /not/ fire an event when the input
 -- changes to 'Nothing'.
-ignoreNothing :: forall a m t. (Reflex t, MonadHold t m, MonadFix m)
+ignoreNothing :: forall a m t. (Reflex t, Reflex.MonadHold t m, MonadFix m)
               => a
               -- ^ The initial value to use if the input dynamic has
               -- not had a single valid value.
               -> Dynamic t (Maybe a)
               -- ^ A dynamic that can have invalid values.
               -> m (Dynamic t a)
-ignoreNothing initial input = foldDynMaybe const initial (updated input)
+ignoreNothing initial input = Reflex.foldDynMaybe const initial (Reflex.updated input)
 
 -- | The value from the last time the given event fired, or 'Nothing'
 -- if it hasn't fired yet.
-lastEvent :: (Reflex t, MonadHold t m, MonadFix m)
+lastEvent :: (Reflex t, Reflex.MonadHold t m, MonadFix m)
           => Event t a -> m (Dynamic t (Maybe a))
-lastEvent = foldDyn (\ a _ -> Just a) Nothing
+lastEvent = Reflex.foldDyn (\ a _ -> Just a) Nothing
 
 -- ** Select Views
 
@@ -309,7 +310,7 @@ lastEvent = foldDyn (\ a _ -> Just a) Nothing
 --
 -- and returns the widget itself, as well as a stream of events from
 -- that widget.
-selectView :: (Adjustable t m, MonadFix m, MonadHold t m, PostBuild t m, Reflex t)
+selectView :: Dom t m
            => Dynamic t (Maybe Int)
            -- ^ Which widget, if any, is selected.
            -> Dynamic t (PushMap a)
@@ -322,11 +323,11 @@ selectView :: (Adjustable t m, MonadFix m, MonadHold t m, PostBuild t m, Reflex 
            -- from the fired event.
 selectView selection values child = do
   -- shared between children for performance
-  let selectionDemux = demux selection
-  childEvents <- listWithKey (PushMap.toMap <$> values) $ \ i a -> do
-    let selected = demuxed selectionDemux (Just i)
+  let selectionDemux = Reflex.demux selection
+  childEvents <- Reflex.listWithKey (PushMap.toMap <$> values) $ \ i a -> do
+    let selected = Reflex.demuxed selectionDemux (Just i)
     fmap (i,) <$> child i a selected
-  pure $ snd <$> switchPromptlyDyn (leftmost . Map.elems <$> childEvents)
+  pure $ snd <$> Reflex.switchPromptlyDyn (Reflex.leftmost . Map.elems <$> childEvents)
 
 -- | Keeps track of an 'Int' id for widgets used in 'selectView'.
 withId :: (Monad m, Reflex t)
