@@ -1,12 +1,14 @@
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecursiveDo         #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ViewPatterns          #-}
 module UI.Drop where
 
 import           Control.Monad               (forM, void)
@@ -15,6 +17,10 @@ import qualified Data.ByteString             as BS
 import           Data.Default.Class          (def)
 import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
+import           Data.Maybe                  (fromMaybe)
+import           Data.Text                   (Text)
+
+import qualified GHCJS.DOM.Node              as Node
 
 import           Language.Javascript.JSaddle (MonadJSM)
 
@@ -25,33 +31,72 @@ import qualified Reflex.Dom                  as Dom
 import qualified UI.Drag                     as Drag
 import           UI.Drag                     (DragConfig (..), Drags (..))
 import qualified UI.Element                  as Element
-import           UI.Element                  (Dom, area, elClass', elDynAttr',
-                                              overlap)
-import           UI.IsElement                (IsElement)
-import           UI.Style                    (setProperty, translate)
+import           UI.Element                  (Dom, Element, area, elClass',
+                                              elDynAttr', overlap)
+import           UI.IsElement                (IsElement, rawElement)
+import           UI.Point                    (Point (..))
+import           UI.Style                    (duration, property, s,
+                                              setProperty, transition,
+                                              translate)
+import           UI.Widget                   (label, ul)
 
 demo :: forall m t. Dom t m => m ()
 demo = void do
-  rec (container, _) <- elClass' "div" "draggable drop-example" do
-        rec (target, _)  <- elClass' "div" "drop-target" (pure ())
-            (element, _) <- elDynAttr' "div" attributes (pure ())
-            wasDropped <- Reflex.holdDyn False $ not . Map.null <$> dropped
+  ul (pure [("class", "drop-demo")])
+    [ example "Change color on hover and drop" changeColor
+    , example "Move element to target" moveElement
+    ]
+  where example :: Text -> (Element t -> m a) -> m ()
+        example description body = do
+          label description
+          rec (container, _) <- elClass' "div" "draggable drop-example" $
+                body container
+          pure ()
 
-            let attributes = do
-                  move <- translate <$> total
-                  colorHover <- colorIf "green" . (not . Map.null) <$> hovering
-                  colorDropped <- colorIf "red" <$> wasDropped
-                  pure $ move $ colorDropped $ colorHover []
+        changeColor container = do
+          rec (target, _)  <- elClass' "div" "drop-target" (pure ())
+              (element, _) <- elDynAttr' "div" attributes (pure ())
+              wasDropped <- Reflex.holdDyn False $ not . Map.null <$> dropped
 
-            drags@Drags { total } <-
-              Drag.drags def { container = Just container } element
-            Drops { hovering, dropped } <-
-              drops element drags [('a', target)]
-        pure ()
-  pure ()
-  where colorIf color flag
+              let attributes = do
+                    move         <- translate <$> total
+                    colorHover   <- colorIf "green" . (not . Map.null) <$> hovering
+                    colorDropped <- colorIf "red" <$> wasDropped
+                    pure $ move $ colorDropped $ colorHover [("class", "draggable")]
+
+              drags@Drags { total } <-
+                Drag.drags def { container = Just container } element
+              Drops { hovering, dropped } <-
+                drops element drags [('a', target)]
+          pure ()
+
+        moveElement :: Element t -> m ()
+        moveElement container = do
+          rec (target, _) <- elClass' "div" "drop-target" (pure ())
+              (element, _) <- elDynAttr' "div" attributes (pure ())
+              snapping <- Reflex.holdDyn id $
+                Reflex.leftmost [id <$ start, snapTo <$ end]
+              let attributes = do
+                    let base = [("class", "draggable")]
+                    move    <- translate . fromMaybe 0 <$> current
+                    animate <- snapping
+                    pure $ animate $ move base
+
+              drags@Drags { current, start, end } <-
+                Drag.drags def { container = Just container } element
+              Drops { dropped } <- drops element drags [('a', target)]
+              Reflex.performEvent_ $ moveTo element target <$ dropped
+          pure ()
+
+        snapTo = transition smooth . translate (Point 0 0)
+        smooth = def { property = "transform", duration = s 0.5 }
+
+        colorIf color flag
           | flag      = setProperty "background-color" color
           | otherwise = id
+
+        moveTo (rawElement -> element) (rawElement -> parent) =
+          Node.appendChild_ parent element
 
 -- | Keeps track of how a draggable element is dropped on a set of
 -- target elements.
@@ -77,7 +122,14 @@ demo = void do
 --     Drag.drags def { container = Just container } element
 --   Drops { hovering, dropped } <-
 --     drops element drags [('a', target)]
+--   wasDropped <- Reflex.holdDyn False $ not . Map.null <$> dropped
 --   pure ()
+-- @
+--
+-- Move element into drop target:
+--
+-- @
+--
 -- @
 drops :: forall k e e' m t. (Ord k, IsElement e, IsElement e', Dom t m)
       => e
