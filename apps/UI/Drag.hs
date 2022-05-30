@@ -8,42 +8,40 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
 module UI.Drag where
 
-import           Control.Applicative             (liftA2)
-import           Control.Monad                   (void)
+import           Control.Applicative         (liftA2)
+import           Control.Monad               (void)
 
-import qualified Data.ByteString                 as BS
-import           Data.Default.Class              (Default (..))
-import           Data.Functor                    ((<&>))
-import           Data.Maybe                      (fromMaybe)
-import           Data.Text                       (Text)
+import qualified Data.ByteString             as BS
+import           Data.Default.Class          (Default (..))
+import           Data.Foldable               (toList)
+import           Data.Functor                ((<&>))
+import           Data.Maybe                  (fromMaybe)
+import           Data.Text                   (Text)
 
-import qualified GHCJS.DOM.CSSStyleDeclaration   as Style
-import qualified GHCJS.DOM.Document              as Document
-import qualified GHCJS.DOM.ElementCSSInlineStyle as Element
+import qualified GHCJS.DOM.Document          as Document
+import qualified GHCJS.DOM.Element           as Element
 
-import qualified Language.Javascript.JSaddle     as Js
+import qualified Language.Javascript.JSaddle as Js
 
 import qualified Reflex
-import           Reflex                          (Dynamic, Event)
-import qualified Reflex.Dom                      as Dom
+import           Reflex                      (Dynamic, Event)
+import qualified Reflex.Dom                  as Dom
 
-import           UI.Attributes                   (Angle (..), Transition (..),
-                                                  addClass, rotate, s, scale,
-                                                  transition, translate)
-import           UI.Element                      (Dom, Element, elClass',
-                                                  elDynAttr')
-import           UI.Event                        (Modifier (Shift),
-                                                  MouseButton (..),
-                                                  MouseEventResult (..), button,
-                                                  client, mouseEvent, on,
-                                                  performJs)
-import           UI.Point                        (Point (..), distance)
-import           UI.Style                        (getComputedProperty,
-                                                  setProperty)
-import           UI.Widget                       (label, ul)
+import           UI.Attributes               (Angle (..), Transition (..),
+                                              addClass, classes, joinClasses,
+                                              rotate, s, scale, transition,
+                                              translate)
+import           UI.Element                  (Dom, Element, elClass',
+                                              elDynAttr')
+import           UI.Event                    (Modifier (Shift),
+                                              MouseButton (..),
+                                              MouseEventResult (..), button,
+                                              client, mouseEvent, on, performJs)
+import           UI.Point                    (Point (..), distance)
+import           UI.Style                    (getComputedProperty, setProperty)
+import           UI.Widget                   (label, ul)
 
 import qualified Witherable
 
@@ -60,6 +58,7 @@ demo = void do
     , example "Middle mouse button while holding @shift@" shiftConfig translate
 
     , snapBack
+    , dragHandle
     ]
   dragAnywhere
   where withTransition p = addClass "smooth-drag" . translate p
@@ -113,13 +112,21 @@ demo = void do
                   Nothing -> []
             pure ()
           pure ()
-
         dragOrSnap = \case
           Just d  -> translate d
           Nothing -> transition snap . translate (Point 0 0)
+        snap = def { property = "transform", duration = s 1}
 
-        snap = def { property = "transform", duration = s 1
- }
+        dragHandle = mdo
+          label "Drag entire diff by handle only."
+          (container, _) <- elClass' "div" "drag-example" mdo
+            (_, attributes) <- elDynAttr' "div" attributes mdo
+              (handle, _) <- elDynAttr' "div" (pure [("class", "draggable drag-handle")]) do
+                Dom.text "X"
+              Drags { total } <- drags def {container = Just container } handle
+              pure $ translate <$> total <*> pure [("class", "smooth-drag")]
+            pure ()
+          pure ()
 
 -- | Information about how a user interacts with an element by
 -- dragging.
@@ -278,8 +285,8 @@ drags DragConfig { container, mouseEventFilter } element = do
 
       -- without user-select: none, dragging an element can also
       -- highlight text/images/etc—really distracting!
-      Reflex.performEvent_ (setUserSelect body "none" <$ start)
-      Reflex.performEvent_ (setUserSelect body "auto" <$ end)
+      Reflex.performEvent_ (dragging body <$ start)
+      Reflex.performEvent_ (notDragging body <$ end)
       -- TODO: save + restore previous state of body.style.user-select
 
       -- current drag
@@ -299,10 +306,16 @@ drags DragConfig { container, mouseEventFilter } element = do
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
 
-        setUserSelect e (value :: Text) = do
-          style <- Element.getStyle e
-          Style.setProperty style ("user-select" :: Text) value (Nothing @Text)
-          Style.setProperty style ("-webkit-user-select" :: Text) value (Nothing @Text)
+        dragging e = do
+          existing <- fromMaybe ("" :: Text) <$>
+            Element.getAttribute e ("class" :: Text)
+          Element.setAttribute e ("class" :: Text) (existing <> " " <> "dragging")
+
+        notDragging e = do
+          let parseClasses = toList . classes . fromMaybe ""
+              remove c = joinClasses . filter (/= c)
+          existing <- parseClasses <$> Element.getAttribute e ("class" :: Text)
+          Element.setAttribute e ("class" :: Text) $ remove "dragging" existing
 
 main :: IO ()
 main = do

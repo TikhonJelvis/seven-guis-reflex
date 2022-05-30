@@ -264,3 +264,21 @@
 .smooth-drag {
   transition: transform 0.1s;
 }
+
+.drag-handle {
+  position: relative;
+
+  height: 15px;
+  width: 15px;
+
+  border: 1px solid black;
+
+  cursor: grab;
+}
+
+body.dragging {
+  cursor: grabbing;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
