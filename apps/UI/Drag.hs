@@ -31,8 +31,8 @@ import           Reflex                          (Dynamic, Event)
 import qualified Reflex.Dom                      as Dom
 
 import           UI.Attributes                   (Angle (..), Transition (..),
-                                                  rotate, s, scale, transition,
-                                                  translate)
+                                                  addClass, rotate, s, scale,
+                                                  transition, translate)
 import           UI.Element                      (Dom, Element, elClass',
                                                   elDynAttr')
 import           UI.Event                        (Modifier (Shift),
@@ -51,6 +51,7 @@ demo :: forall m t. (Dom t m) => m ()
 demo = void do
   ul (pure [("class", "drag-demo")])
     [ example "Follow cursor exactly" def translate
+    , example "Follow with transition" def withTransition
     , example "Horizontal only" def xOnly
     , example "Vertical only" def yOnly
     , example "Snap to 50px grid" def (snapTo 50)
@@ -61,10 +62,13 @@ demo = void do
     , snapBack
     ]
   dragAnywhere
-  where xOnly Point { x } = translate (Point x 0)
+  where withTransition p = addClass "smooth-drag" . translate p
+
+        xOnly Point { x } = translate (Point x 0)
         yOnly Point { y } = translate (Point 0 y)
 
-        snapTo n Point { x, y } = translate (Point (toGrid n x) (toGrid n y))
+        snapTo n Point { x, y } =
+          addClass "smooth-drag" . translate (Point (toGrid n x) (toGrid n y))
         toGrid n x = x - fromInteger (round x `mod` n)
 
         rotateByDistance p = rotate (Turn $ distance p 0 / 100)

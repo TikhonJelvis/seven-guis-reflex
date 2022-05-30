@@ -260,3 +260,7 @@
   top: 40px;
   left: 500px;
 }
+
+.smooth-drag {
+  transition: transform 0.1s;
+}
