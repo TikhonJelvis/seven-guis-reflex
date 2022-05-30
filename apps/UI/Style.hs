@@ -2,9 +2,11 @@
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE MonoLocalBinds             #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE ViewPatterns               #-}
 -- | Functionality for working with element's @style@ attributes as
 -- well as their /computed/ styles.
@@ -34,22 +36,41 @@ module UI.Style
 
   , Transition (..)
   , transition
+  , removeTransition
+
+  , getComputedProperty
   )
 where
 
-import           Data.Default.Class (Default (..))
-import           Data.Foldable      (toList)
-import           Data.Map.Strict    (Map)
-import qualified Data.Map.Strict    as Map
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
-import           Data.Vector        (Vector)
+import           Data.Default.Class            (Default (..))
+import           Data.Foldable                 (toList)
+import           Data.Functor                  ((<&>))
+import           Data.Map.Strict               (Map)
+import qualified Data.Map.Strict               as Map
+import           Data.String                   (IsString)
+import           Data.Text                     (Text)
+import qualified Data.Text                     as Text
+import           Data.Text.Display             (Display)
+import           Data.Vector                   (Vector)
 
-import           UI.Point           (Point (..), Point3D (..))
+import qualified GHCJS.DOM                     as GHCJS
+import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
+import           GHCJS.DOM.Types               (MonadDOM)
+import           GHCJS.DOM.Window              as Window
 
--- ** CSS Style
+import           UI.IsElement                  (IsElement, rawElement)
+import           UI.Point                      (Point (..), Point3D (..))
 
--- *** CSS values
+-- * CSS Properties
+
+-- | A CSS property name.
+--
+-- In the future this is going to be something more structured, but
+-- for now a newtype will do.
+newtype Property = Property Text
+  deriving newtype (Show, Eq, ToCss, Display, IsString)
+
+-- * CSS Values
 
 -- | Types that can be converted to CSS values: numbers, length units,
 -- percentages... etc.
@@ -84,7 +105,7 @@ instance ToCss Point3D where
   toCss Point3D { x, y, z } =
     "(" <> toCss x <> ", " <> toCss y <> ", " <> toCss z <> ")"
 
--- *** Units
+-- * Units
 
               -- TODO: Redesign CSS unit handling?
 
@@ -123,14 +144,6 @@ newtype Duration = Duration Double
 instance ToCss Duration where
   toCss (Duration d) = toCss d <> "ms"
 
-    -- TODO: Structured representation for easing functions?
--- | An @<easing-function>@ specifying how to interpolate between
--- values.
---
--- See MDN:
--- [<easing-function>](https://developer.mozilla.org/en-US/docs/Web/CSS/easing-function)
-type EasingFunction = Text
-
 -- | A duration in milliseconds.
 --
 -- >>> toCss (ms 1000)
@@ -146,7 +159,15 @@ ms = Duration
 s :: Double -> Duration
 s = Duration . (* 1000)
 
--- *** Style Attribute
+    -- TODO: Structured representation for easing functions?
+-- | An @<easing-function>@ specifying how to interpolate between
+-- values.
+--
+-- See MDN:
+-- [<easing-function>](https://developer.mozilla.org/en-US/docs/Web/CSS/easing-function)
+type EasingFunction = Text
+
+-- * Style Attribute
 
 -- | Parse out the CSS declarations defined in a style attribute
 -- string.
@@ -196,13 +217,13 @@ joinStyles = Text.intercalate "; " . map joinDeclaration . Map.toList
 --
 -- >>> setProperty "color" "blue" []
 -- fromList [("style","color: blue")]
-setProperty :: Text
+setProperty :: Property
             -- ^ Property name
             -> Text
             -- ^ Property value
             -> Map Text Text
             -> Map Text Text
-setProperty property value attributes = case Map.lookup "style" attributes of
+setProperty (Property property) value attributes = case Map.lookup "style" attributes of
   Nothing       -> Map.insert "style" (joinStyles [(property, value)]) attributes
   Just existing -> Map.insert "style" (joinStyles $ update existing) attributes
   where update = Map.insert property value . styles
@@ -225,18 +246,17 @@ setProperty property value attributes = case Map.lookup "style" attributes of
 -- fromList [("style","transform: rotate(10deg) translate(10px, 10px)")]
 updateProperty :: (Text -> Text -> Text)
                -- ^ Function to combine values: @f new old@
-               -> Text
+               -> Property
                -- ^ Property name
                -> Text
                -- ^ New property value
                -> Map Text Text
                -> Map Text Text
-updateProperty f property value attributes = case Map.lookup "style" attributes of
-  Nothing       -> Map.insert "style" (joinStyles [(property, value)]) attributes
-  Just existing -> Map.insert "style" (joinStyles $ update existing) attributes
+updateProperty f (Property property) value attributes =
+  case Map.lookup "style" attributes of
+    Nothing       -> Map.insert "style" (joinStyles [(property, value)]) attributes
+    Just existing -> Map.insert "style" (joinStyles $ update existing) attributes
   where update = Map.insertWith f property value . styles
-
--- ***
 
 -- | Set the @user-select@ and @-webkit-user-select@ properties.
 --
@@ -246,7 +266,7 @@ setUserSelect :: Text -> Map Text Text -> Map Text Text
 setUserSelect value =
   setProperty "user-select" value . setProperty "-webkit-user-select" value
 
--- *** CSS Transforms
+-- * CSS Transforms
 
 -- $ The CSS @transform@ property lets you translate, scale, rotate
 -- and skew how an element is rendered in three dimensions. The value
@@ -373,7 +393,7 @@ instance ToCss Transform where
     where commas :: ToCss a => [a] -> Text
           commas = Text.intercalate ", " . map toCss
 
--- **** Setting CSS Transforms
+-- ** Setting CSS Transforms
 
 -- | Add a transform function to a @style@ attribute.
 --
@@ -409,7 +429,7 @@ rotate = addTransform . Rotate
 scale :: Double -> Map Text Text -> Map Text Text
 scale n = addTransform $ Scale (toCss n) (toCss n)
 
--- *** CSS Transitions
+-- * Transitions
 
 -- | The CSS @transition@ property lets us animate changes in values
 -- of other properties like colors, sizes and positions.
@@ -447,3 +467,73 @@ instance Default Transition where
 transition :: Transition -> Map Text Text -> Map Text Text
 transition = updateProperty after "transition" . toCss
   where after new existing = existing <> ", " <> new
+
+-- | Remove any transitions set for the current property.
+removeTransition :: Property -> Map Text Text -> Map Text Text
+removeTransition (Property property) =
+  updateProperty remove "transition" "" . updateProperty remove' "transition-property" ""
+  where remove _ = overProperties $ filter (not . Text.isInfixOf property)
+        remove' _ = overProperties $ filter (/= property)
+
+        overProperties f = Text.intercalate ", " . f . parseProperties
+        parseProperties = map Text.strip . Text.split (== ',')
+
+-- * Computed Styles
+
+-- $ Functions for working with the /computed/ style of DOM
+-- elements. The actual values of a CSS property on a DOM element are
+-- combined from several sources:
+--
+--  * the element's @style@ attribute (@element.style@ in JavaScript)
+--  * rules matching the element from external stylesheets
+--  * intermediate calculations from CSS animations and transitions
+--
+-- This means that inspecting an element's @style@ attribute is not
+-- sufficient to know what the element is /actually/ styled
+-- as. Instead, we can get this information by querying the element's
+-- __computed style__ directly.
+--
+-- Apart from accounting for the different ways an element's property
+-- can be set, computed properties are also evaluated to __resolved
+-- values__:
+--
+--  * relative units like @em@ are converted to absolute units like
+--    @px@
+--  * special properties like @inherit@ are converted to normal values
+--  * variables and computations like animations are evaluated
+--
+-- These additional calculations mean that even if a property is
+-- explicitly set in an element's @style@ attribute—which has a higher
+-- priority than rules from external stylesheets—the computed value
+-- can still differ from the specified value.
+--
+-- See MDN:
+--
+--  * [Window.getComputedStyle](https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle)
+--  * [resolved value](https://developer.mozilla.org/en-US/docs/Web/CSS/resolved_value)
+--  * [computed value](https://developer.mozilla.org/en-US/docs/Web/CSS/computed_value)
+--  * [used value](https://developer.mozilla.org/en-US/docs/Web/CSS/used_value)
+
+        -- TODO: error handling!
+-- | Get the __computed value__ of a specific style property.
+--
+-- Returns @Nothing@ if the property name is not valid.
+--
+-- Note: the underlying @Window.getComputedStyle@ API does not support
+-- shorthand properties. This function will account for that in the
+-- future, but for now asking for a shorthand property will produce
+-- @Nothing@.
+getComputedProperty :: (IsElement e, MonadDOM m)
+                    => e
+                    -- ^ Element to get the computed property for
+                    -> Property
+                    -- ^ The name of the property
+                    -> m (Maybe Text)
+                    -- ^ The computed value of the property as a string
+                    -- or 'Nothing' if the property name is not supported
+getComputedProperty (rawElement -> element) (Property propertyName) = do
+  window <- GHCJS.currentWindow <&> \case
+    Just w  -> w
+    Nothing -> error "Could not get global Window object"
+  styleDeclaration <- Window.getComputedStyle window element (Nothing @Text)
+  Just <$> CSSStyleDeclaration.getPropertyValue styleDeclaration propertyName

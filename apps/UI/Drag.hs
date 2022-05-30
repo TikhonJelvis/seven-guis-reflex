@@ -16,6 +16,7 @@ import           Control.Monad                   (void)
 
 import qualified Data.ByteString                 as BS
 import           Data.Default.Class              (Default (..))
+import           Data.Functor                    ((<&>))
 import           Data.Maybe                      (fromMaybe)
 import           Data.Text                       (Text)
 
@@ -40,6 +41,8 @@ import           UI.Event                        (Modifier (Shift),
                                                   client, mouseEvent, on,
                                                   performJs)
 import           UI.Point                        (Point (..), distance)
+import           UI.Style                        (getComputedProperty,
+                                                  setProperty)
 import           UI.Widget                       (label, ul)
 
 import qualified Witherable
@@ -92,14 +95,27 @@ demo = void do
           label "Snap back after each drag"
           (container, _) <- elClass' "div" "drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
-            let attributes = dragOrSnap <$> current <*> pure []
-            Drags { current } <- drags def { container = Just container } element
+            let attributes = dragOrSnap <$> current <*> base
+            Drags { current, start, end } <- drags def { container = Just container } element
+
+            -- TODO: some design that makes this behavior less
+            -- convoluted?
+            computed <- Reflex.performEvent $
+              getComputedProperty element "transform" <$ start
+            transform <- Reflex.holdDyn Nothing $
+              Reflex.leftmost [computed, Nothing <$ end]
+            let base = transform <&> \case
+                  Just t  -> setProperty "transform" t []
+                  Nothing -> []
             pure ()
           pure ()
+
         dragOrSnap = \case
           Just d  -> translate d
           Nothing -> transition snap . translate (Point 0 0)
-        snap = def { property = "transform", duration = s 100 }
+
+        snap = def { property = "transform", duration = s 1
+ }
 
 -- | Information about how a user interacts with an element by
 -- dragging.
