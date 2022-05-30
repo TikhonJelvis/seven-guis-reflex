@@ -42,7 +42,7 @@ import           UI.Widget           (label, ul)
 
 import qualified Witherable
 
-demo :: forall m t. (Dom t m) => m ()
+demo :: forall m t. Dom t m => m ()
 demo = void do
   ul (pure [("class", "drag-demo")])
     [ example "Follow cursor exactly" def translate

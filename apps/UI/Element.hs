@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MonadComprehensions   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedLists       #-}
@@ -28,6 +29,9 @@ module UI.Element
   , elDynAttrNs'
 
   , Rectangle
+  , overlap
+  , area
+
   , bounds
   , dimensions
   , viewportPosition
@@ -163,13 +167,42 @@ data Rectangle = Rectangle
   -- ^ The x and y coordinates of the rectangle's top-left corner in
   -- px.
 
-  , height   :: !Double
-  -- ^ The height of the rectangle in px.
-
   , width    :: !Double
   -- ^ The width of the rectangle in px.
+
+  , height   :: !Double
+  -- ^ The height of the rectangle in px.
   }
   deriving stock (Show, Eq)
+
+-- | Get the parts of two rectangles that overlap—that is, the
+-- intersection of two rectangles.
+--
+-- Returns 'Nothing' if the rectangles do not overlap.
+--
+-- >>> let r₁ = Rectangle (Point 5 10) 20 30
+-- >>> let r₂ = Rectangle (Point 10 15) 16 20
+-- >>> overlap r₁ r₂
+-- Just (Rectangle {position = Point {x = 10.0, y = 15.0}, width = 15.0, height = 20.0})
+--
+-- >>> let r₁ = Rectangle (Point 5 10) 20 30
+-- >>> let r₂ = Rectangle (Point 26 15) 16 20
+-- >>> overlap r₁ r₂
+-- Nothing
+overlap :: Rectangle -> Rectangle -> Maybe Rectangle
+overlap (Rectangle (Point x₁ y₁) w₁ h₁) (Rectangle (Point x₂ y₂) w₂ h₂) =
+  [ Rectangle { position = Point { x, y }, height, width } | doOverlap ]
+  where x = max x₁ x₂
+        y = max y₁ y₂
+        width = min (x₁ + w₁) (x₂ + w₂) - x
+        height = min (y₁ + h₁) (y₂ + h₂) - y
+
+        doOverlap = width > 0 && height > 0
+
+-- | Return the area of the rectangle.
+area :: Rectangle -> Double
+area Rectangle { width, height } = width * height
+  
 
 -- | Get the __bounding rectangle__ for the element.
 --

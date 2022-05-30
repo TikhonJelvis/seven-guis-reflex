@@ -24,6 +24,7 @@ executable guis
     UI.Attributes
     UI.Dialog
     UI.Drag
+    UI.Drop
     UI.Element
     UI.Event
     UI.History

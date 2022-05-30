@@ -281,3 +281,42 @@ body.dragging, .dragging {
   -webkit-user-select: none;
   user-select: none;
 }
+
+.drop-example {
+  position: relative;
+
+  height: 200px;
+  width: 400px;
+
+  overflow: hidden;
+
+  border: 4px solid black;
+}
+
+.drop-example .drop-target {
+  position: relative;
+
+  left: 50%;
+
+  height: 100%;
+  width: 50%;
+
+  background-color: gray;
+}
+
+.drop-example .draggable {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  margin: 10px;
+
+  height: 50px;
+  width: 50px;
+
+  border: 2px solid black;
+  border-radius: 10px;
+
+  background-color: blue;
+}
