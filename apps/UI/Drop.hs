@@ -41,7 +41,7 @@ demo = void do
                   move <- translate <$> total
                   colorHover <- colorIf "green" . (not . Map.null) <$> hovering
                   colorDropped <- colorIf "red" <$> wasDropped
-                  pure $ move $ colorDropped $ colorHover [("class", "draggable")]
+                  pure $ move $ colorDropped $ colorHover []
 
             drags@Drags { total } <-
               Drag.drags def { container = Just container } element
@@ -65,12 +65,19 @@ demo = void do
 -- color when it's hovering and again after it's been dropped.
 --
 -- @
--- dragAndDrop = do
---   rec let attributes = do
---     move <- translate <$> total
---     color <- highlight <$> dragStatus
---     pure (move $ color [])
+-- dragAndDrop container target = mdo
+--   (element, _) <- elDynAttr' "div" attributes (pure ())
+--   let attributes = do
+--         move <- translate <$> total
+--         colorHover   <- colorIf "green" (not . Map.null) <$> hovering
+--         colorDropped <- colorIf "red" <$> wasDropped
+--         pure $ move $ colorDropped $ colorHover []
 --
+--   drags@Drags { total } <-
+--     Drag.drags def { container = Just container } element
+--   Drops { hovering, dropped } <-
+--     drops element drags [('a', target)]
+--   pure ()
 -- @
 drops :: forall k e e' m t. (Ord k, IsElement e, IsElement e', Dom t m)
       => e
