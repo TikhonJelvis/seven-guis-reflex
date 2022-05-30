@@ -15,6 +15,20 @@
   background-color: red;
 }
 
+.draggable {
+  cursor: grab;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.dragging, .dragging {
+  cursor: grabbing;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .progress-bar {
   position: relative;
   width: 200px;
@@ -54,19 +68,6 @@
 .alert form {
   margin-bottom: 0;
   margin-top: 2ex;
-}
-
-.draggable {
-  position: absolute;
-
-  cursor: grab;
-
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.draggable.dragged {
-  cursor: grabbing;
 }
 
 /* Counter  */
@@ -272,11 +273,9 @@
   width: 15px;
 
   border: 1px solid black;
-
-  cursor: grab;
 }
 
-body.dragging {
+.drag-example .dragging {
   cursor: grabbing;
 
   -webkit-user-select: none;

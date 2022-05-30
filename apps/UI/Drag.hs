@@ -8,40 +8,37 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
 module UI.Drag where
 
-import           Control.Applicative         (liftA2)
-import           Control.Monad               (void)
+import           Control.Applicative (liftA2)
+import           Control.Monad       (void)
 
-import qualified Data.ByteString             as BS
-import           Data.Default.Class          (Default (..))
-import           Data.Foldable               (toList)
-import           Data.Functor                ((<&>))
-import           Data.Maybe                  (fromMaybe)
-import           Data.Text                   (Text)
+import qualified Data.ByteString     as BS
+import           Data.Default.Class  (Default (..))
+import           Data.Foldable       (toList)
+import           Data.Functor        ((<&>))
+import           Data.Maybe          (fromMaybe, isJust)
+import           Data.Text           (Text)
 
-import qualified GHCJS.DOM.Document          as Document
-import qualified GHCJS.DOM.Element           as Element
-
-import qualified Language.Javascript.JSaddle as Js
+import qualified GHCJS.DOM.Document  as Document
+import qualified GHCJS.DOM.Element   as Element
 
 import qualified Reflex
-import           Reflex                      (Dynamic, Event)
-import qualified Reflex.Dom                  as Dom
+import           Reflex              (Dynamic, Event)
+import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes               (Angle (..), Transition (..),
-                                              addClass, classes, joinClasses,
-                                              rotate, s, scale, transition,
-                                              translate)
-import           UI.Element                  (Dom, Element, elClass',
-                                              elDynAttr')
-import           UI.Event                    (Modifier (Shift),
-                                              MouseButton (..),
-                                              MouseEventResult (..), button,
-                                              client, mouseEvent, on, performJs)
-import           UI.Point                    (Point (..), distance)
-import           UI.Style                    (getComputedProperty, setProperty)
-import           UI.Widget                   (label, ul)
+import           UI.Attributes       (Angle (..), Transition (..), addClass,
+                                      classes, joinClasses, rotate, s, scale,
+                                      setClass, transition, translate)
+import           UI.Element          (Dom, Element, elClass', elDynAttr')
+import           UI.Event            (Modifier (Shift), MouseButton (..),
+                                      MouseEventResult (..), button, client,
+                                      mouseEvent, on, performJs)
+import           UI.IsElement        (rawElement)
+import           UI.Point            (Point (..), distance)
+import           UI.Style            (getComputedProperty, setProperty)
+import           UI.Widget           (label, ul)
 
 import qualified Witherable
 
@@ -87,7 +84,7 @@ demo = void do
 
         example description config doDrag = mdo
           label description
-          (container, _) <- elClass' "div" "drag-example" mdo
+          (container, _) <- elClass' "div" "draggable drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
             let attributes = doDrag <$> total <*> pure []
             Drags { total } <- drags config { container = Just container } element
@@ -96,7 +93,7 @@ demo = void do
 
         snapBack = mdo
           label "Snap back after each drag"
-          (container, _) <- elClass' "div" "drag-example" mdo
+          (container, _) <- elClass' "div" "draggable drag-example" mdo
             (element, _) <- elDynAttr' "div" attributes (pure ())
             let attributes = dragOrSnap <$> current <*> base
             Drags { current, start, end } <- drags def { container = Just container } element
@@ -123,8 +120,9 @@ demo = void do
             (_, attributes) <- elDynAttr' "div" attributes mdo
               (handle, _) <- elDynAttr' "div" (pure [("class", "draggable drag-handle")]) do
                 Dom.text "X"
-              Drags { total } <- drags def {container = Just container } handle
-              pure $ translate <$> total <*> pure [("class", "smooth-drag")]
+              Drags { total, current } <- drags def {container = Just container } handle
+              let isDragging = setClass "dragging" . isJust <$> current
+              pure $ isDragging <*> (translate <$> total <*> pure [])
             pure ()
           pure ()
 
@@ -283,11 +281,18 @@ drags DragConfig { container, mouseEventFilter } element = do
 
       isDragged <- Reflex.holdDyn False $ Reflex.leftmost [False <$ end, True <$ start]
 
-      -- without user-select: none, dragging an element can also
-      -- highlight text/images/etc—really distracting!
+      -- add .draggable class to body and container
+      --
+      -- we want to add to both so that we can turn off user-select
+      -- across the entire document—otherwise, dragging outside the
+      -- boundaries of the container highlights text in a jarring way
       Reflex.performEvent_ (dragging body <$ start)
       Reflex.performEvent_ (notDragging body <$ end)
-      -- TODO: save + restore previous state of body.style.user-select
+      case container of
+        Just container' -> do
+          Reflex.performEvent_ (dragging container' <$ start)
+          Reflex.performEvent_ (notDragging container' <$ end)
+        Nothing -> pure ()
 
       -- current drag
       startPosition <- Reflex.holdDyn (Point 0 0) start
@@ -306,12 +311,12 @@ drags DragConfig { container, mouseEventFilter } element = do
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
 
-        dragging e = do
+        dragging (rawElement -> e) = do
           existing <- fromMaybe ("" :: Text) <$>
             Element.getAttribute e ("class" :: Text)
           Element.setAttribute e ("class" :: Text) (existing <> " " <> "dragging")
 
-        notDragging e = do
+        notDragging (rawElement -> e) = do
           let parseClasses = toList . classes . fromMaybe ""
               remove c = joinClasses . filter (/= c)
           existing <- parseClasses <$> Element.getAttribute e ("class" :: Text)
