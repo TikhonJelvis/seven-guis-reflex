@@ -1,6 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -22,10 +24,13 @@ import           Control.Monad.IO.Class      (MonadIO (liftIO))
 import           Control.Monad.Reader        (ReaderT (..))
 
 import           Data.Functor.Misc           (WrapArg (..))
+import           Data.Hashable               (Hashable)
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
+
+import           GHC.Generics                (Generic)
 
 import qualified GHCJS.DOM.ClipboardEvent    as ClipboardEvent
 import qualified GHCJS.DOM.DataTransfer      as DataTransfer
@@ -98,6 +103,7 @@ type family EventResultType en where
   EventResultType 'Dom.WheelTag       = WheelEventResult
 
 newtype EventResult en = EventResult { unEventResult :: EventResultType en }
+  deriving stock (Generic)
 
 domHandler :: Dom.EventName en
            -> Dom.EventType en
@@ -160,7 +166,8 @@ instance Reflex t => HasDomEvent t (Dom.Element EventResult d t) en where
 
 -- | Modifier keys that can be held down during an event.
 data Modifier = Ctrl | Shift | Alt | Meta
-  deriving stock (Show, Eq, Ord, Enum, Bounded)
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
 
 -- * Mouse Events
 
@@ -185,7 +192,8 @@ data MouseButton = Main
                  -- button.
                  | UnknownButton !Word
                  -- ^ Some other, unknown mouse button.
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- TODO: Separate out "click"-style events (mousedown, mouseup, click)
 -- from "move"-style events (mouseenter, mouseleave, mouseover,
@@ -226,6 +234,8 @@ data MouseEventResult = MouseEventResult
   -- TODO: Logically this should be a Maybe, but it isn't a 'Maybe' in
   -- @GHCJS.Dom.MouseEvent@, so who knows...
   }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | Build a 'MouseEvent' out of a raw JS mouse event.
 mouseEvent :: Js.MonadJSM m => MouseEvent.MouseEvent -> m MouseEventResult
@@ -265,13 +275,16 @@ data WheelEventResult = WheelEventResult
   , deltaMode :: !DeltaMode
     -- ^ How the deltas were measured.
   }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | How the change in position for a wheel event was measured.
 data DeltaMode = Delta_Line
                | Delta_Pixel
                | Delta_Page
                | Delta_Unknown Word
-  deriving stock (Show, Eq, Ord)
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
 
 
 -- TODO: Get MouseEvent properties for WheelEvent too?
@@ -302,7 +315,8 @@ data ScrollEventResult = ScrollEventResult
   -- If the element's @direction@ is @rtl@, this is calculated from
   -- the right instead.
   }
-  deriving stock (Show, Eq, Ord)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | Build a 'ScrollEventResult' from a scroll event.
 --
@@ -327,6 +341,8 @@ data KeyboardEventResult = KeyboardEventResult
   , modifiers :: !(Set Modifier)
   , location  :: !KeyLocation
   }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- TODO: Replace with a structure type—straightforward, but it was
 -- just a bit too tedious to write this up before getting other things
@@ -341,7 +357,8 @@ data KeyboardEventResult = KeyboardEventResult
 -- MDN documentation for a full list:
 -- <https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values>
 newtype Key = Key Text
-  deriving stock (Show, Eq, Ord)
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
 
 -- | The key location associated with the key that triggered the
 -- keyboard event. This lets you distinguish paired keys like left
@@ -370,6 +387,8 @@ data KeyLocation = KeyLocation_Standard
 
                  | KeyLocation_Unknown Word
                  -- ^ A location code that is not standard.
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
 
 -- | Build a 'KeyboardEventResult' from the native JS event object.
 keyboardEvent :: Js.MonadJSM m => KeyboardEvent.KeyboardEvent -> m KeyboardEventResult

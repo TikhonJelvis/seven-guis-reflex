@@ -1,5 +1,7 @@
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -41,9 +43,12 @@ where
 
 import           Control.Monad.Fix           (MonadFix)
 
+import           Data.Hashable               (Hashable)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
 import           Data.Text                   (Text)
+
+import           GHC.Generics                (Generic)
 
 import qualified GHCJS.DOM.DOMRect           as GHCJS
 import qualified GHCJS.DOM.Element           as GHCJS
@@ -173,7 +178,8 @@ data Rectangle = Rectangle
   , height   :: !Double
   -- ^ The height of the rectangle in px.
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | Get the parts of two rectangles that overlap—that is, the
 -- intersection of two rectangles.
@@ -202,7 +208,7 @@ overlap (Rectangle (Point x₁ y₁) w₁ h₁) (Rectangle (Point x₂ y₂) w�
 -- | Return the area of the rectangle.
 area :: Rectangle -> Double
 area Rectangle { width, height } = width * height
-  
+
 
 -- | Get the __bounding rectangle__ for the element.
 --

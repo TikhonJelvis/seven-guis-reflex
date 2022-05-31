@@ -1,4 +1,6 @@
 {-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE DerivingStrategies  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -20,6 +22,8 @@ import           Data.Foldable       (toList)
 import           Data.Functor        ((<&>))
 import           Data.Maybe          (fromMaybe, isJust)
 import           Data.Text           (Text)
+
+import           GHC.Generics        (Generic)
 
 import qualified GHCJS.DOM.Document  as Document
 import qualified GHCJS.DOM.Element   as Element
@@ -158,6 +162,7 @@ data Drags t = Drags
     -- ^ The user stopped dragging the element at the given client X
     -- and Y coordinates.
   }
+  deriving stock (Generic)
              -- TODO: Does it make more sense for start and end to
              -- have the distance moved, just like the behaviors? If
              -- so, what distance: current or total?
@@ -193,6 +198,7 @@ data DragConfig d t = DragConfig
   -- in drags def { mouseEventFilter } draggableElement
   -- @
   }
+  deriving stock (Generic)
 
 instance Default (DragConfig d t) where
   def = DragConfig

@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
@@ -45,6 +47,7 @@ where
 import           Data.Default.Class            (Default (..))
 import           Data.Foldable                 (toList)
 import           Data.Functor                  ((<&>))
+import           Data.Hashable                 (Hashable)
 import           Data.Map.Strict               (Map)
 import qualified Data.Map.Strict               as Map
 import           Data.String                   (IsString)
@@ -52,6 +55,9 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as Text
 import           Data.Text.Display             (Display)
 import           Data.Vector                   (Vector)
+import           Data.Vector.Instances         ()
+
+import           GHC.Generics                  (Generic)
 
 import qualified GHCJS.DOM                     as GHCJS
 import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
@@ -68,7 +74,8 @@ import           UI.Point                      (Point (..), Point3D (..))
 -- In the future this is going to be something more structured, but
 -- for now a newtype will do.
 newtype Property = Property Text
-  deriving newtype (Show, Eq, ToCss, Display, IsString)
+  deriving stock (Generic)
+  deriving newtype (Show, Eq, ToCss, Display, IsString, Hashable)
 
 -- * CSS Values
 
@@ -127,7 +134,8 @@ data Angle = Deg !Double
            | Grad !Double
            | Rad !Double
            | Turn !Double
- deriving stock (Show, Eq)
+ deriving stock (Show, Eq, Generic)
+ deriving anyclass (Hashable)
 
 instance ToCss Angle where
   toCss = \case
@@ -138,8 +146,9 @@ instance ToCss Angle where
 
 -- | A duration, stored in milliseconds.
 newtype Duration = Duration Double
-  deriving stock (Show, Eq, Ord)
+  deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (Read, Num, Real, Fractional, Floating)
+  deriving anyclass (Hashable)
 
 instance ToCss Duration where
   toCss (Duration d) = toCss d <> "ms"
@@ -343,6 +352,8 @@ data Transform = Matrix3D !(Vector Double)
                --
                -- See MDN:
                -- [translate3d](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/translate3d)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | To the corresponding @<transform-function>@.
 --
@@ -453,7 +464,8 @@ data Transition = Transition
     -- ^ How long to wait before starting a transition. During the
     -- initial delay, the corresponding property will not change.
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 instance ToCss Transition where
   toCss Transition { property, duration, timing, delay } =

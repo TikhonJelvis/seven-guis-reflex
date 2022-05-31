@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DerivingStrategies  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
@@ -8,13 +10,16 @@
 -- | Utilities for maintaining undo/redo history.
 module UI.History where
 
-import           Control.Lens ((&))
+import           Control.Lens  ((&))
 
-import qualified Data.List    as List
-import           Data.Maybe   (listToMaybe)
+import           Data.Hashable (Hashable)
+import qualified Data.List     as List
+import           Data.Maybe    (listToMaybe)
+
+import           GHC.Generics  (Generic)
 
 import qualified Reflex
-import           Reflex       (Dynamic, Event)
+import           Reflex        (Dynamic, Event)
 
 import           UI.Element
 import           UI.Widget
@@ -29,7 +34,8 @@ data History a = History
   , redos :: [a]
     -- ^ Actions that were undone but can be redone.
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | A history with no actions to undo or redo.
 empty :: History a
@@ -132,3 +138,4 @@ data Undos t a = Undos
   , redoActions :: Event t a
   -- ^ An event that fires with the action to redo.
   }
+  deriving stock (Generic)

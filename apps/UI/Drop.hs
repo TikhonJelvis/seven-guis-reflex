@@ -1,4 +1,6 @@
 {-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE NamedFieldPuns        #-}
@@ -19,6 +21,8 @@ import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (Text)
+
+import           GHC.Generics                (Generic)
 
 import qualified GHCJS.DOM.Node              as Node
 
@@ -167,6 +171,7 @@ data Drops k t = Drops
     -- ^ A dynamic that tracks which targets are being hovered the
     -- dragged element, and how much the element overlaps the target.
   }
+  deriving stock (Generic)
 
 -- * Drop Calculations
 

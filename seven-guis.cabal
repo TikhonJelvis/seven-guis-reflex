@@ -56,4 +56,5 @@ executable guis
     , transformers
     , unordered-containers
     , vector
+    , vector-instances
     , witherable

@@ -1,5 +1,7 @@
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists            #-}
@@ -7,10 +9,12 @@
 module UI.PushMap where
 
 import           Data.Bifunctor (second)
+import           Data.Hashable  (Hashable)
 import           Data.Map       (Map)
 import qualified Data.Map       as Map
 
 import           GHC.Exts       (IsList (..))
+import           GHC.Generics   (Generic)
 
 import           Prelude        hiding (lookup)
 
@@ -24,8 +28,9 @@ import           Witherable     (Filterable)
 -- index currently assigned, but with no guarantees about the exact
 -- progression.
 newtype PushMap a = PushMap { toMap :: Map Int a }
-  deriving stock (Show, Eq, Foldable, Functor)
+  deriving stock (Show, Eq, Foldable, Functor, Generic)
   deriving newtype (Semigroup, Monoid, Filterable)
+  deriving anyclass (Hashable)
 
 instance IsList (PushMap a) where
   type Item (PushMap a) = (Int, a)

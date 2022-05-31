@@ -1,4 +1,6 @@
 {-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
@@ -15,8 +17,11 @@ import           Control.Lens                ((^.))
 import           Control.Monad               (unless, void, when)
 
 import qualified Data.ByteString             as BS
+import           Data.Hashable               (Hashable)
 import           Data.Map                    (Map)
 import           Data.Text                   (Text)
+
+import           GHC.Generics                (Generic)
 
 import           Language.Javascript.JSaddle (MonadJSM, jsf, liftJSM, valToBool,
                                               (!))
@@ -49,7 +54,8 @@ import           UI.Widget
 --  * [@show@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/show)
 --  * [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/cancel)
 data ModalState = Show | ShowModal | Hide
-  deriving stock (Show, Eq, Ord, Enum, Bounded)
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
 
 -- | The 'Element' for a dialog along with events for when the dialog
 -- is canceled or closed.
@@ -77,6 +83,7 @@ data DialogElement t = DialogElement
   -- See MDN:
   -- [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
   }
+  deriving stock (Generic)
 
 instance IsElement (DialogElement t) where rawElement = rawElement . element
 

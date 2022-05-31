@@ -1,4 +1,6 @@
 {-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DerivingStrategies    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -18,8 +20,10 @@ import           Control.Applicative    (liftA2)
 
 import           Data.Colour            (AlphaColour, Colour, ColourOps (over))
 import qualified Data.Colour            as Colour
+import           Data.Colour.RGBSpace   (RGB (..))
 import qualified Data.Colour.SRGB       as Colour
 import           Data.Default.Class     (Default, def)
+import           Data.Hashable          (Hashable (..))
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.String            (IsString (..))
@@ -28,6 +32,8 @@ import qualified Data.Text              as Text
 import           Data.Text.Display      (Display (..))
 import qualified Data.Text.Lazy.Builder as Builder
 import           Data.Word              (Word8)
+
+import           GHC.Generics           (Generic)
 
 import qualified Numeric
 
@@ -121,7 +127,7 @@ svgDynAttr' = elDynAttrNs' (Just svgNamespace)
 
 -- | A CSS color.
 newtype Color = Color (AlphaColour Double)
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Show, Generic)
 
 instance IsString Color where
   fromString ['#', r, g, b] =
@@ -136,6 +142,12 @@ instance IsString Color where
     where readHex = fst . head . Numeric.readHex
           toDouble x = fromInteger x / 255
   fromString invalid = error $ "Invalid color: " <> invalid
+
+-- | hash based on sRGB + α-channel
+instance Hashable Color where
+  hashWithSalt s (Color c) = hashWithSalt s (r, g, b, α)
+    where α = Colour.alphaChannel c
+          RGB r g b = Colour.toSRGB24 (c `over` Colour.black)
 
 -- | Create a 'Color' that is a fully opaque version of the given
 -- 'Colour'.
@@ -174,7 +186,8 @@ data Stroke = Stroke
   , linecap  :: Linecap
   , linejoin :: Linejoin
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 instance Default Stroke where
   def = Stroke
@@ -202,7 +215,8 @@ data Linecap = Butt
              | Round
              -- ^ The ends of a line are rounded, with the radius
              -- determined by @stroke-width@.
-  deriving stock (Show, Eq, Ord, Enum, Bounded)
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
 
 instance ToAttributeValue Linecap where
   toAttributeValue = \case
@@ -212,7 +226,8 @@ instance ToAttributeValue Linecap where
 
 -- | How to draw the joints between two line segments.
 data Linejoin = Miter | Round' | Bevel
-  deriving stock (Show, Eq, Ord, Enum, Bounded)
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
 
 instance ToAttributeValue Linejoin where
   toAttributeValue = \case
@@ -229,7 +244,8 @@ data Circle = Circle
   , radius :: !Double
   -- ^ The circle's radius.
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
 
 instance ToAttributes Circle where
   toAttributes Circle { center = Point cx cy, radius = r } =
