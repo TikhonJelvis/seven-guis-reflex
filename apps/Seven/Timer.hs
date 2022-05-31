@@ -11,7 +11,6 @@ import           Control.Applicative    (liftA2)
 import           Control.Lens           ((<&>))
 import           Control.Monad.IO.Class (liftIO)
 
-import qualified Data.ByteString        as BS
 import           Data.Maybe             (fromMaybe, isJust)
 import qualified Data.Text              as Text
 import qualified Data.Time              as Time
@@ -22,6 +21,7 @@ import qualified Reflex.Dom             as Dom
 import           Text.Printf            (printf)
 
 import           UI.Element
+import           UI.Main                (Runnable (..), withCss)
 import           UI.Widget
 
 -- | A timer with a progress bar and a slider to control the total
@@ -56,7 +56,4 @@ widget = Dom.elClass "div" "timer" do
     where renderSeconds t = Text.pack $ printf "%.1f s" (realToFrac t :: Double)
 
 main :: IO ()
-main = do
-  css <- BS.readFile "css/tasks.css"
-  Dom.mainWidgetWithCss css widget
-
+main = withCss "css/tasks.css" (Runnable widget)

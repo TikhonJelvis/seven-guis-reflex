@@ -1,0 +1,95 @@
+@import "ui.css";
+
+/* Drag and Drop demos */
+
+.drag-demo .drag-example {
+  position: relative;
+
+  height: 200px;
+  width: 400px;
+
+  overflow: hidden;
+
+  border: 4px solid black;
+  padding: 10px;
+  
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drag-example > div, .drag-me {
+  height: 50px;
+  width: 50px;
+
+  border: 2px solid black;
+  border-radius: 10px;
+
+  color: white;
+  background-color: blue;
+}
+
+.drag-me {
+  position: absolute;
+
+  top: 40px;
+  left: 500px;
+}
+
+.smooth-drag {
+  transition: transform 0.1s;
+}
+
+.drag-handle {
+  position: relative;
+
+  height: 15px;
+  width: 15px;
+
+  border: 1px solid black;
+}
+
+.drag-example .dragging {
+  cursor: grabbing;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drop-example {
+  position: relative;
+
+  height: 200px;
+  width: 400px;
+
+  overflow: hidden;
+
+  border: 4px solid black;
+}
+
+.drop-example .drop-target {
+  position: relative;
+
+  left: 50%;
+
+  height: 100%;
+  width: 50%;
+
+  background-color: gray;
+}
+
+.drop-example .draggable {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  margin: 10px;
+
+  height: 50px;
+  width: 50px;
+
+  border: 2px solid black;
+  border-radius: 10px;
+
+  background-color: blue;
+}

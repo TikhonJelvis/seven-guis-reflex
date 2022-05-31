@@ -16,7 +16,6 @@ module UI.Dialog where
 import           Control.Lens                ((^.))
 import           Control.Monad               (unless, void, when)
 
-import qualified Data.ByteString             as BS
 import           Data.Hashable               (Hashable)
 import           Data.Map                    (Map)
 import           Data.Text                   (Text)
@@ -33,6 +32,7 @@ import qualified Reflex.Dom                  as Dom
 import           UI.Element
 import           UI.Event                    (on)
 import           UI.IsElement                (IsElement (..))
+import           UI.Main                     (Runnable (..), withCss)
 import           UI.Widget
 
 -- | HTML modal dialogs can either be hidden or shown in two ways:
@@ -172,8 +172,7 @@ setDialogState (rawElement -> raw) state = liftJSM do
 
 main :: IO ()
 main = do
-  css <- BS.readFile "css/tasks.css"
-  Dom.mainWidgetWithCss css do
+  withCss "css/ui.css" $ Runnable do
     press <- Dom.button "Hello"
     DialogElement { closed, canceled } <- alert ("Hello, World!" <$ press)
     countClose <- Reflex.count closed

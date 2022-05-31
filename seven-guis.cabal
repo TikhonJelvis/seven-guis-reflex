@@ -31,6 +31,7 @@ executable guis
     UI.Event
     UI.History
     UI.IsElement
+    UI.Main
     UI.Point
     UI.PushMap
     UI.Style
@@ -43,10 +44,12 @@ executable guis
     , colour
     , containers
     , data-default-class
+    , directory
     , file-embed
     , ghcjs-dom
     , hashable
     , jsaddle
+    , jsaddle-webkit2gtk
     , lens
     , mtl
     , reflex

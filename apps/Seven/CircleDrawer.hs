@@ -17,7 +17,6 @@ module Seven.CircleDrawer where
 import           Control.Applicative (liftA2)
 import           Control.Lens        ((<&>), (??))
 
-import qualified Data.ByteString     as BS
 import           Data.Default.Class  (def)
 import           Data.Maybe          (fromMaybe)
 import qualified Data.Text           as Text
@@ -37,6 +36,7 @@ import           UI.Element          (Dom, Element)
 import           UI.Event
 import qualified UI.History          as History
 import           UI.History          (Undos (..))
+import           UI.Main             (Runnable (..), withCss)
 import           UI.Point
 import qualified UI.PushMap          as PushMap
 import           UI.PushMap          (PushMap)
@@ -46,9 +46,7 @@ import           UI.Widget
 import           Witherable          (Filterable (..), catMaybes, (<&?>))
 
 main :: IO ()
-main = do
-  css <- BS.readFile "css/tasks.css"
-  Dom.mainWidgetWithCss css widget
+main = withCss "css/tasks.css" (Runnable widget)
 
 widget :: forall m t. Dom t m => m ()
 widget = Dom.elClass "div" "circle-drawer" do

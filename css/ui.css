@@ -1,0 +1,68 @@
+.output {
+  position: relative;
+  padding: 1px 4px;
+  margin: 0 4px;
+
+  text-align: right;
+
+  border: 1px solid black;
+}
+
+.invalid > input {
+  background-color: red;
+}
+
+.draggable {
+  cursor: grab;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.dragging, .dragging {
+  cursor: grabbing;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.progress-bar {
+  position: relative;
+  width: 200px;
+  height: 25px;
+}
+
+.progress-bar .bar {
+  position: relative;
+  height: 100%;
+  background-color: blue;
+}
+
+.listbox {
+  border: 1px solid black;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.listbox .row {
+  cursor: pointer;
+}
+
+.listbox .selected {
+  background-color: blue;
+  color: white;
+}
+
+.centered {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.alert {
+  padding: 15px 10px 5px 10px;
+}
+
+.alert form {
+  margin-bottom: 0;
+  margin-top: 2ex;
+}

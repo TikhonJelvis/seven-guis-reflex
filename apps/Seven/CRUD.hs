@@ -11,7 +11,6 @@ module Seven.CRUD where
 import           Control.Applicative (liftA2)
 import           Control.Lens
 
-import qualified Data.ByteString     as BS
 import           Data.Default.Class  (def)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
@@ -22,6 +21,7 @@ import           Reflex              (Dynamic, Event, (<@>))
 import qualified Reflex.Dom          as Dom
 
 import           UI.Element
+import           UI.Main             (Runnable (..), withCss)
 import qualified UI.PushMap          as PushMap
 import           UI.Widget
 
@@ -97,6 +97,4 @@ filterPrefix :: Witherable.Filterable f => Text -> f Name -> f Name
 filterPrefix prefix = Witherable.filter (Text.isPrefixOf prefix . surname)
 
 main :: IO ()
-main = do
-  css <- BS.readFile "css/tasks.css"
-  Dom.mainWidgetWithCss css widget
+main = withCss "css/tasks.css" (Runnable widget)

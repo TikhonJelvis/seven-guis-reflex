@@ -15,7 +15,6 @@ module UI.Drop where
 
 import           Control.Monad               (forM, void)
 
-import qualified Data.ByteString             as BS
 import           Data.Default.Class          (def)
 import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
@@ -30,7 +29,6 @@ import           Language.Javascript.JSaddle (MonadJSM)
 
 import qualified Reflex
 import           Reflex                      (Dynamic, Event)
-import qualified Reflex.Dom                  as Dom
 
 import qualified UI.Drag                     as Drag
 import           UI.Drag                     (DragConfig (..), Drags (..))
@@ -38,6 +36,7 @@ import qualified UI.Element                  as Element
 import           UI.Element                  (Dom, Element, area, elClass',
                                               elDynAttr', overlap)
 import           UI.IsElement                (IsElement, rawElement)
+import           UI.Main                     (Runnable (..), withCss)
 import           UI.Point                    (Point (..))
 import           UI.Style                    (duration, property, s,
                                               setProperty, transition,
@@ -189,6 +188,4 @@ overlapProportion element target = do
 
 
 main :: IO ()
-main = do
-  css <- BS.readFile "css/tasks.css"
-  Dom.mainWidgetWithCss css demo
+main = withCss "css/ui-demo.css" (Runnable demo)

@@ -16,7 +16,6 @@ module UI.Drag where
 import           Control.Applicative (liftA2)
 import           Control.Monad       (void)
 
-import qualified Data.ByteString     as BS
 import           Data.Default.Class  (Default (..))
 import           Data.Foldable       (toList)
 import           Data.Functor        ((<&>))
@@ -40,6 +39,7 @@ import           UI.Event            (Modifier (Shift), MouseButton (..),
                                       MouseEventResult (..), button, client,
                                       mouseEvent, on, performJs)
 import           UI.IsElement        (rawElement)
+import           UI.Main             (Runnable (..), withCss)
 import           UI.Point            (Point (..), distance)
 import           UI.Style            (getComputedProperty, setProperty)
 import           UI.Widget           (label, ul)
@@ -329,6 +329,4 @@ drags DragConfig { container, mouseEventFilter } element = do
           Element.setAttribute e ("class" :: Text) $ remove "dragging" existing
 
 main :: IO ()
-main = do
-  css <- BS.readFile "css/tasks.css"
-  Dom.mainWidgetWithCss css demo
+main = withCss "css/ui-demo.css" (Runnable demo)

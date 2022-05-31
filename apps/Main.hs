@@ -1,13 +1,9 @@
 module Main where
 
-import qualified Seven.CRUD      as CRUD
+import qualified Seven.CRUD as CRUD
 
-import qualified Data.ByteString as BS
-
-import           Reflex.Dom      (mainWidgetWithCss)
+import           UI.Main    (Runnable (Runnable), withCss)
 
 
 main :: IO ()
-main = do
-  css <- BS.readFile "css/tasks.css"
-  mainWidgetWithCss css CRUD.widget
+main = withCss "css/tasks.css" (Runnable CRUD.widget)
