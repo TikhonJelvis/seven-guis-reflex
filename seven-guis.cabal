@@ -17,6 +17,8 @@ executable guis
   other-modules:
     Cards.Card
     Cards.Place
+    Cards.UI.Card
+    Cards.UI.Pile
     Seven.CircleDrawer
     Seven.Counter
     Seven.CRUD
@@ -51,6 +53,7 @@ executable guis
     , jsaddle
     , jsaddle-webkit2gtk
     , lens
+    , modern-uri
     , mtl
     , reflex
     , reflex-dom

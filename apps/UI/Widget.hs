@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -37,14 +38,29 @@ import           Reflex.Dom         (DomBuilder, DomBuilderSpace, (=:))
 
 import           Text.Printf        (printf)
 import           Text.Read          (readMaybe)
+import qualified Text.URI           as URI
+import           Text.URI           (URI)
+import           Text.URI.QQ        (uri)
 
 import           UI.Attributes      (addClass)
-import           UI.Element
+import           UI.Element         (Dom, Element, elDynAttr')
 import           UI.Event           (EventResult)
+import           UI.Main            (Runnable (..), withCss)
 import qualified UI.PushMap         as PushMap
 import           UI.PushMap         (PushMap)
 
 -- * Widgets
+
+demo :: forall m t. Dom t m => m ()
+demo = void $ ul (pure [("class", "widget-demo")])
+  [ example "image" $ image [uri|https://haskell.org/img/haskell-logo.svg|]
+  ]
+  where example description body = do
+          label description
+          body
+
+main :: IO ()
+main = withCss "css/ui-demo.css" (Runnable demo)
 
 -- ** Structure
 
@@ -75,6 +91,30 @@ ul attributes = elDynAttr' "ul" attributes . mapM (Dom.el "li")
 -- | A static label with some text. Has the CSS class @label@.
 label :: forall m t. DomBuilder t m => Text -> m ()
 label = Dom.elClass "div" "label" . Dom.text
+
+-- | An image with a dynamic @src@ attribute.
+img :: forall m t. Dom t m
+    => Dynamic t URI
+    -- ^ src
+    -> Dynamic t (Map Text Text)
+    -- ^ other attributes (src will be overridden)
+    -> m (Element t)
+img src attributes =
+  fst <$> elDynAttr' "img" (setSrc <$> src <*> attributes) (pure ())
+  where setSrc = Map.insert "src" . URI.render
+
+-- | A static image.
+--
+-- __Example__
+--
+-- @
+-- image [uri|https://haskell.org/img/haskell-logo.svg|]
+-- @
+image :: forall m t. Dom t m
+      => URI
+      -- ^ src
+      -> m (Element t)
+image src = img (pure src) (pure [])
 
 -- | A label that displays a dynamically updating value.
 --

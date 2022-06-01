@@ -25,6 +25,7 @@ module Cards.Card where
 import qualified Data.Char              as Char
 import           Data.Hashable          (Hashable)
 import           Data.Text              (Text)
+import qualified Data.Text              as Text
 import           Data.Text.Display      (Display (displayBuilder))
 import qualified Data.Text.Lazy.Builder as Text
 import           Data.Vector            ((!))
@@ -55,6 +56,20 @@ data Suit = Clubs | Diamonds | Hearts | Spades
 -- | Colored symbols: ♠️, ♥️, ♦️, ♣️
 instance Display Suit where
   displayBuilder = Text.fromText . suitShorthand
+
+-- | All the suits in order.
+--
+-- >>> suits
+-- [Clubs,Diamonds,Hearts,Spades]
+suits :: [Suit]
+suits = [minBound .. maxBound]
+
+-- | The text name of each suit (in lowercase).
+--
+-- >>> suitName <$> suits
+-- ["clubs","diamonds","hearts","spades"]
+suitName :: Suit -> Text
+suitName = Text.toLower . Text.pack . show
 
 -- | The Unicode representation of each suit symbol /in color/.
 --
@@ -113,6 +128,21 @@ data Rank = Ace
 -- | Conventional shorthand: A, 2–10, J, K, Q
 instance Display Rank where
   displayBuilder = Text.fromText . rankShorthand
+
+-- | All the ranks, ordered from 'Ace' to 'King'.
+--
+-- >>> ranks
+-- [Ace,Two,Three,Four,Five,Six,Seven,Eight,Nine,Ten,Jack,Queen,King]
+ranks :: [Rank]
+ranks = [minBound .. maxBound]
+
+-- | The text name of each rank (in lowercase). Aces are @"ace"@ and
+-- numbers are spelled out as words.
+--
+-- >>> rankName <$> ranks
+-- ["ace","two","three","four","five","six","seven","eight","nine","ten","jack","queen","king"]
+rankName :: Rank -> Text
+rankName = Text.toLower . Text.pack . show
 
 -- | The conventional shorthand for each rank:
 --

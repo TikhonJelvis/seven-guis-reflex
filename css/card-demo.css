@@ -1,0 +1,26 @@
+@import "ui.css";
+
+.card {
+  position: relative;
+
+  width: 223px;
+  height: 324px;
+
+  border-radius: 25px;
+
+  box-shadow: 5px 5px 12px  rgba(0, 0, 0, 0.3);
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.card img {
+  pointer-events: none;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.card.dragging {
+  box-shadow: 12px 12px 12px rgba(0, 0, 0, 0.3);
+}
