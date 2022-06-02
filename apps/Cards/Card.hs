@@ -44,7 +44,7 @@ import           GHC.Generics           (Generic)
 --  * diamonds (♦️)
 --  * clubs (♣️)
 --
--- Suits are ordered based on bridge conventions: ♠️ > ♥️ > ♦️ > ♣️, which
+-- Suits are ordered based on bridge conventions: ♣️ < ♦️ < ♥️ < ♠️, which
 -- is the same as alphabetical order based on their English names.
 --
 -- >>> Spades > Clubs
@@ -179,6 +179,13 @@ data Card = Card
 instance Display Card where
   displayBuilder Card { rank, suit } =
     displayBuilder rank <> displayBuilder suit
+
+-- | A list of all 52 playing cards in a standard deck.
+--
+-- Cards are ordered by suit first (♣️ < ♦️ < ♥️ < ♠️) then by rank (aces
+-- low, kings high).
+cards :: [Card]
+cards = [Card rank suit | suit <- suits, rank <- ranks]
 
 -- | The standard shorthand for a card: the rank followed by the suit
 -- (eg A♠️ for the ace of spades).
