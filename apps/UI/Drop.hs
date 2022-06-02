@@ -70,7 +70,7 @@ demo = void do
               drags@Drags { total } <-
                 Drag.drags def { container = Just container } element
               Drops { hovering, dropped } <-
-                drops element drags [('a', target)]
+                drops drags [('a', target)]
           pure ()
 
         moveElement :: Element t -> m ()
@@ -87,7 +87,7 @@ demo = void do
 
               drags@Drags { current, start, end } <-
                 Drag.drags def { container = Just container } element
-              Drops { dropped } <- drops element drags [('a', target)]
+              Drops { dropped } <- drops drags [('a', target)]
               Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
 
@@ -134,18 +134,16 @@ demo = void do
 -- @
 --
 -- @
-drops :: forall k e e' m t. (Ord k, IsElement e, IsElement e', Dom t m)
-      => e
-      -- ^ draggable element
-      -> Drags t
+drops :: forall k e m t. (Ord k, IsElement e, Dom t m)
+      => Drags t
       -- ^ drag events + dynamics for the element
-      -> Map k e'
+      -> Map k e
       -- ^ target elements
       --
       -- The 'Drops' value returned will track the key(s) of the
       -- element(s) being hovered or dropped on.
       -> m (Drops k t)
-drops element Drags { current, end } targets = do
+drops Drags { element, current, end } targets = do
   dropped  <- Reflex.performEvent $ getOverlaps <$ end
   dragged  <- Reflex.performEvent $ getOverlaps <$ Reflex.updated current
   hovering <- Reflex.holdDyn [] dragged

@@ -133,7 +133,10 @@ demo = void do
 -- | Information about how a user interacts with an element by
 -- dragging.
 data Drags t = Drags
-  { current  :: Dynamic t (Maybe Point)
+  { element :: Element t
+    -- ^ The element being dragged.
+
+  , current  :: Dynamic t (Maybe Point)
     -- ^ The x and y distance moved by the mouse during the currently
     -- active drag. 'Nothing' when the user is not dragging this
     -- element.
@@ -313,7 +316,7 @@ drags DragConfig { container, mouseEventFilter } element = do
 
       let total = liftA2 (+) (fromMaybe 0 <$> current) finished
 
-  pure Drags { current, finished, total, start, end }
+  pure Drags { element, current, finished, total, start, end }
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
 
