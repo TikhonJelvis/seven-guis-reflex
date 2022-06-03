@@ -1,11 +1,14 @@
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecursiveDo         #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 module Cards.UI.Card where
 
 import           Cards.Card         (Card (..), Rank (..), Suit (..), rankName,
@@ -13,44 +16,70 @@ import           Cards.Card         (Card (..), Rank (..), Suit (..), rankName,
 
 import           Control.Monad      (void)
 
-import           Data.Default.Class (def)
+import           Data.Default.Class (Default, def)
 import           Data.Map           (Map)
 import           Data.Maybe         (fromMaybe, isJust)
 import           Data.Text          (Text)
+
+import           GHC.Generics       (Generic)
 
 import           Reflex             (Dynamic)
 import qualified Reflex.Dom         as Dom
 
 import qualified Text.URI           as URI
 
-import           UI.Attributes      (addClass, removeClass)
+import           UI.Attributes      (addClass, removeClass, setClass,
+                                     setProperty)
 import qualified UI.Drag            as Drag
-import           UI.Drag            (Drags (..))
+import           UI.Drag            (DragConfig (..), Drags (..))
 import           UI.Element         (Dom, Html, elClass', elDynAttr')
 import           UI.Main            (Runnable (..), withCss)
-import           UI.Style           (Angle (..), rotate, setProperty, translate)
-import           UI.Widget          (image, label)
+import           UI.Style           (Angle (..), rotate, translate)
+import           UI.Widget          (Enabled (..), image, label)
 
 demo :: forall m t. Dom t m => m ()
 demo = void $ elClass' "div" "card-demo" do
   label "Cards draggable across body"
-  draggable $ Card Ace Spades
-  draggable $ Card King Hearts
+  rec CardElement { drags } <-
+        draggable (Card Ace Spades) def { attributes = attributes' drags }
+  rec CardElement { drags } <-
+        draggable (Card King Hearts) def { attributes = attributes' drags }
   pure ()
-  where draggable c = do
-          rec element <- card c attributes
-              let attributes = do
-                    move <- translate <$> total
-                    class' <- whenDragged . isJust <$> current
-                    pure $ class' $ move [("class", "draggable")]
-              Drags { total, current } <- Drag.drags def element
-          pure ()
-
+  where attributes' Drags { current } =
+          Just $ whenDragged . isJust <$> current <*> pure []
         whenDragged True  =
           setProperty "z-index" "100" . rotate (Deg 5) . addClass "dragging"
         whenDragged False = removeClass "dragging"
 
--- | Creates an element representing a specific card.
+-- | Various parameters that can be set up for a card element.
+data CardConfig t = CardConfig
+  { container  :: Maybe (Html t)
+    -- ^ The container within which the card is draggable.
+    --
+    -- Drag events outside the container will not register.
+
+  , dragging   :: Maybe (Dynamic t Enabled)
+    -- ^ Is dragging enabled for the card?
+
+  , attributes :: Maybe (Dynamic t (Map Text Text))
+    -- ^ Any additional dynamic attributes.
+    --
+    -- Note that various card-specific properties will add to or
+    -- override properties set here.
+  }
+  deriving stock (Generic)
+
+-- | All values default to 'Nothing'
+instance Default (CardConfig t) where
+
+-- | Information about a card element.
+data CardElement t = CardElement
+  { drags :: Drags t
+  , card  :: Cards.Card.Card
+  }
+  deriving stock (Generic)
+
+-- | Creates a draggable element representing a specific card.
 --
 -- The element will have the CSS class @card@ as well as classes for
 -- its rank (@ace@, @two@... @ten@, @jack@, @queen@, @king@) and suit
@@ -69,29 +98,28 @@ demo = void $ elClass' "div" "card-demo" do
 --       Drags { total } <- Drag.drags def element
 --   pure element
 -- @
-card :: forall m t. Dom t m
-     => Card
-     -> Dynamic t (Map Text Text)
-     -- ^ Additional attributes for the element.
-     --
-     -- Note: the @card@, rank and suit classes will be added in
-     -- addition to any classes specified by these attributes.
-     -> m (Html t)
-card card'@Card { rank, suit } attributes = do
-  (element, _) <- elDynAttr' "div" (withClasses <$> attributes) do
-    -- top, with rank + suit in lefthand corner
-    -- Dom.elClass "div" "top" summary
-
+draggable :: forall m t. Dom t m
+          => Card
+          -> CardConfig t
+          -> m (CardElement t)
+draggable card@Cards.Card.Card { rank, suit } CardConfig { container, dragging, attributes } = mdo
+  (element, _) <- elDynAttr' "div" attributes' do
     -- core part of card with pips or picture
-    Dom.elClass "div" "center" $ cardCenter card'
+    Dom.elClass "div" "center" $ cardCenter card
 
-    -- bottom, with rank + suit in righthand corner
-    -- Dom.elClass "div" "bottom" summary
-  pure element
-  where withClasses =
+  drags@Drags { current, total } <-
+    Drag.drags def { container, enabled = dragging } element
+  let attributes' = do
+        move <- translate <$> total
+        draggingClass <- setClass "dragging" . isJust <$> current
+        move . draggingClass . classes <$> fromMaybe (pure []) attributes
+
+  pure CardElement { card, drags }
+  where classes =
+          addClass "draggable" .
           addClass "card" .
-          addClass (suitName suit) .
-          addClass (rankName rank)
+          addClass (Cards.Card.suitName suit) .
+          addClass (Cards.Card.rankName rank)
 
         -- summary = do
         --   Dom.elClass "div" "rank-summary" $ Dom.text $ rankShorthand rank
@@ -99,10 +127,10 @@ card card'@Card { rank, suit } attributes = do
 
 -- | Render the center part of a card which contains either pips or a
 -- picture as appropriate.
-cardCenter :: forall m t. Dom t m => Card -> m ()
-cardCenter Card { rank, suit } =
+cardCenter :: forall m t. Dom t m => Cards.Card.Card -> m ()
+cardCenter Cards.Card.Card { rank, suit } =
   void $ image $ fromMaybe (error "Invalid URI!") $ URI.mkURI cardURI
-  where cardURI = "img/" <> rankName rank <> "-" <> suitName suit <> ".svg"
+  where cardURI = "img/" <> Cards.Card.rankName rank <> "-" <> Cards.Card.suitName suit <> ".svg"
 
 main :: IO ()
 main = withCss "css/card-demo.css" (Runnable demo)
