@@ -25,7 +25,7 @@ import           Data.Bool          (bool)
 import           Data.Default.Class (def)
 import           Data.Map           (Map)
 import qualified Data.Map           as Map
-import           Data.Maybe         (fromMaybe)
+import           Data.Maybe         (fromMaybe, isJust)
 import           Data.Text          (Text)
 import qualified Data.Text          as Text
 import           Data.Text.Display  (Display)
@@ -43,8 +43,9 @@ import           Text.URI           (URI)
 import           Text.URI.QQ        (uri)
 
 import           UI.Attributes      (addClass)
-import           UI.Element         (Dom, Element, elDynAttr')
-import           UI.Event           (EventResult)
+import           UI.Element         (Dom, Element (..), elAttr', elDynAttr',
+                                     getAttribute, setAttribute)
+import           UI.Event           (EventResult, on)
 import           UI.Main            (Runnable (..), withCss)
 import qualified UI.PushMap         as PushMap
 import           UI.PushMap         (PushMap)
@@ -186,6 +187,44 @@ button' l enabled = do
   where attrs = enabled <&> \case
           Enabled  -> []
           Disabled -> [("disabled", "true")]
+
+-- | Create a checkbox with the given name.
+--
+-- You can add a label for the checkbox using 'labelFor':
+--
+-- @
+-- control = do
+--   checked <- checkbox "my-control"
+--   labelFor "my-control" "This is my control:"
+--   pure checked
+-- @
+checkbox :: forall m t. Dom t m
+         => Text
+         -- ^ @name@ of the checkbox, used for linking labels to
+         -- checkboxes.
+         -> Bool
+         -- ^ Initial state: checked ('True') or unchecked ('False').
+         -> Event t Bool
+         -- ^ Explicitly set the state of the checkbox, overriding any
+         -- interactions the user has made.
+         -> m (Element t, Dynamic t Bool)
+         -- ^ Whether the checkbox is checked ('True') or unchecked
+         -- ('False').
+checkbox name initial overrides = do
+  (element, _) <- elAttr' "input" [("name", name), ("type", "checkbox")] (pure ())
+
+  changed :: Event t () <- element `on` "input"
+  checked               <- Reflex.performEvent $ getChecked element <$ changed
+  isChecked             <- Reflex.holdDyn initial checked
+
+  Reflex.performEvent_ $ setChecked element <$> overrides
+
+  pure (element, isChecked)
+  where getChecked element = isJust <$> getAttribute "checked" element
+
+        setChecked element checked
+          | checked   = setAttribute "checked" (Just "") element
+          | otherwise = setAttribute "checked" Nothing element
 
 -- | An input element that contains a value of some readable type.
 --

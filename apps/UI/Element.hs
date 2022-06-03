@@ -22,13 +22,16 @@ module UI.Element
   , Dom
 
   , IsElement
-  , Element
+  , Element (..)
 
   , el'
   , elClass'
   , elAttr'
   , elDynAttr'
   , elDynAttrNs'
+
+  , getAttribute
+  , setAttribute
 
   , Rectangle
   , overlap
@@ -51,7 +54,7 @@ import           Data.Text                   (Text)
 import           GHC.Generics                (Generic)
 
 import qualified GHCJS.DOM.DOMRect           as GHCJS
-import qualified GHCJS.DOM.Element           as GHCJS
+import qualified GHCJS.DOM.Element           as Element
 import qualified GHCJS.DOM.HTMLElement       as GHCJS
 import qualified GHCJS.DOM.Node              as GHCJS
 import           GHCJS.DOM.Types             (castTo)
@@ -71,7 +74,7 @@ import           UI.Point
 
 type PerformJS d m = ( MonadFix m
                      , MonadJSM m
-                     , RawElement d ~ GHCJS.Element
+                     , RawElement d ~ Element.Element
                      )
 
 type Dom t m = ( MonadFix m
@@ -164,6 +167,35 @@ elDynAttrNs' namespace tagName attrs body = do
 
 -- * Element Properties
 
+-- ** Current attributes
+
+-- | Get the current value of an attribute on the element.
+--
+-- Will be 'Nothing' if the attribute is not set.
+getAttribute :: forall e m. (MonadJSM m, IsElement e)
+             => Text
+             -- ^ Name of the attribute
+             -> e
+             -- ^ Element
+             -> m (Maybe Text)
+getAttribute attribute (rawElement -> element) = do
+  hasAttribute <- Element.hasAttribute element attribute
+  if hasAttribute then pure Nothing else do
+    Element.getAttribute element attribute
+
+setAttribute :: forall e m. (MonadJSM m, IsElement e)
+             => Text
+                -- ^ Name of the attribute to set.
+             -> Maybe Text
+                -- ^ New value of the attribute or 'Nothing' to remove
+                -- the attribute.
+             -> e
+               -- ^ Element
+             -> m ()
+setAttribute attribute value (rawElement -> element) = case value of
+  Nothing -> Element.removeAttribute element attribute
+  Just v  -> Element.setAttribute element attribute v
+
 -- ** Bounding Rectangle
 
 -- | The position and dimensions of a rectangle on the screen.
@@ -225,7 +257,7 @@ bounds :: forall e m. (IsElement e, MonadJSM m)
        => e
        -> m Rectangle
 bounds (rawElement -> raw) = do
-  rect <- GHCJS.getBoundingClientRect raw
+  rect <- Element.getBoundingClientRect raw
 
   x <- GHCJS.getX rect
   y <- GHCJS.getY rect
