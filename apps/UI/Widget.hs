@@ -1,54 +1,64 @@
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE DerivingStrategies  #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE RecursiveDo         #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE BlockArguments             #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE RecursiveDo                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE ViewPatterns               #-}
 -- | Widgets that I use throughout the seven example tasks.
 module UI.Widget where
 
-import           Control.Lens       ((&), (.~), (<&>))
-import           Control.Monad      (void)
-import           Control.Monad.Fix  (MonadFix)
+import           Control.Lens               ((&), (.~), (<&>))
+import           Control.Monad              (void)
+import           Control.Monad.Fix          (MonadFix)
 
-import           Data.Bool          (bool)
-import           Data.Default.Class (def)
-import           Data.Map           (Map)
-import qualified Data.Map           as Map
-import           Data.Maybe         (fromMaybe, isJust)
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
-import           Data.Text.Display  (Display)
-import qualified Data.Text.Display  as Display
+import           Data.Bool                  (bool)
+import           Data.Default.Class         (def)
+import           Data.Hashable              (Hashable)
+import           Data.Map                   (Map)
+import qualified Data.Map                   as Map
+import           Data.Maybe                 (fromMaybe)
+import           Data.String                (IsString)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Data.Text.Display          (Display)
+import qualified Data.Text.Display          as Display
+
+import           GHC.Generics               (Generic)
+
+import qualified GHCJS.DOM.HTMLInputElement as HTMLInputElement
 
 import qualified Reflex
-import           Reflex             (Dynamic, Event, Reflex)
-import qualified Reflex.Dom         as Dom
-import           Reflex.Dom         (DomBuilder, DomBuilderSpace, (=:))
+import           Reflex                     (Dynamic, Event, Reflex)
+import qualified Reflex.Dom                 as Dom
+import           Reflex.Dom                 (DomBuilder, DomBuilderSpace, (=:))
 
-import           Text.Printf        (printf)
-import           Text.Read          (readMaybe)
-import qualified Text.URI           as URI
-import           Text.URI           (URI)
-import           Text.URI.QQ        (uri)
+import           Text.Printf                (printf)
+import           Text.Read                  (readMaybe)
+import qualified Text.URI                   as URI
+import           Text.URI                   (URI)
+import           Text.URI.QQ                (uri)
 
-import           UI.Attributes      (addClass)
-import           UI.Element         (Dom, Element (..), elAttr', elDynAttr',
-                                     getAttribute, setAttribute)
-import           UI.Event           (EventResult, on)
-import           UI.Main            (Runnable (..), withCss)
-import qualified UI.PushMap         as PushMap
-import           UI.PushMap         (PushMap)
+import           UI.Attributes              (addClass)
+import           UI.Element                 (Dom, Html, HtmlInput, el', elAttr',
+                                             elDynAttr', input)
+import           UI.Event                   (EventResult, on)
+import           UI.IsElement               (rawHtmlInput)
+import           UI.Main                    (Runnable (..), withCss)
+import qualified UI.PushMap                 as PushMap
+import           UI.PushMap                 (PushMap)
 
 -- * Widgets
 
@@ -73,7 +83,7 @@ ol :: forall a m t. Dom t m
    -- ^ Attributes
    -> [m a]
    -- ^ List items
-   -> m (Element t, [a])
+   -> m (Html t, [a])
 ol attributes = elDynAttr' "ol" attributes . mapM (Dom.el "li")
 
 -- | An unordered list, with the given widgets as list items.
@@ -84,14 +94,28 @@ ul :: forall a m t. Dom t m
    -- ^ Attributes
    -> [m a]
    -- ^ List items
-   -> m (Element t, [a])
+   -> m (Html t, [a])
 ul attributes = elDynAttr' "ul" attributes . mapM (Dom.el "li")
 
 -- ** Outputs
 
--- | A static label with some text. Has the CSS class @label@.
-label :: forall m t. DomBuilder t m => Text -> m ()
-label = Dom.elClass "div" "label" . Dom.text
+-- | A static label with some text. Uses the HTML @label@ element.
+label :: forall m t. Dom t m => Text -> m (Html t)
+label text = fst <$> el' "label" (Dom.text text)
+
+-- | A label for a named element. Labels can be associated with:
+--
+--  * @button@
+--  * @input@
+--  * @meter@
+--  * @output@
+--  * @progress@
+--  * @select@
+--  * @textarea@
+--
+labelFor :: forall m t. Dom t m => Name -> Text -> m (Html t)
+labelFor name text =
+  fst <$> elAttr' "label" [("for", toText name)] (Dom.text text)
 
 -- | An image with a dynamic @src@ attribute.
 img :: forall m t. Dom t m
@@ -99,7 +123,7 @@ img :: forall m t. Dom t m
     -- ^ src
     -> Dynamic t (Map Text Text)
     -- ^ other attributes (src will be overridden)
-    -> m (Element t)
+    -> m (Html t)
 img src attributes =
   fst <$> elDynAttr' "img" (setSrc <$> src <*> attributes) (pure ())
   where setSrc = Map.insert "src" . URI.render
@@ -114,7 +138,7 @@ img src attributes =
 image :: forall m t. Dom t m
       => URI
       -- ^ src
-      -> m (Element t)
+      -> m (Html t)
 image src = img (pure src) (pure [])
 
 -- | A label that displays a dynamically updating value.
@@ -153,11 +177,21 @@ progressBar progress = Dom.elClass "div" "progress-bar" do
 
 -- ** Inputs
 
+-- | Input elements can have names, which have several uses like
+-- associating labels with specific inputs.
+newtype Name = Name { toText :: Text }
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+  deriving newtype (IsString, Display)
+
 -- | Whether an input element is enabled or disabled.
 --
 -- A disabled element should not accept user input and should have
 -- some visual indication that it is disabled.
-data Enabled = Enabled | Disabled deriving (Show, Eq)
+data Enabled = Enabled
+             | Disabled
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
 
 -- | 'Enabled' if 'True', 'Disabled' if 'False'.
 enabledIf :: Bool -> Enabled
@@ -199,7 +233,7 @@ button' l enabled = do
 --   pure checked
 -- @
 checkbox :: forall m t. Dom t m
-         => Text
+         => Name
          -- ^ @name@ of the checkbox, used for linking labels to
          -- checkboxes.
          -> Bool
@@ -207,11 +241,14 @@ checkbox :: forall m t. Dom t m
          -> Event t Bool
          -- ^ Explicitly set the state of the checkbox, overriding any
          -- interactions the user has made.
-         -> m (Element t, Dynamic t Bool)
+         --
+         -- Use 'Reflex.never' if you don't want to override the
+         -- checkbox.
+         -> m (HtmlInput t, Dynamic t Bool)
          -- ^ Whether the checkbox is checked ('True') or unchecked
          -- ('False').
 checkbox name initial overrides = do
-  (element, _) <- elAttr' "input" [("name", name), ("type", "checkbox")] (pure ())
+  element <- input (pure attributes)
 
   changed :: Event t () <- element `on` "input"
   checked               <- Reflex.performEvent $ getChecked element <$ changed
@@ -220,11 +257,11 @@ checkbox name initial overrides = do
   Reflex.performEvent_ $ setChecked element <$> overrides
 
   pure (element, isChecked)
-  where getChecked element = isJust <$> getAttribute "checked" element
+  where attributes = [("name", toText name) , ("type", "checkbox")]
+                     <> Map.fromList [("checked", "") | initial]
 
-        setChecked element checked
-          | checked   = setAttribute "checked" (Just "") element
-          | otherwise = setAttribute "checked" Nothing element
+        getChecked = HTMLInputElement.getChecked . rawHtmlInput
+        setChecked = HTMLInputElement.setChecked . rawHtmlInput
 
 -- | An input element that contains a value of some readable type.
 --
@@ -249,8 +286,8 @@ readInput :: forall a m t. (Dom t m, Read a, Show a)
           -> m (Dynamic t (Maybe a))
 readInput initial setEvents enabled = do
   modify <- Dom.dynamicAttributesToModifyAttributes $ toAttributes <$> enabled
-  input <- Dom.inputElement (config modify)
-  Reflex.holdDyn (Just initial) $ read' <$> Dom._inputElement_input input
+  element <- Dom.inputElement (config modify)
+  Reflex.holdDyn (Just initial) $ read' <$> Dom._inputElement_input element
   where read' = readMaybe . Text.unpack
         show' = Text.pack . show
 
@@ -368,7 +405,7 @@ ignoreNothing :: forall a m t. (Reflex t, Reflex.MonadHold t m, MonadFix m)
               -> Dynamic t (Maybe a)
               -- ^ A dynamic that can have invalid values.
               -> m (Dynamic t a)
-ignoreNothing initial input = Reflex.foldDynMaybe const initial (Reflex.updated input)
+ignoreNothing initial values = Reflex.foldDynMaybe const initial (Reflex.updated values)
 
 -- | The value from the last time the given event fired, or 'Nothing'
 -- if it hasn't fired yet.

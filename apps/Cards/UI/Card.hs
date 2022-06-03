@@ -26,7 +26,7 @@ import qualified Text.URI           as URI
 import           UI.Attributes      (addClass, removeClass)
 import qualified UI.Drag            as Drag
 import           UI.Drag            (Drags (..))
-import           UI.Element         (Dom, Element, elClass', elDynAttr')
+import           UI.Element         (Dom, Html, elClass', elDynAttr')
 import           UI.Main            (Runnable (..), withCss)
 import           UI.Style           (Angle (..), rotate, setProperty, translate)
 import           UI.Widget          (image, label)
@@ -76,7 +76,7 @@ card :: forall m t. Dom t m
      --
      -- Note: the @card@, rank and suit classes will be added in
      -- addition to any classes specified by these attributes.
-     -> m (Element t)
+     -> m (Html t)
 card card'@Card { rank, suit } attributes = do
   (element, _) <- elDynAttr' "div" (withClasses <$> attributes) do
     -- top, with rank + suit in lefthand corner

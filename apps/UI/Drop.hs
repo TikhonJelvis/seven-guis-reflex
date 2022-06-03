@@ -33,7 +33,7 @@ import           Reflex                      (Dynamic, Event)
 import qualified UI.Drag                     as Drag
 import           UI.Drag                     (DragConfig (..), Drags (..))
 import qualified UI.Element                  as Element
-import           UI.Element                  (Dom, Element, area, elClass',
+import           UI.Element                  (Dom, Html, area, elClass',
                                               elDynAttr', overlap)
 import           UI.IsElement                (IsElement, rawElement)
 import           UI.Main                     (Runnable (..), withCss)
@@ -49,7 +49,7 @@ demo = void do
     [ example "Change color on hover and drop" changeColor
     , example "Move element to target" moveElement
     ]
-  where example :: Text -> (Element t -> m a) -> m ()
+  where example :: Text -> (Html t -> m a) -> m ()
         example description body = do
           label description
           rec (container, _) <- elClass' "div" "draggable drop-example" $
@@ -73,7 +73,7 @@ demo = void do
                 drops drags [('a', target)]
           pure ()
 
-        moveElement :: Element t -> m ()
+        moveElement :: Html t -> m ()
         moveElement container = do
           rec (target, _) <- elClass' "div" "drop-target" (pure ())
               (element, _) <- elDynAttr' "div" attributes (pure ())

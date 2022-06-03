@@ -1,16 +1,18 @@
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE DerivingStrategies  #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE RecursiveDo         #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 module UI.Drag where
 
 import           Control.Applicative (liftA2)
@@ -34,7 +36,7 @@ import qualified Reflex.Dom          as Dom
 import           UI.Attributes       (Angle (..), Transition (..), addClass,
                                       classes, joinClasses, rotate, s, scale,
                                       setClass, transition, translate)
-import           UI.Element          (Dom, Element, elClass', elDynAttr')
+import           UI.Element          (Dom, Html, el', elClass', elDynAttr')
 import           UI.Event            (Modifier (Shift), MouseButton (..),
                                       MouseEventResult (..), button, client,
                                       mouseEvent, on, performJs)
@@ -42,7 +44,8 @@ import           UI.IsElement        (rawElement)
 import           UI.Main             (Runnable (..), withCss)
 import           UI.Point            (Point (..), distance)
 import           UI.Style            (getComputedProperty, setProperty)
-import           UI.Widget           (label, ul)
+import           UI.Widget           (Enabled (..), checkbox, enabledIf, label,
+                                      labelFor, ul)
 
 import qualified Witherable
 
@@ -60,6 +63,7 @@ demo = void do
 
     , snapBack
     , dragHandle
+    , enableDisable
     ]
   dragAnywhere
   where withTransition p = addClass "smooth-drag" . translate p
@@ -130,10 +134,29 @@ demo = void do
             pure ()
           pure ()
 
+        enableDisable = mdo
+          label "Enable or disable dragging interactively."
+          (_, enabled) <- el' "div" do
+            labelFor "toggle-drag" "Enabled dragging"
+            snd <$> checkbox "toggle-drag" True Reflex.never
+          (container, _) <- elClass' "div" "drag-example" mdo
+            (element, _) <- elDynAttr' "div" attributes (pure ())
+            let attributes = do
+                  move   <- translate <$> total
+                  class_ <- setClass "draggable" <$> enabled
+                  pure $ class_ $ move []
+                config = def
+                  { container = Just container
+                  , enabled   = Just $ enabledIf <$> enabled
+                  }
+            Drags { total } <- drags config element
+            pure ()
+          pure ()
+
 -- | Information about how a user interacts with an element by
 -- dragging.
 data Drags t = Drags
-  { element :: Element t
+  { element  :: Html t
     -- ^ The element being dragged.
 
   , current  :: Dynamic t (Maybe Point)
@@ -172,13 +195,43 @@ data Drags t = Drags
 
 -- | Configure how to measure drags for an item.
 data DragConfig d t = DragConfig
-  { container        :: Maybe (Element t)
+  { container        :: Maybe (Html t)
   -- ^ Restrict the dragging to a container. Events outside the
   -- container do not count for the drag distance and don't end a
   -- drag.
   --
   -- The default is 'Nothing', which will use events from the entire
   -- document body.
+
+  , enabled          :: Maybe (Dynamic t Enabled)
+  -- ^ Is dragging enabled for the element?
+  --
+  -- Default is 'Nothing', equivalent to "always enabled" (@pure
+  -- Enabled@).
+  --
+  -- If 'enabled' becomes 'Disabled' /while a drag is going on/, the
+  -- drag will continue, but the user will not be able to drag the
+  -- element again. (Note: this might change in the future when the
+  -- 'drags' API is extended to make drags dynamically cancellable).
+
+  -- enabled is a 'Maybe' because if we used 'Dynamic t Enabled' and
+  -- wrote the corresponding Default instance:
+  --
+  -- instance Reflex t => Default (DragConfig d t) where
+  --   def = DragConfig { ..., enabled = pure Enabled }
+  --
+  -- the type variable t would be ambiguous when overriding 'enabled':
+  --
+  -- def { enabled = ... }
+  --
+  -- using Maybe lets us write an instance without the Reflex t
+  -- constraint, avoiding this problem
+  --
+  -- instance Default (DragConfig d t) where
+  --   def = DragConfig { ..., enabled = Nothing }
+  --
+  -- this feels like a bit of a hack, but I have not been able to
+  -- figure out a better solution
 
   , mouseEventFilter :: MouseEventResult -> Bool
   -- ^ A function to specify which mouse events can /start/ drags.
@@ -206,6 +259,7 @@ data DragConfig d t = DragConfig
 instance Default (DragConfig d t) where
   def = DragConfig
     { container        = Nothing
+    , enabled          = Nothing
     , mouseEventFilter = \ e -> button e == Main
     }
 
@@ -260,7 +314,7 @@ instance Default (DragConfig d t) where
 drags :: forall m d t. Dom t m
       => DragConfig d t
       -- ^ Configuration for how to measure drags.
-      -> Element t
+      -> Html t
       -- ^ The element that can be dragged.
       -> m (Drags t)
       -- ^ Two dynamics that combine to get the net move across /all/
@@ -271,7 +325,7 @@ drags :: forall m d t. Dom t m
       --
       --  2. The net movement from all /finished/ drags, /not/
       --  including the current drag.
-drags DragConfig { container, mouseEventFilter } element = do
+drags DragConfig { container, enabled, mouseEventFilter } element = do
   -- TODO: Better error handling?
   body <- Document.getBodyUnsafe =<< Dom.askDocument
   (mouseup, mousemove) <- case container of
@@ -281,9 +335,9 @@ drags DragConfig { container, mouseEventFilter } element = do
       up   <- performJs mouseEvent =<< body `on` "mouseup"
       move <- performJs mouseEvent =<< body `on` "mousemove"
       pure (up, move)
-  rec let start = gate (not <$> isDragged) (client <$> mousedown)
-          end   = gate isDragged           (client <$> mouseup)
-          move  = gate isDragged           (client <$> mousemove)
+  rec let start = gate (canDrag <$> enabled' <*> isDragged) (client <$> mousedown)
+          end   = gate isDragged (client <$> mouseup)
+          move  = gate isDragged (client <$> mousemove)
 
           mousedown = Witherable.filter mouseEventFilter $
             Dom.domEvent Dom.Mousedown element
@@ -319,6 +373,11 @@ drags DragConfig { container, mouseEventFilter } element = do
   pure Drags { element, current, finished, total, start, end }
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
+
+        canDrag Enabled isDragged = not isDragged
+        canDrag Disabled _        = False
+
+        enabled' = fromMaybe (pure Enabled) enabled
 
         dragging (rawElement -> e) = do
           existing <- fromMaybe ("" :: Text) <$>

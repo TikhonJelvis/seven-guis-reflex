@@ -13,7 +13,6 @@ import           Control.Monad          (void)
 import           Control.Monad.IO.Class (MonadIO (liftIO))
 
 import           Data.Text.Display      (Display (..))
-import qualified Data.Text.Display      as Display
 import qualified Data.Text.Lazy.Builder as Text
 import           Data.Time              (Day)
 import qualified Data.Time              as Time
@@ -66,7 +65,7 @@ widget = Dom.elClass "div" "flight-booker" do
         toTrip Return start end = Return' <$> start <*> end
 
         confirmationMessage Nothing     = pure ()
-        confirmationMessage (Just trip) = label $ Display.display trip
+        confirmationMessage (Just trip) = output $ pure trip
 
 -- | A date input with validation.
 --

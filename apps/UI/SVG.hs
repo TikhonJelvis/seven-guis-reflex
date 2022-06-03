@@ -37,17 +37,33 @@ import           GHC.Generics           (Generic)
 
 import qualified Numeric
 
-import           Reflex                 (Dynamic)
-import           Reflex.Dom             (AttributeName (..))
+import           Reflex                 (Dynamic, Reflex)
+import qualified Reflex.Dom             as Dom
 
 import           Text.Printf            (printf)
 
 import           UI.Attributes          (ToAttributeValue (..),
                                          ToAttributes (..), with)
-import           UI.Element             (Dom, Element, elDynAttrNs')
+import           UI.Element             (Dom, elDynAttrNs')
+import qualified UI.Event               as Event
+import           UI.IsElement           (FromElement (..), IsElement (..))
 import           UI.Point
 
 -- * SVG Elements
+
+newtype Svg t = Svg (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+
+instance FromElement Svg where
+  type EventResult Svg = Event.EventResult
+  fromElement = Svg
+
+instance IsElement (Svg t) where
+  rawElement (Svg e) = Dom._element_raw e
+
+instance Reflex t => Dom.HasDomEvent t (Svg t) en where
+  type DomEventType (Svg t) en = Event.EventResultType en
+  domEvent eventName (Svg e) = Dom.domEvent eventName e
+
 
 -- ** Arbitrary Elements
 
@@ -93,7 +109,7 @@ svg' :: forall a m t. Dom t m
      -- ^ Tag name
      -> m a
      -- ^ Body
-     -> m (Element t, a)
+     -> m (Svg t, a)
 svg' tag = svgAttr' tag []
 {-# INLINABLE svg' #-}
 
@@ -105,7 +121,7 @@ svgAttr' :: forall a m t. Dom t m
          -- ^ Static attributes
          -> m a
          -- ^ Body
-         -> m (Element t, a)
+         -> m (Svg t, a)
 svgAttr' tag = svgDynAttr' tag . pure
 {-# INLINABLE svgAttr' #-}
 
@@ -117,7 +133,7 @@ svgDynAttr' :: forall a m t. Dom t m
             -- ^ Attributes
             -> m a
             -- ^ Body
-            -> m (Element t, a)
+            -> m (Svg t, a)
 svgDynAttr' = elDynAttrNs' (Just svgNamespace)
 {-# INLINABLE svgDynAttr' #-}
 
@@ -272,7 +288,7 @@ circle :: forall m t. Dom t m
        -> Dynamic t (Map Text Text)
        -- ^ Additional attributes. The 'Circle' argument will override
        -- @cx@, @cy@ and @r@ in this map.
-       -> m (Element t)
+       -> m (Svg t)
 circle c attrs =
   fst <$> svgDynAttr' "circle" (liftA2 with c attrs) (pure ())
 
@@ -284,10 +300,10 @@ svgNamespace = "http://www.w3.org/2000/svg"
 
 -- | Wrap a text attribute name into an 'AttributeName' with the SVG
 -- namespace (see 'svgNamespace').
-svgAttribute :: Text -> AttributeName
-svgAttribute = AttributeName (Just svgNamespace)
+svgAttribute :: Text -> Dom.AttributeName
+svgAttribute = Dom.AttributeName (Just svgNamespace)
 
 -- | Wrap a text attribute map into a map with 'AttributeName' keys
 -- namespaced for SVG (see 'svgNamespace').
-svgAttributes :: Map Text a -> Map AttributeName a
+svgAttributes :: Map Text a -> Map Dom.AttributeName a
 svgAttributes = Map.mapKeys svgAttribute

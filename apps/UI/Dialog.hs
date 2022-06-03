@@ -66,7 +66,7 @@ data ModalState = Show | ShowModal | Hide
 --   * [@cancel@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/cancel_event)
 --   * [@close@](https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close_event)
 data DialogElement t = DialogElement
-  { element  :: Element t
+  { element  :: Html t
   -- ^ The @dialog@ HTML element itself.
 
   , closed   :: Event t ()

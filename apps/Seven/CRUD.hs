@@ -9,21 +9,21 @@
 module Seven.CRUD where
 
 import           Control.Applicative (liftA2)
-import           Control.Lens
+import           Control.Lens        ((??))
 
 import           Data.Default.Class  (def)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
-import           Data.Text.Display
+import           Data.Text.Display   (Display (displayBuilder))
 
 import qualified Reflex
 import           Reflex              (Dynamic, Event, (<@>))
 import qualified Reflex.Dom          as Dom
 
-import           UI.Element
+import           UI.Element          (Dom)
 import           UI.Main             (Runnable (..), withCss)
 import qualified UI.PushMap          as PushMap
-import           UI.Widget
+import           UI.Widget           (label, listbox)
 
 import qualified Witherable          (Filterable (filter))
 

@@ -21,8 +21,8 @@ module UI.Element
   ( PerformJS
   , Dom
 
-  , IsElement
-  , Element (..)
+  , Html
+  , HtmlInput
 
   , el'
   , elClass'
@@ -30,10 +30,12 @@ module UI.Element
   , elDynAttr'
   , elDynAttrNs'
 
+  , input
+
   , getAttribute
   , setAttribute
 
-  , Rectangle
+  , Rectangle (..)
   , overlap
   , area
 
@@ -55,9 +57,9 @@ import           GHC.Generics                (Generic)
 
 import qualified GHCJS.DOM.DOMRect           as GHCJS
 import qualified GHCJS.DOM.Element           as Element
-import qualified GHCJS.DOM.HTMLElement       as GHCJS
-import qualified GHCJS.DOM.Node              as GHCJS
-import           GHCJS.DOM.Types             (castTo)
+import qualified GHCJS.DOM.HTMLElement       as HTMLElement
+import qualified GHCJS.DOM.Node              as Node
+import qualified GHCJS.DOM.Types             as GHCJS
 
 import           Language.Javascript.JSaddle (MonadJSM)
 
@@ -68,8 +70,9 @@ import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
                                               ElementConfig (..), HasDocument,
                                               RawElement)
 
-import           UI.Event
-import           UI.IsElement                (IsElement (..))
+import qualified UI.Event                    as Event
+import           UI.IsElement                (FromElement (..), IsElement (..),
+                                              IsHtml (..), IsHtmlInput (..))
 import           UI.Point
 
 type PerformJS d m = ( MonadFix m
@@ -89,21 +92,50 @@ type Dom t m = ( MonadFix m
                , HasDocument m
                )
 
-newtype Element t = Element (Dom.Element EventResult Dom.GhcjsDomSpace t)
+-- | An HTML DOM element (as opposed to an SVG element or the like).
+newtype Html t = Html (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
 
-instance IsElement (Element t) where
-  rawElement (Element e) = Dom._element_raw e
+instance FromElement Html where
+  type EventResult Html = Event.EventResult
+  fromElement = Html
 
-instance Reflex t => Dom.HasDomEvent t (Element t) en where
-  type DomEventType (Element t) en = EventResultType en
-  domEvent eventName (Element e) = Dom.domEvent eventName e
+instance IsElement (Html t) where
+  rawElement (Html e) = Dom._element_raw e
+
+instance IsHtml (Html t) where
+  rawHtml (Html e) =
+    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
+
+instance Reflex t => Dom.HasDomEvent t (Html t) en where
+  type DomEventType (Html t) en = Event.EventResultType en
+  domEvent eventName (Html e) = Dom.domEvent eventName e
+
+-- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
+-- JavaScript).
+newtype HtmlInput t = HtmlInput (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+
+instance FromElement HtmlInput where
+  type EventResult HtmlInput = Event.EventResult
+  fromElement = HtmlInput
+
+instance IsElement (HtmlInput t) where
+  rawElement (HtmlInput e) = Dom._element_raw e
+
+instance IsHtml (HtmlInput t) where
+  rawHtml (HtmlInput e) =
+    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
+
+instance IsHtmlInput (HtmlInput t) where
+  rawHtmlInput (HtmlInput e) =
+    GHCJS.uncheckedCastTo GHCJS.HTMLInputElement $ Dom._element_raw e
+
 
 -- * Creating Elements
 
 el' :: forall a m t. Dom t m
     => Text
     -> m a
-    -> m (Element t, a)
+    -> m (Html t, a)
 el' tagName = elAttr' tagName []
 {-# INLINABLE el' #-}
 
@@ -112,7 +144,7 @@ elClass' :: forall a m t. Dom t m
          => Text
          -> Text
          -> m a
-         -> m (Element t, a)
+         -> m (Html t, a)
 elClass' tagName class_ = elAttr' tagName [("class", class_)]
 {-# INLINABLE elClass' #-}
 
@@ -121,7 +153,7 @@ elAttr' :: forall a m t. Dom t m
         => Text
         -> Map Text Text
         -> m a
-        -> m (Element t, a)
+        -> m (Html t, a)
 elAttr' tagName attr = elDynAttr' tagName (pure attr)
 {-# INLINABLE elAttr' #-}
 
@@ -131,12 +163,12 @@ elDynAttr' :: forall a m t. Dom t m
            => Text
            -> Dynamic t (Map Text Text)
            -> m a
-           -> m (Element t, a)
+           -> m (Html t, a)
 elDynAttr' = elDynAttrNs' Nothing
 {-# INLINABLE elDynAttr' #-}
 
 -- | Create and return an element in the given (optional) namespace.
-elDynAttrNs' :: forall a m t. Dom t m
+elDynAttrNs' :: forall e a m t. (Dom t m, FromElement e, EventResult e ~ Event.EventResult)
              => Maybe Text
              -- ^ Optional namespace
              -> Text
@@ -145,7 +177,7 @@ elDynAttrNs' :: forall a m t. Dom t m
              -- ^ Dynamic attributes
              -> m a
              -- ^ Body
-             -> m (Element t, a)
+             -> m (e t, a)
 elDynAttrNs' namespace tagName attrs body = do
   modifyAttrs <- Dom.dynamicAttributesToModifyAttributes attrs
   let config = ElementConfig
@@ -158,12 +190,24 @@ elDynAttrNs' namespace tagName attrs body = do
   (element, result) <- Dom.element tagName config body
   postBuild <- Reflex.getPostBuild
   Reflex.notReadyUntil postBuild
-  pure (Element element, result)
+  pure (fromElement element, result)
   where eventSpec = Dom.GhcjsEventSpec filters handler
         filters = mempty
         handler = Dom.GhcjsEventHandler \ (eventName, event) ->
-          domHandler eventName $ Dom.unGhcjsDomEvent event
+          Event.domHandler eventName $ Dom.unGhcjsDomEvent event
 {-# INLINABLE elDynAttrNs' #-}
+
+-- * Input Elements
+
+-- | An HTML @<input>@ element.
+--
+-- Since @input@ is an /empty element/—it cannot have children—this
+-- does not take an argument for the body.
+input :: forall m t. Dom t m
+      => Dynamic t (Map Text Text)
+      -- ^ Dynamic attributes for the input element.
+      -> m (HtmlInput t)
+input attributes = fst <$> elDynAttrNs' Nothing "input" attributes (pure ())
 
 -- * Element Properties
 
@@ -306,15 +350,15 @@ offsetPosition :: forall e m. (IsElement e, MonadJSM m)
                => e
                -> m Point
 offsetPosition element =
-  castTo GHCJS.HTMLElement (rawElement element) >>= \case
+  GHCJS.castTo GHCJS.HTMLElement (rawElement element) >>= \case
     Just htmlElement -> do
-      x <- GHCJS.getOffsetLeft htmlElement
-      y <- GHCJS.getOffsetTop htmlElement
+      x <- HTMLElement.getOffsetLeft htmlElement
+      y <- HTMLElement.getOffsetTop htmlElement
       pure Point { x, y }
     Nothing -> elementOffset
   where elementOffset = do
           elementPosition <- viewportPosition element
-          GHCJS.getParentElement (rawElement element) >>= \case
+          Node.getParentElement (rawElement element) >>= \case
             Nothing     -> pure elementPosition
             Just parent -> do
               parentPosition <- viewportPosition parent
