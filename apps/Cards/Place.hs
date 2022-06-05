@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE TypeFamilies       #-}
 -- | Many games involve placing cards face-up or face-down on a
 -- playing area, or putting cards in a pile.
 module Cards.Place where

@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- | Values that can be viewed as a raw JavaScript @Element@ object.
 module UI.IsElement where

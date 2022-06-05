@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
 module UI.Color where
 
 import           Data.Colour            (AlphaColour, Colour, over)

@@ -1,8 +1,3 @@
-{-# LANGUAGE DerivingStrategies    #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE OverloadedLists       #-}
-{-# LANGUAGE OverloadedStrings     #-}
 module UI.Attributes
   ( ToAttributes(..)
   , ToAttributeValue (..)

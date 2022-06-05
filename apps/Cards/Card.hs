@@ -1,8 +1,3 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE NamedFieldPuns     #-}
-{-# LANGUAGE OverloadedStrings  #-}
 -- | "Standard" or "French suited" 52-card deck playing cards.
 --
 -- The standard 52-card deck has four __suits__:
