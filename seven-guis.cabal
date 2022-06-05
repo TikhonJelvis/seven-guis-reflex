@@ -26,6 +26,7 @@ executable guis
     Seven.TemperatureConverter
     Seven.Timer
     UI.Attributes
+    UI.Color
     UI.Dialog
     UI.Drag
     UI.Drop

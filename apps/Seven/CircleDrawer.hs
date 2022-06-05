@@ -40,7 +40,8 @@ import           UI.Main             (Runnable (..), withCss)
 import           UI.Point
 import qualified UI.PushMap          as PushMap
 import           UI.PushMap          (PushMap)
-import           UI.SVG
+import           UI.SVG              (Circle (..), Stroke (..), Svg, circle,
+                                      svgAttr')
 import           UI.Widget
 
 import           Witherable          (Filterable (..), catMaybes, (<&?>))
