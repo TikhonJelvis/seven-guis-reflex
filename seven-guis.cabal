@@ -39,6 +39,8 @@ executable guis
     UI.PushMap
     UI.Style
     UI.SVG
+    UI.SVG.Haskell
+    UI.SVG.Path
     UI.Widget
 
   build-depends:
