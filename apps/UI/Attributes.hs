@@ -41,17 +41,21 @@ module UI.Attributes
   , isHtmlWhitespace
   , htmlWhitespace
 
-  , ShowLowercase (..))
+  , ShowLowercase (..)
+  , AsAttribute (..))
 where
 
 import           Data.Bool     (bool)
 import qualified Data.Foldable as Foldable
 import           Data.Map      (Map)
 import qualified Data.Map      as Map
+import           Data.Proxy    (Proxy (..))
 import           Data.Set      (Set)
 import qualified Data.Set      as Set
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
+
+import           GHC.TypeLits  (KnownSymbol, Symbol, symbolVal)
 
 import           UI.Style
 
@@ -263,3 +267,30 @@ newtype ShowLowercase a = ShowLowercase a
 instance Show a => ToAttributeValue (ShowLowercase a) where
   toAttributeValue (ShowLowercase a) =
     Text.toLower $ Text.pack $ show a
+
+-- | A type for deriving 'ToAttributes' for types that have a single
+-- "default" attribute name.
+--
+-- __Example__
+--
+-- 'GradientUnits' is only ever used with the @gradientUnits@
+-- attribute.
+--
+-- @
+-- data GradientUnits = UserSpaceOnUse | ObjectBoundingBox
+--   deriving ToAttributes via AsAttribute "spreadMethod" GradientUnits
+--
+-- instance ToAttributeValue GradientUnits where {- ... -}
+-- @
+--
+-- Then @toAttributes UserSpaceOnUse@ would give us:
+--
+-- @
+-- [("gradientUnits", toAttributeValue UserSpaceOnUse)]
+-- @
+newtype AsAttribute (attribute :: Symbol) a = AsAttribute a
+
+instance (KnownSymbol attribute, ToAttributeValue a) =>
+         ToAttributes (AsAttribute attribute a) where
+  toAttributes (AsAttribute a) =
+    Map.fromList [(Text.pack $ symbolVal (Proxy @attribute), toAttributeValue a)]

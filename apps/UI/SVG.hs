@@ -55,9 +55,9 @@ import           GHC.Generics        (Generic)
 import           Reflex              (Dynamic, Reflex)
 import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes       (RelativeLength, ShowLowercase (..),
-                                      ToAttributeValue (..), ToAttributes (..),
-                                      href, id_, with)
+import           UI.Attributes       (AsAttribute (..), RelativeLength,
+                                      ShowLowercase (..), ToAttributeValue (..),
+                                      ToAttributes (..), href, id_, with)
 import           UI.Color            (Color)
 import           UI.Element          (Dom, elDynAttrNs')
 import qualified UI.Event            as Event
@@ -451,6 +451,9 @@ dynStops stops = Dom.dyn_ $ stops <&> mapM_ \ stop ->
 
 -- | How a gradient should behave outside of its bounds—what to do
 -- when @offset@ would logically be below 0 or above 1?
+--
+-- >>> toAttributes Pad
+-- fromList [("spreadMethod","pad")]
 data Spread = Pad
               -- ^ Fill out the remainder of the space with a solid
               -- color from @offset = 0@ or @offset = 1@ as
@@ -465,14 +468,15 @@ data Spread = Pad
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
   deriving ToAttributeValue via ShowLowercase Spread
-
-instance ToAttributes Spread where
-  toAttributes spread = [("spreadMethod", toAttributeValue spread)]
+  deriving ToAttributes via AsAttribute "spreadMethod" Spread
 
 -- | The coordinate system for a gradient.
 --
 -- This defines how gradient coordinates are translated to actual
 -- coordinates when the gradient is used.
+--
+-- >>> toAttributes UserSpaceOnUse
+-- fromList [("gradientUnits","userSpaceOnUse")]
 data GradientUnits = UserSpaceOnUse
                      -- ^ Use the __user coordinates__ at the time and
                      -- place the gradient is applied.
@@ -489,14 +493,12 @@ data GradientUnits = UserSpaceOnUse
                      -- bounding box.
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
+  deriving ToAttributes via AsAttribute "gradientUnits" GradientUnits
 
 instance ToAttributeValue GradientUnits where
   toAttributeValue = \case
-    UserSpaceOnUse -> "userSpaceOnUse"
+    UserSpaceOnUse    -> "userSpaceOnUse"
     ObjectBoundingBox -> "objectBoundingBox"
-
-instance ToAttributes GradientUnits where
-  toAttributes units = [("gradientUnits", toAttributeValue units)]
 
 -- * SVG Namespace
 
