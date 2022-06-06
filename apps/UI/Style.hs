@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 -- | Functionality for working with element's @style@ attributes as
 -- well as their /computed/ styles.
 module UI.Style
@@ -5,12 +6,17 @@ module UI.Style
 
   , Length
   , px
+
   , RelativeLength
+
   , Factor
-  , Angle (..)
+
+  , Angle (.., Deg, Turn, Grad)
+
   , Duration (..)
   , ms
   , s
+
   , styles
   , joinStyles
   , setProperty
@@ -23,13 +29,14 @@ module UI.Style
   , translate
   , rotate
   , scale
+  , flipAround
+  , matrix
 
   , Transition (..)
   , transition
   , removeTransition
 
-  , getComputedProperty
-  )
+  , getComputedProperty)
 where
 
 import           Data.Default.Class            (Default (..))
@@ -41,7 +48,7 @@ import qualified Data.Map.Strict               as Map
 import           Data.String                   (IsString)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as Text
-import           Data.Text.Display             (Display)
+import           Data.Text.Display             (Display (..))
 import           Data.Vector                   (Vector)
 import           Data.Vector.Instances         ()
 
@@ -51,6 +58,8 @@ import qualified GHCJS.DOM                     as GHCJS
 import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
 import           GHCJS.DOM.Types               (MonadDOM)
 import           GHCJS.DOM.Window              as Window
+
+import           Text.Printf                   (printf)
 
 import           UI.IsElement                  (IsElement, rawElement)
 import           UI.Point                      (Point (..), Point3D (..))
@@ -118,19 +127,70 @@ type RelativeLength = Text
 type Factor = Text
 
 -- | CSS @<angle>@ units for specifying rotations.
-data Angle = Deg !Double
-           | Grad !Double
-           | Rad !Double
-           | Turn !Double
- deriving stock (Show, Eq, Generic)
+--
+-- Angles can be manipulated using any of the normal CSS units in
+-- Haskell, but will always convert to radians in CSS.
+--
+-- >>> toCss (Rad pi)
+-- "3.141592653589793rad"
+--
+-- >>> import Data.Text.Display (display)
+-- >>> display (Rad (2 * pi)) == "2.0π rad"
+-- True
+newtype Angle = Rad Double
+ deriving stock (Show, Eq, Ord, Generic)
  deriving anyclass (Hashable)
+ deriving newtype (Num, Fractional, Floating, Real, RealFloat, RealFrac)
+
+instance Display Angle where
+  displayBuilder (Rad θ) = displayBuilder (θ / pi) <> "π rad"
+
+-- | An 'Angle' in degrees.
+--
+-- >>> Deg 90
+-- Rad 1.5707963267948966
+--
+-- >>> let Deg θ = Rad (pi / 2) in θ
+-- 90.0
+--
+-- >>> Deg 180 == Rad pi
+-- True
+pattern Deg :: Double -> Angle
+pattern Deg θ <- Rad ((* (180 / pi)) -> θ)
+  where Deg θ = Rad (θ * pi / 180)
+
+-- | An 'Angle' in turns (1 turn = 360° = 2π rad).
+--
+-- >>> Turn 1 == Rad (2 * pi)
+-- True
+--
+-- >>> let Turn n = Deg 720 in n
+-- 2.0
+--
+-- >>> import Data.Text.Display (display)
+-- >>> display (Turn 0.5) == "1.0π rad"
+-- True
+pattern Turn :: Double -> Angle
+pattern Turn θ <- Rad ((/ (2 * pi)) -> θ)
+  where Turn θ = Rad (2 * pi * θ)
+
+-- | An 'Angle' in gradians (1 grad = 0.9° = π/200 rad).
+--
+-- >>> Grad 100 == Deg 90
+-- True
+--
+-- >>> let Grad θ = Turn 3 in θ
+-- 1200.0
+--
+-- >>> import Data.Text.Display (display)
+-- >>> display (Grad 1200) == "6.0π rad"
+-- True
+pattern Grad :: Double -> Angle
+pattern Grad θ <- Rad ((* (200 / pi)) -> θ)
+  where Grad θ = Rad (θ * pi / 200)
 
 instance ToCss Angle where
-  toCss = \case
-    Deg d  -> toCss d <> "deg"
-    Grad d -> toCss d <> "grad"
-    Rad d  -> toCss d <> "rad"
-    Turn d -> toCss d <> "turn"
+  toCss (Rad d) = toCss d <> "rad"
 
 -- | A duration, stored in milliseconds.
 newtype Duration = Duration Double
@@ -427,6 +487,67 @@ rotate = addTransform . Rotate
 -- | Uniformly scale an element.
 scale :: Double -> Map Text Text -> Map Text Text
 scale n = addTransform $ Scale (toCss n) (toCss n)
+
+-- | Flip an element around an axis running through the element's
+-- /center of rotation/ at an angle of θ to the y-axis.
+--
+-- __Examples__
+--
+-- Flip horizontally:
+--
+-- @
+-- flipAround (Deg 0)
+-- @
+--
+-- Flip vertically:
+--
+-- @
+-- flipAround (Turn 0.25)
+-- @
+--
+-- Flip along diagonal:
+--
+-- @
+-- flipAround (Deg 45)
+-- @
+flipAround :: Angle -> Map Text Text -> Map Text Text
+flipAround θ =
+  addTransform (Rotate (-θ)) .
+  addTransform (Scale "-1" "1") .
+  addTransform (Rotate θ)
+
+-- | Add a 2D matrix transform.
+--
+-- The matrix can take one of two forms:
+--
+-- @[a, b, c, d]@, mapping to:
+--
+-- @
+-- matrix(a, b, c, d, 0, 0)
+-- @
+--
+-- (no translation)
+--
+-- and
+--
+-- @[a, b, c, d, tx, ty]@
+--
+-- mapping to:
+--
+-- @
+-- matrix(a, b, c, d, tx, ty)
+-- @
+--
+-- (with translation by @(tx, ty)@)
+--
+-- Any other number of entries will result in a runtime error.
+matrix :: Vector Double -> Map Text Text -> Map Text Text
+matrix [a, b, c, d] = addTransform $
+  Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+matrix [a, b, c, d, tx, ty] = addTransform $
+  Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, ty, tx, 0, 1]
+matrix invalid =
+  error $ printf "Invalid matrix: %s" (show invalid)
 
 -- * Transitions
 

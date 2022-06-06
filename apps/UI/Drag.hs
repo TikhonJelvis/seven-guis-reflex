@@ -18,9 +18,9 @@ import qualified Reflex
 import           Reflex              (Dynamic, Event)
 import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes       (Angle (..), Transition (..), addClass,
-                                      classes, joinClasses, rotate, s, scale,
-                                      setClass, transition, translate)
+import           UI.Attributes       (Transition (..), addClass, classes,
+                                      joinClasses, rotate, s, scale, setClass,
+                                      transition, translate)
 import           UI.Element          (Dom, Html, el', elClass', elDynAttr')
 import           UI.Event            (Modifier (Shift), MouseButton (..),
                                       MouseEventResult (..), button, client,
@@ -28,7 +28,8 @@ import           UI.Event            (Modifier (Shift), MouseButton (..),
 import           UI.IsElement        (rawElement)
 import           UI.Main             (Runnable (..), withCss)
 import           UI.Point            (Point (..), distance)
-import           UI.Style            (getComputedProperty, setProperty)
+import           UI.Style            (Angle (..), getComputedProperty,
+                                      setProperty)
 import           UI.Widget           (Enabled (..), checkbox, enabledIf, label,
                                       labelFor, ul)
 

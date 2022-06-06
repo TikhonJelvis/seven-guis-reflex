@@ -64,7 +64,7 @@ instance Default (CardConfig t) where
 -- | Information about a card element.
 data CardElement t = CardElement
   { drags :: Drags t
-  , card  :: Cards.Card.Card
+  , card  :: Card
   }
   deriving stock (Generic)
 
@@ -91,7 +91,7 @@ draggable :: forall m t. Dom t m
           => Card
           -> CardConfig t
           -> m (CardElement t)
-draggable card@Cards.Card.Card { rank, suit } CardConfig { container, dragging, attributes } = mdo
+draggable card@Card { rank, suit } CardConfig { container, dragging, attributes } = mdo
   (element, _) <- elDynAttr' "div" attributes' do
     -- core part of card with pips or picture
     Dom.elClass "div" "center" $ cardCenter card
@@ -107,8 +107,8 @@ draggable card@Cards.Card.Card { rank, suit } CardConfig { container, dragging, 
   where classes =
           addClass "draggable" .
           addClass "card" .
-          addClass (Cards.Card.suitName suit) .
-          addClass (Cards.Card.rankName rank)
+          addClass (suitName suit) .
+          addClass (rankName rank)
 
         -- summary = do
         --   Dom.elClass "div" "rank-summary" $ Dom.text $ rankShorthand rank
@@ -116,10 +116,10 @@ draggable card@Cards.Card.Card { rank, suit } CardConfig { container, dragging, 
 
 -- | Render the center part of a card which contains either pips or a
 -- picture as appropriate.
-cardCenter :: forall m t. Dom t m => Cards.Card.Card -> m ()
-cardCenter Cards.Card.Card { rank, suit } =
+cardCenter :: forall m t. Dom t m => Card -> m ()
+cardCenter Card { rank, suit } =
   void $ image $ fromMaybe (error "Invalid URI!") $ URI.mkURI cardURI
-  where cardURI = "img/" <> Cards.Card.rankName rank <> "-" <> Cards.Card.suitName suit <> ".svg"
+  where cardURI = "img/" <> rankName rank <> "-" <> suitName suit <> ".svg"
 
 main :: IO ()
 main = withCss "css/card-demo.css" (Runnable demo)

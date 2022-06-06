@@ -2,14 +2,20 @@
 -- | An extended example of using the SVG @path@ element to draw
 -- variations on the Haskell logo.
 module UI.SVG.Haskell where
-import           Data.Hashable (Hashable)
+import           Data.Default.Class (Default (..))
+import           Data.Hashable      (Hashable)
+import           Data.Map           (Map)
+import           Data.Text          (Text)
 
-import           GHC.Generics  (Generic)
+import           GHC.Generics       (Generic)
 
-import           UI.Element    (Dom)
-import           UI.Main       (Runnable (..), withCss)
-import           UI.SVG        (Command (..), Path, Svg, h, l, path, svgAttr',
-                                v)
+import           Reflex             (Dynamic)
+
+import           UI.Element         (Dom)
+import           UI.Main            (Runnable (..), withCss)
+import           UI.Style           (scale)
+import           UI.SVG             (Command (..), Path, Svg, g_, h, l, path,
+                                     svgAttr', v)
 
 -- * Haskell Logo in SVG
 
@@ -58,22 +64,14 @@ data Haskell = Haskell
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
 
--- | Given a scale, these parameters match up the examples in the
--- Wiki, although the examples do not seem to be 100%
--- consistent. Using these parameters should give you something
--- indistinguishable from the "official" Haskell logo.
-defaultHaskell :: Double
-                  -- ^ Scaling factor, where 1 corresponds to @spacing
-                  -- = 1@, making @lambdaWidth = 3@, @height = 12@ and
-                  -- @width = 17@.
-               -> Haskell
-defaultHaskell α = Haskell
-  { lambdaWidth = 3 * α
-  , equalsWidth = 2 * α
-  , spacing = α
-  , height = 12 * α
-  , width = 17 * α
-  }
+instance Default Haskell where
+  def = Haskell
+    { lambdaWidth = 3
+    , equalsWidth = 2
+    , spacing     = 1
+    , height      = 12
+    , width       = 17
+    }
 
 -- | The four paths for each part of the Haskell logo.
 data HaskellPaths = HaskellPaths
@@ -146,19 +144,25 @@ haskellPaths Haskell {..} = HaskellPaths { leftAngle, lambda, topLine, bottomLin
         -- a function of their y position (calculated above)
         cornerX topLeft = (2 * lambdaWidth) + (2 * spacing) + ((2/3) * topLeft)
 
--- | An SVG element with paths for a Haskell logo.
+-- | An SVG group (@g@ element) with paths for a Haskell logo.
 --
 -- Shape based on the SVG + Tikz versions of the logo from the Haskell
 -- Wiki: https://wiki.haskell.org/TW-Logo-Haskell
 --
 -- Colors taken from Haskell.org logo
-haskell :: forall m t. Dom t m => Haskell -> m (Svg t)
-haskell config = fst <$> svgAttr' "svg" [] do
-  let HaskellPaths {..} = haskellPaths config
-  path (pure leftAngle) (pure [("fill", "#453a62")])
-  path (pure lambda) (pure [("fill", "#5e5086")])
-  path (pure topLine) (pure [("fill", "#8f4e8b")])
-  path (pure bottomLine) (pure [("fill", "#8f4e8b")])
+haskell :: forall m t. Dom t m
+        => Haskell
+        -> Dynamic t (Map Text Text)
+        -> m (Svg t)
+haskell config attributes = g_ attributes
+  [ path (pure leftAngle)  (pure [("fill", "#453a62")])
+  , path (pure lambda)     (pure [("fill", "#5e5086")])
+  , path (pure topLine)    (pure [("fill", "#8f4e8b")])
+  , path (pure bottomLine) (pure [("fill", "#8f4e8b")])
+  ]
+  where HaskellPaths {..} = haskellPaths config
 
 main :: IO ()
-main = withCss "css/ui-demo.css" (Runnable $ haskell $ defaultHaskell 5)
+main = withCss "css/ui-demo.css" $ Runnable do
+  svgAttr' "svg" [("viewBox", "0 0 340 340")] do
+    haskell def $ pure $ scale 8 []

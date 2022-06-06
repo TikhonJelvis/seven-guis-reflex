@@ -48,6 +48,7 @@ executable guis
   other-modules:
     Cards.Card
     Cards.Place
+    Cards.UI.Back
     Cards.UI.Card
     Cards.UI.Pile
     Seven.CircleDrawer
@@ -70,6 +71,7 @@ executable guis
     UI.PushMap
     UI.Style
     UI.SVG
+    UI.SVG.Attributes
     UI.SVG.Haskell
     UI.SVG.Path
     UI.Widget

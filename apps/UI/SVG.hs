@@ -9,11 +9,16 @@ module UI.SVG
   , svgAttr'
   , svgDynAttr'
 
-  , Stroke (..)
-  , Linecap (..)
+  , g
+  , g_
+
+  , module UI.SVG.Attributes
 
   , circle
   , Circle (..)
+
+  , rect
+  , Rectangle (..)
 
   , module UI.SVG.Path
   , path
@@ -25,8 +30,7 @@ where
 
 import           Control.Applicative (liftA2)
 
-import qualified Data.Colour         as Colour
-import           Data.Default.Class  (Default, def)
+import           Data.Foldable       (sequenceA_)
 import           Data.Hashable       (Hashable (..))
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
@@ -36,15 +40,16 @@ import           Data.Text.Display   (Display (..))
 import           GHC.Generics        (Generic)
 
 import           Reflex              (Dynamic, Reflex)
+import qualified Reflex
 import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes       (ToAttributeValue (..), ToAttributes (..),
-                                      with)
-import           UI.Color            (Color, fromColour)
+import           UI.Attributes       (RelativeLength, ToAttributeValue (..),
+                                      ToAttributes (..), with, setProperty)
 import           UI.Element          (Dom, elDynAttrNs')
 import qualified UI.Event            as Event
 import           UI.IsElement        (FromElement (..), IsElement (..))
 import           UI.Point
+import           UI.SVG.Attributes
 import           UI.SVG.Path
 
 -- * SVG Elements
@@ -62,8 +67,7 @@ instance Reflex t => Dom.HasDomEvent t (Svg t) en where
   type DomEventType (Svg t) en = Event.EventResultType en
   domEvent eventName (Svg e) = Dom.domEvent eventName e
 
-
--- ** Arbitrary Elements
+-- ** Creating Any Element
 
 -- | Create an SVG element.
 svg :: forall a m t. Dom t m
@@ -132,69 +136,41 @@ svgDynAttr' :: forall a m t. Dom t m
             -> m a
             -- ^ Body
             -> m (Svg t, a)
-svgDynAttr' = elDynAttrNs' (Just svgNamespace)
+svgDynAttr' tag attributes body = do
+  -- hack to work around what seems to be a WebKitGTK bug
+  --
+  -- without this, % in transforms and transform-origin settings don't
+  -- work when the page loads!
+  done <- Reflex.delay 0.01 =<< Dom.getPostBuild
+  after <- Reflex.delay 0.01 done
+  forceTransformBox <- Reflex.holdDyn id $
+    Reflex.leftmost [setTransformBox <$ done, id <$ after]
+  let attributes' = Reflex.zipDynWith ($) forceTransformBox attributes
+
+  elDynAttrNs' (Just svgNamespace) tag attributes' body
+  where setTransformBox = setProperty "transform-box" ""
 {-# INLINABLE svgDynAttr' #-}
 
--- ** Presentation
+-- ** Grouping
 
--- *** Stroke
+-- | A group of SVG elements.
+g :: forall a m t. Dom t m
+  => Dynamic t (Map Text Text)
+  -- ^ Attributes
+  -> [m a]
+  -- ^ SVG elements to group
+  -> m (Svg t, [a])
+g attributes = svgDynAttr' "g" attributes . sequenceA
 
--- | How to draw the lines of a shape.
-data Stroke = Stroke
-  { color    :: Color
-  , width    :: Double
-  -- ^ stroke width in px
-  , linecap  :: Linecap
-  , linejoin :: Linejoin
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (Hashable)
-
-instance Default Stroke where
-  def = Stroke
-    { color    = fromColour Colour.black
-    , width    = 0
-    , linecap  = Butt
-    , linejoin = Miter
-    }
-
-instance ToAttributes Stroke where
-  toAttributes Stroke { color, width, linecap, linejoin } =
-    [ ("stroke", toAttributeValue color)
-    , ("stroke-width", toAttributeValue width)
-    , ("linecap", toAttributeValue linecap)
-    , ("linejoin", toAttributeValue linejoin)
-    ]
-
--- | The shape at the end of lines.
-data Linecap = Butt
-             -- ^ Lines are closed with a straight edge perpendicular
-             -- to the direction of the line.
-             | Square
-             -- ^ Same as 'Butt' but extends the stroke slightly
-             -- beyond its actual path.
-             | Round
-             -- ^ The ends of a line are rounded, with the radius
-             -- determined by @stroke-width@.
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
-  deriving anyclass (Hashable)
-
-instance ToAttributeValue Linecap where
-  toAttributeValue = \case
-    Butt   -> "butt"
-    Square -> "square"
-    Round  -> "round"
-
--- | How to draw the joints between two line segments.
-data Linejoin = Miter | Round' | Bevel
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
-  deriving anyclass (Hashable)
-
-instance ToAttributeValue Linejoin where
-  toAttributeValue = \case
-    Miter  -> "miter"
-    Round' -> "round"
-    Bevel  -> "bevel"
+-- | A group of SVG elements, discarding the value returned from
+-- creating each element.
+g_ :: forall a m t. Dom t m
+   => Dynamic t (Map Text Text)
+  -- ^ Attributes
+  -> [m a]
+  -- ^ SVG elements to group
+  -> m (Svg t)
+g_ attributes = fmap fst . svgDynAttr' "g" attributes . sequenceA_
 
 -- ** Shapes
 
@@ -236,6 +212,34 @@ circle :: forall m t. Dom t m
        -> m (Svg t)
 circle circle_ attributes =
   fst <$> svgDynAttr' "circle" (liftA2 with circle_ attributes) (pure ())
+
+-- | A rectangle specified as a point along with a width and a height.
+data Rectangle = Rectangle
+  { height :: RelativeLength
+  , width  :: RelativeLength
+  , x      :: RelativeLength
+  , y      :: RelativeLength
+  }
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+
+instance ToAttributes Rectangle where
+  toAttributes Rectangle { x, y, width, height } =
+    [ ("width", toAttributeValue width)
+    , ("height", toAttributeValue height)
+    , ("x", toAttributeValue x)
+    , ("y", toAttributeValue y)
+    ]
+
+rect :: forall m t. Dom t m
+     => Dynamic t Rectangle
+     -- ^ Position and dimensions
+     -> Dynamic t (Map Text Text)
+     -- ^ Additional attributes. The 'Rectangle' argument will
+     -- override @x@, @y@, @width@ and @height@ here.
+     -> m (Svg t)
+rect rectangle attributes =
+  fst <$> svgDynAttr' "rect" (liftA2 with rectangle attributes) (pure ())
 
 -- *** Paths
 
