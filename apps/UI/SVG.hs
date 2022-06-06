@@ -11,6 +11,9 @@ module UI.SVG
 
   , g
   , g_
+  , defs
+  , use
+  , pattern_
 
   , module UI.SVG.Attributes
 
@@ -23,14 +26,24 @@ module UI.SVG
   , module UI.SVG.Path
   , path
 
+  , Stop (..)
+  , linear
+  , linearPath
+  , radial
+  , radialPath
+  , Spread (..)
+  , GradientUnits (..)
+
   , svgAttribute
   , svgAttributes
   )
 where
 
 import           Control.Applicative (liftA2)
+import           Control.Monad       (forM)
 
 import           Data.Foldable       (sequenceA_)
+import           Data.Functor        ((<&>))
 import           Data.Hashable       (Hashable (..))
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
@@ -40,11 +53,12 @@ import           Data.Text.Display   (Display (..))
 import           GHC.Generics        (Generic)
 
 import           Reflex              (Dynamic, Reflex)
-import qualified Reflex
 import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes       (RelativeLength, ToAttributeValue (..),
-                                      ToAttributes (..), with, setProperty)
+import           UI.Attributes       (RelativeLength, ShowLowercase (..),
+                                      ToAttributeValue (..), ToAttributes (..),
+                                      href, id_, with)
+import           UI.Color            (Color)
 import           UI.Element          (Dom, elDynAttrNs')
 import qualified UI.Event            as Event
 import           UI.IsElement        (FromElement (..), IsElement (..))
@@ -137,18 +151,7 @@ svgDynAttr' :: forall a m t. Dom t m
             -- ^ Body
             -> m (Svg t, a)
 svgDynAttr' tag attributes body = do
-  -- hack to work around what seems to be a WebKitGTK bug
-  --
-  -- without this, % in transforms and transform-origin settings don't
-  -- work when the page loads!
-  done <- Reflex.delay 0.01 =<< Dom.getPostBuild
-  after <- Reflex.delay 0.01 done
-  forceTransformBox <- Reflex.holdDyn id $
-    Reflex.leftmost [setTransformBox <$ done, id <$ after]
-  let attributes' = Reflex.zipDynWith ($) forceTransformBox attributes
-
-  elDynAttrNs' (Just svgNamespace) tag attributes' body
-  where setTransformBox = setProperty "transform-box" ""
+  elDynAttrNs' (Just svgNamespace) tag attributes body
 {-# INLINABLE svgDynAttr' #-}
 
 -- ** Grouping
@@ -171,6 +174,94 @@ g_ :: forall a m t. Dom t m
   -- ^ SVG elements to group
   -> m (Svg t)
 g_ attributes = fmap fst . svgDynAttr' "g" attributes . sequenceA_
+
+-- | Define elements that are not rendered immediately, but can be
+-- used in other parts of the SVG (ie with 'use').
+--
+-- __Examples__
+--
+-- Define and use an element:
+--
+-- @
+-- do
+--   defs [("myElement",
+--          circle (pure Circle { center = Point 0 0, radius = 5 }))
+--        ]
+--   use "myElement" (pure [("x", "10"), ("y", "4")])
+-- @
+--
+-- Define a pattern and use it to fill an element:
+--
+-- @
+-- do
+--   let c = circle (pure (Circle 0 10)) (pure $ fill "#fff")
+--   defs [("bg", \ attrs -> pattern_ attrs c)]
+--   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
+-- @
+defs :: forall a m t. Dom t m
+     => Map Text (Dynamic t (Map Text Text) -> m a)
+     -- ^ A map from ids to functions that take attributes and create
+     -- elements.
+     -> m (Map Text a)
+defs (Map.toList -> definitions) =
+  snd <$> svg' "defs" do
+    Map.fromList <$> forM definitions \ (name, f) -> do
+      result <- f (pure $ with (id_ name) [])
+      pure (name, result)
+
+-- | Use an element defined elsewhere in the current document,
+-- referenced by id.
+--
+-- __Examples__
+--
+-- Define and use an element:
+--
+-- @
+-- do
+--   defs [("myElement",
+--          circle (pure Circle { center = Point 0 0, radius = 5 }) (pure []))
+--        ]
+--   use "myElement" (pure [("x", "10"), ("y", "4")])
+-- @
+use :: forall m t. Dom t m
+    => Text
+    -- ^ The id of the element to use
+    -> Dynamic t (Map Text Text)
+    -- ^ Other attributes of the @use@ tag. An @href@ set here will be
+    -- overridden.
+    --
+    -- Note that /most/ attributes will be the same as the element
+    -- being used—only @x@, @y@, @width@ and @height@ will have any
+    -- effect.
+    --
+    -- See MDN:
+    -- [use](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use)
+    -> m (Svg t)
+use element attributes = fst <$> svgDynAttr' "use"
+  (with (href $ "#" <> element) <$> attributes)
+  (pure ())
+
+-- | A @pattern@ element defines an object that can be tiled along x-
+-- and y-coordinate intervals.
+--
+-- __Example__
+--
+-- A rectangle tiled with white circles:
+--
+-- @
+-- do
+--   let c = circle (pure (Circle 0 10)) (pure $ fill "#fff")
+--   defs [("bg", \ attrs -> pattern_ attrs c)]
+--   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
+-- @
+pattern_ :: forall a m t. Dom t m
+         => Dynamic t (Map Text Text)
+         -- ^ Attributes
+         -> m a
+         -- ^ Pattern contents
+         -> m a
+pattern_ attributes body =
+  snd <$> svgDynAttr' "pattern" attributes body
 
 -- ** Shapes
 
@@ -215,8 +306,8 @@ circle circle_ attributes =
 
 -- | A rectangle specified as a point along with a width and a height.
 data Rectangle = Rectangle
-  { height :: RelativeLength
-  , width  :: RelativeLength
+  { width  :: RelativeLength
+  , height :: RelativeLength
   , x      :: RelativeLength
   , y      :: RelativeLength
   }
@@ -231,6 +322,7 @@ instance ToAttributes Rectangle where
     , ("y", toAttributeValue y)
     ]
 
+-- | Create a retangle (@rect@ element).
 rect :: forall m t. Dom t m
      => Dynamic t Rectangle
      -- ^ Position and dimensions
@@ -240,8 +332,6 @@ rect :: forall m t. Dom t m
      -> m (Svg t)
 rect rectangle attributes =
   fst <$> svgDynAttr' "rect" (liftA2 with rectangle attributes) (pure ())
-
--- *** Paths
 
 -- | The @path@ element with a dynamic @d@ attribute.
 path :: forall m t. Dom t m
@@ -254,6 +344,159 @@ path :: forall m t. Dom t m
      -> m (Svg t)
 path d attributes =
   fst <$> svgDynAttr' "path" (liftA2 with d attributes) (pure ())
+
+-- ** Gradients
+
+-- $ SVG supports __linear__ and __radial__ gradients.
+--
+-- Gradients are specified as a series of __stops__ which define the
+-- colors to transition between along the length of the gradient.
+--
+-- A gradient is not rendered by itself; it needs to be used as the
+-- @stroke@ or @fill@ property of another element. The best way to do
+-- this is by defining gradients in a 'defs' block and using
+-- 'paintWith':
+--
+-- @
+-- do
+--   let stops = [Stop 0 "#fff", Stop 0.5 "#000", Stop 1 "#fff"]
+--
+--   defs
+--     [ ("myLinear", linear (pure stops))
+--     , ("myRadial", radial (pure stops))
+--     ]
+--
+--  let sample x y attributes = rect (pure $ r x y) (pure attributes)
+--      r x y = Rectangle
+--        { height = px 100, width = px 100, x = px x, y = px y }
+--  sample 0 0 (fill $ paintWith "myLinear")
+--  sample 110 110 (fill $ paintWith "myRadial")
+-- @
+
+-- | A gradient is made up of multiple __stops__ that specify the
+-- color to transition part of the way through the gradient.
+data Stop = Stop
+  { offset :: Double
+    -- ^ A number between 0 and 1 specifying how far along the
+    -- gradient to position the stop.
+  , color  :: Color
+    -- ^ The color for this stop.
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
+
+-- TODO: special handling for stop-opacity?
+instance ToAttributes Stop where
+  toAttributes Stop { offset, color } =
+    [ ("offset", toAttributeValue offset)
+    , ("stop-color", toAttributeValue color)
+    ]
+
+-- | A linear gradient, transitioning between stops along a straight
+-- line.
+--
+-- __Examples__
+--
+--
+linear :: forall m t. Dom t m
+       => Dynamic t [Stop]
+       -- ^ Gradient stops
+       -> Dynamic t (Map Text Text)
+       -- ^ Attributes
+       -> m (Svg t)
+linear stops attributes =
+  fst <$> svgDynAttr' "linearGradient" attributes (dynStops stops)
+
+-- | The start and end points of the line that a linear gradient
+-- follows.
+linearPath :: Point
+           -- ^ point corresponding to @offset = 0@
+           -> Point
+           -- ^ point corresponding to @offset = 1@
+           -> Map Text Text
+linearPath Point { x = x₁, y = y₁ } Point { x = x₂, y = y₂ } =
+  [ ("x1", toAttributeValue x₁), ("y1", toAttributeValue y₁)
+  , ("x2", toAttributeValue x₂), ("y2", toAttributeValue y₂)
+  ]
+
+-- | A radial gradient which transitions colors from a center point
+-- (@offset = 0@) out in a circle up to some radius (@offset = 1@).
+radial :: forall m t. Dom t m
+       => Dynamic t [Stop]
+       -- ^ Gradient stops
+       -> Dynamic t (Map Text Text)
+       -- ^ Attributes
+       -> m (Svg t)
+radial stops attributes =
+  fst <$> svgDynAttr' "radialGradient" attributes (dynStops stops)
+
+  -- TODO: handle changing focal point/etc
+-- | The center and radius for the circle covered by a radial
+-- gradient.
+radialPath :: Point
+           -- ^ center of the circle, corresponding to @offset = 0@
+           -> Double
+           -- ^ radius of the circle; @offset = 1@ at points at least
+           -- @radius@ away from @center@
+           -> Map Text Text
+radialPath Point { x, y } r =
+  [("cx", toAttributeValue x), ("cy", toAttributeValue y), ("r", toAttributeValue r)]
+
+-- | A dynamic set of @stop@ elements.
+dynStops :: forall m t. Dom t m
+         => Dynamic t [Stop]
+         -> m ()
+dynStops stops = Dom.dyn_ $ stops <&> mapM_ \ stop ->
+  svgAttr' "stop" (toAttributes stop) (pure ())
+
+-- | How a gradient should behave outside of its bounds—what to do
+-- when @offset@ would logically be below 0 or above 1?
+data Spread = Pad
+              -- ^ Fill out the remainder of the space with a solid
+              -- color from @offset = 0@ or @offset = 1@ as
+              -- appropriate.
+
+            | Reflect
+              -- ^ Render the gradient /inverted/ (ie treat the offset
+              -- as @1 - offset@).
+
+            | Repeat
+              -- ^ Repeat the gradient, resetting @offset@ to @0..1@.
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+  deriving ToAttributeValue via ShowLowercase Spread
+
+instance ToAttributes Spread where
+  toAttributes spread = [("spreadMethod", toAttributeValue spread)]
+
+-- | The coordinate system for a gradient.
+--
+-- This defines how gradient coordinates are translated to actual
+-- coordinates when the gradient is used.
+data GradientUnits = UserSpaceOnUse
+                     -- ^ Use the __user coordinates__ at the time and
+                     -- place the gradient is applied.
+                     --
+                     -- Percentage values are computed relative to the
+                     -- /current SVG viewport/.
+
+                   | ObjectBoundingBox
+                     -- ^ Use coordinates defined based on the
+                     -- /bounding box/ of the element the gradient
+                     -- applies to.
+                     --
+                     -- Percentage values are computed relative to the
+                     -- bounding box.
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+
+instance ToAttributeValue GradientUnits where
+  toAttributeValue = \case
+    UserSpaceOnUse -> "userSpaceOnUse"
+    ObjectBoundingBox -> "objectBoundingBox"
+
+instance ToAttributes GradientUnits where
+  toAttributes units = [("gradientUnits", toAttributeValue units)]
 
 -- * SVG Namespace
 

@@ -3,6 +3,9 @@ module UI.SVG.Attributes where
 import qualified Data.Colour        as Colour
 import           Data.Default.Class (Default (..))
 import           Data.Hashable      (Hashable)
+import           Data.Map           (Map)
+import           Data.String        (IsString (..))
+import           Data.Text          (Text)
 
 import           GHC.Generics       (Generic)
 
@@ -10,6 +13,12 @@ import           UI.Attributes      (ToAttributeValue (..), ToAttributes (..))
 import           UI.Color           (Color, fromColour)
 
 -- * Presentation
+
+-- ** Fill
+
+-- | Set the @fill@ property of an element.
+fill :: Paint -> Map Text Text
+fill paint = [("fill", toAttributeValue paint)]
 
 -- ** Stroke
 
@@ -40,7 +49,9 @@ instance ToAttributes Stroke where
     , ("linejoin", toAttributeValue linejoin)
     ]
 
--- ** Linecap
+-- | Set just the @stroke@ attribute.
+stroke :: Paint -> Map Text Text
+stroke paint = [("stroke", toAttributeValue paint)]
 
 -- | The shape at the end of lines.
 data Linecap = Butt
@@ -71,3 +82,62 @@ instance ToAttributeValue Linejoin where
     Miter  -> "miter"
     Round' -> "round"
     Bevel  -> "bevel"
+
+-- ** Paint
+
+-- | How to render the @fill@ or @stroke@ of an element.
+data Paint = None
+           -- ^ Do not render the fill or stroke
+
+           | Color Color
+           -- ^ A solid color
+
+             -- TODO: structured URL type?
+           | Url Text (Maybe Color)
+           -- ^ A URL referencing a "paint server": a
+           -- @linearGradient@, @pattern@ or @radialGradient@
+
+           | ContextFill
+           -- ^ Use the @fill@ from a __context element__
+
+           | ContextStroke
+           -- ^ Use the @stroke@ from a __context element__
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
+
+instance ToAttributeValue Paint where
+  toAttributeValue = \case
+    None                  -> "none"
+    Color c               -> toAttributeValue c
+    Url u Nothing         -> url u
+    Url u (Just fallback) -> url u <> " " <> toAttributeValue fallback
+    ContextFill           -> "context-fill"
+    ContextStroke         -> "context-stroke"
+    where url u = "url(" <> u <> ")"
+
+-- | @"#fff"@/etc for colors, @"none"@ for 'None', @"context-fill"@ and @"context-stroke"@
+--
+-- use 'Url' constructor for URLs
+instance IsString Paint where
+  fromString = \case
+    "none"           -> None
+    "context-fill"   -> ContextFill
+    "context-stroke" -> ContextStroke
+    c                -> Color $ fromString c
+
+-- | A paint referencing a /paint server/ with the given id and no
+-- fallback.
+--
+-- >>> paintWith "myCircle"
+-- Url "#myCircle" Nothing
+--
+-- Works well with 'defs':
+--
+-- @
+-- do
+--   let c = circle (pure (Circle 0 10)) (pure $ fill "#fff")
+--   defs [("bg", \ attrs -> pattern_ attrs c)]
+--   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
+-- @
+paintWith :: Text -> Paint
+paintWith id_ = Url ("#" <> id_) Nothing

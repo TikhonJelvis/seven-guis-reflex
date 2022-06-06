@@ -37,3 +37,11 @@
   border-radius: inherit;
   border: 10px solid white;
 }
+
+.card .back-design > svg {
+  height: 100%;
+  width: 100%;
+
+  border-radius: inherit;
+  border: 1px solid black;
+}

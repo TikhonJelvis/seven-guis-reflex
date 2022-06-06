@@ -3,6 +3,9 @@ module UI.Attributes
   , ToAttributeValue (..)
   , with
 
+  , href
+  , id_
+
   , hasClass
   , addClass
   , setClass
@@ -37,7 +40,8 @@ module UI.Attributes
 
   , isHtmlWhitespace
   , htmlWhitespace
-  )
+
+  , ShowLowercase (..))
 where
 
 import           Data.Bool     (bool)
@@ -79,6 +83,16 @@ instance ToAttributeValue Int where toAttributeValue = Text.pack . show
 instance ToAttributeValue Double where toAttributeValue = Text.pack . show
 
 -- * Specific Attributes
+
+-- | The @href@ attribute used for referencing URIs in hyperlinks and
+-- other elements.
+href :: Text -> Map Text Text
+href url = [("href", url)]
+
+-- | The @id@ attribute of an element. Should be unique across the
+-- entire document.
+id_ :: Text -> Map Text Text
+id_ elementId = [("id", elementId)]
 
 -- ** Classes
 
@@ -231,3 +245,21 @@ isHtmlWhitespace c = c `elem` htmlWhitespace
 --
 htmlWhitespace :: Set Char
 htmlWhitespace = [' ', '\t', '\n', '\f', '\r']
+
+-- * Deriving Via
+
+-- | A type for deriving 'ToAttributeValue' by lowercasing the type's
+-- 'show' function.
+--
+-- __Example__
+--
+-- @
+-- data Spread = Pad | Reflect | Repeat
+--   deriving stock (Show)
+--   deriving ToAttributeValue via (ShowLowercase Spread)
+-- @
+newtype ShowLowercase a = ShowLowercase a
+
+instance Show a => ToAttributeValue (ShowLowercase a) where
+  toAttributeValue (ShowLowercase a) =
+    Text.toLower $ Text.pack $ show a

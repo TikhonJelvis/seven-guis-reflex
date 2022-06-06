@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 -- | Functions for rendering (hopefully) nice-looking card backs.
 module Cards.UI.Back where
 
@@ -7,24 +8,27 @@ import           Data.Default.Class (def)
 import           Data.Map           (Map)
 import           Data.Maybe         (isJust)
 import           Data.Text          (Text)
+import qualified Data.Text          as Text
 
-import qualified Reflex
-import           Reflex             (Dynamic, Reflex (Event))
+import           Reflex             (Dynamic)
 import qualified Reflex.Dom         as Dom
 
-import           UI.Attributes      (addClass, addTransform, setClass,
-                                     setProperty)
+import           Text.Printf        (printf)
+
+import           UI.Attributes      (ToAttributes (toAttributes), addClass,
+                                     setClass, setProperty, with)
 import qualified UI.Drag            as Drag
 import           UI.Drag            (DragConfig (..), Drags (..))
 import           UI.Element         (Dom, Html, elClass', elDynAttr')
 import           UI.Main            (Runnable (..), withCss)
 import           UI.Point           (Point (..))
-import           UI.Style           (Angle (..), Transform (..), addTransform,
-                                     flipAround, matrix, px, rotate, scale,
+import           UI.Style           (Angle (..), flipAround, rotate, scale,
                                      translate)
-import           UI.SVG             (Circle (..), Rectangle (..), circle, g_,
-                                     rect, svgAttr')
-import           UI.SVG.Haskell     (haskell)
+import           UI.SVG             (GradientUnits (..), Rectangle (..),
+                                     Stop (..), defs, g_, path, radial,
+                                     radialPath, rect, svgAttr')
+import           UI.SVG.Attributes  (Stroke (..), fill, paintWith)
+import           UI.SVG.Haskell     (HaskellPaths (..), haskellPaths)
 import           UI.Widget          (Enabled (..), label)
 
 demo :: forall m t. Dom t m => m ()
@@ -64,39 +68,56 @@ back container dragging attributes backDesign = mdo
 -- | A card back design based on the Haskell logo.
 haskellBack :: forall m t. Dom t m => m ()
 haskellBack = mdo
-  void $ svgAttr' "svg" container do
-    centerLogo (pure [])
-    rect (pure Rectangle { height = "100%", width = px 1, x = "50%", y = "0" }) (pure [])
-    rect (pure Rectangle { height = px 1, width = "100%", x = "0", y = "50%" }) (pure [])
-  where centerLogo attributes = void $ svgAttr' "svg" centerAttrs do
-          pair attributes
-          pair attributes
+  void $ svgAttr' "svg" [("viewBox", "-100 -300 200 600")] do
+    defs [ ("lambda", path (pure lambda) . fmap (with $ fill "#fff"))
+         , ("background", backgroundGradient)
+         ]
 
-        pair attributes = g_ (transformSettings <$> attributes)
-          [ logo $ translate' "0" "-50%" <$> attributes
-          , logo $ flipAround (Deg 0) . translate' "-100%" "-50%" <$> attributes
+    -- background
+    let background = with (fill $ paintWith "background") []
+    rect (pure $ Rectangle "400" "600" "-200" "-300") (pure background)
+
+    -- center logo
+    g_ (pure $ scale 6 [])
+      [ pair (translate $ Point 0 (-12))
+      , pair (flipAround (Deg 90) . translate (Point 0 12))
+      ]
+
+  where backgroundGradient =
+          radial (pure stops) .
+          fmap (with (radialPath 0 400) . with UserSpaceOnUse)
+          where stops =
+                  [ Stop 0 "#000000"
+                  , Stop 0.7 "#453a62"
+                  , Stop 1 "#5e5086"
+                  ]
+
+        -- WebKitGTK was not handling transform-origin or %
+        -- measurments for dimensions correctly, so the code has some
+        -- hardcoded numbers to work around that
+        --
+        -- each logo is 17 units wide and 12 units tall, everything
+        -- else is based on that
+
+        pair f = g_ (pure $ f [])
+          [ logo (pure [])
+          , logo $ pure $ translate (Point 17 0) $ flipAround (Deg 0) []
           ]
 
-        logo attributes = haskell def $
-          rotate (Deg 20) . transformSettings <$> attributes
-
-        centerAttrs =
-          [ ("viewBox", "-100 -30 200 60")
-          , ("height", "120px")
-          , ("width", "340px")
-          , ("x", "0")
-          , ("y", "0")
+        logo attributes = g_ (rotate (Deg 20) . origin 8.5 6 <$> attributes)
+          [ path (pure leftAngle)  (logoPart "#fff")
+          , path (pure lambda)     (logoPart "#fff")
+          , path (pure topLine)    (logoPart "#fff")
+          , path (pure bottomLine) (logoPart "#fff")
           ]
+        HaskellPaths {..} = haskellPaths def
 
-        translate' x y = addTransform (Translate x y "0")
+        logoPart color = pure $
+          fill "none" <> toAttributes def { width = 0.25, color }
 
-        container =
-          setProperty "height" "100%" $
-          setProperty "width" "100%"
-          []
-
-        transformSettings =
-          setProperty "transform-origin" "center" .
+        origin :: Double -> Double -> Map Text Text -> Map Text Text
+        origin x y =
+          setProperty "transform-origin" (Text.pack $ printf "%fpx %fpx" x y) .
           setProperty "transform-box" "fill-box"
 
 main :: IO ()
