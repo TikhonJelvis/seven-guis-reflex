@@ -22,12 +22,14 @@ import           UI.Drag            (DragConfig (..), Drags (..))
 import           UI.Element         (Dom, Html, elClass', elDynAttr')
 import           UI.Main            (Runnable (..), withCss)
 import           UI.Point           (Point (..))
-import           UI.Style           (Angle (..), flipAround, rotate, scale,
+import           UI.Style           (Angle (..), flipAround, px, rotate, scale,
                                      translate)
-import           UI.SVG             (GradientUnits (..), Rectangle (..),
-                                     Stop (..), defs, g_, path, radial,
-                                     radialPath, rect, svgAttr')
-import           UI.SVG.Attributes  (Stroke (..), fill, paintWith)
+import           UI.SVG             (Command (..), GradientUnits (..),
+                                     Rectangle (..), Stop (..), a, defs, g_, h,
+                                     m, path, pattern_, radial, radialPath,
+                                     rect, svgAttr', use, v)
+import           UI.SVG.Attributes  (FillRule (..), Stroke (..), fill,
+                                     paintWith, stroke)
 import           UI.SVG.Haskell     (HaskellPaths (..), haskellPaths)
 import           UI.Widget          (Enabled (..), label)
 
@@ -69,13 +71,20 @@ back container dragging attributes backDesign = mdo
 haskellBack :: forall m t. Dom t m => m ()
 haskellBack = mdo
   void $ svgAttr' "svg" [("viewBox", "-100 -300 200 600")] do
-    defs [ ("lambda", path (pure lambda) . fmap (with $ fill "#fff"))
+    defs [ ("small-lambda", smallLambda)
+         , ("lambda-tile", lambdaTile)
+         , ("lambda-pattern", lambdaPattern)
          , ("background", backgroundGradient)
          ]
 
     -- background
     let background = with (fill $ paintWith "background") []
     rect (pure $ Rectangle "400" "600" "-200" "-300") (pure background)
+
+    aroundLogo 400 600 110 $ pure $
+      translate (Point (-200) (-300)) $
+      with EvenOdd $
+      stroke "none" <> fill (paintWith "lambda-pattern")
 
     -- center logo
     g_ (pure $ scale 6 [])
@@ -87,9 +96,11 @@ haskellBack = mdo
           radial (pure stops) .
           fmap (with (radialPath 0 400) . with UserSpaceOnUse)
           where stops =
-                  [ Stop 0 "#000000"
-                  , Stop 0.7 "#453a62"
-                  , Stop 1 "#5e5086"
+                  [ Stop 0    "#000000"
+                  , Stop 0.25 "#251a42"
+                  , Stop 0.5  "#453a62"
+                  , Stop 0.75 "#5e5086"
+                  , Stop 1    "#8f4e8b"
                   ]
 
         -- WebKitGTK was not handling transform-origin or %
@@ -105,15 +116,65 @@ haskellBack = mdo
           ]
 
         logo attributes = g_ (rotate (Deg 20) . origin 8.5 6 <$> attributes)
-          [ path (pure leftAngle)  (logoPart "#fff")
-          , path (pure lambda)     (logoPart "#fff")
-          , path (pure topLine)    (logoPart "#fff")
-          , path (pure bottomLine) (logoPart "#fff")
+          [ path (pure leftAngle)  $ logoPart (fill "#fff7")
+          , path (pure lambda)     $ logoPart (fill "#fff6")
+          , path (pure topLine)    $ logoPart (fill "#fff5")
+          , path (pure bottomLine) $ logoPart (fill "#fff5")
           ]
         HaskellPaths {..} = haskellPaths def
 
-        logoPart color = pure $
-          fill "none" <> toAttributes def { width = 0.25, color }
+        logoPart attrs = pure $ attrs <> toAttributes def { width = 0.4, color = "#fff" }
+
+        -- a path /around/ the logo in the center—a rectangle with a
+        -- circle of the given radius removed from the center
+        --
+        -- using the EvenOdd fill rule will fill the rectangle but not
+        -- the circle in the middle
+        aroundLogo width height radius = path $ pure
+          [ M 0 0
+          , v height
+          , h width
+          , v (-height)
+          , h (-width)
+
+          , M (width / 2) (height / 2)
+          , m radius 0
+          , a radius radius 0 True True (-2 * radius) 0
+          , a radius radius 0 True True (2 * radius) 0
+          , Z
+          ]
+
+        smallLambda attributes = path (pure lambda) $
+          with (def { color = "#fff", width = 0.75 }) .
+          with (fill $ paintWith "background") <$> attributes
+
+        -- a quadrant of lambdas facing up and down to be tiled:
+        --
+        -- ↑↓
+        -- ↓↑
+        lambdaTile attributes = g_ attributes
+          [ top []
+          , bottom (translate (Point (-1) 14) [])
+          ]
+          where λ f = use "small-lambda" (pure $ f $ origin 8 6 [])
+                top attrs = g_ (pure attrs)
+                  [ λ id
+                  , λ (flipAround (Deg 90) . translate (Point 8 0))
+                  , λ (translate (Point 16 0))
+                  ]
+                bottom attrs = g_ (pure attrs)
+                  [ λ (rotate (Deg 180) . translate (Point 0 0))
+                  , λ (flipAround (Deg 0) . translate (Point 8 0))
+                  , λ (rotate (Deg 180) . translate (Point 16 0))
+                  ]
+
+        lambdaPattern attributes =
+          fst <$> pattern_ attributes' (lambdaTile $ pure [])
+          where attributes' = (base <>) <$> attributes
+                base = [ ("viewBox", "6 0 16 28")
+                       , ("width", "12%")
+                       , ("height", "14%")
+                       ]
 
         origin :: Double -> Double -> Map Text Text -> Map Text Text
         origin x y =

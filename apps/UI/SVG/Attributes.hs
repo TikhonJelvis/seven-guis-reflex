@@ -9,7 +9,8 @@ import           Data.Text          (Text)
 
 import           GHC.Generics       (Generic)
 
-import           UI.Attributes      (ToAttributeValue (..), ToAttributes (..))
+import           UI.Attributes      (AsAttribute (..), ShowLowercase (..),
+                                     ToAttributeValue (..), ToAttributes (..))
 import           UI.Color           (Color, fromColour)
 
 -- * Presentation
@@ -19,6 +20,31 @@ import           UI.Color           (Color, fromColour)
 -- | Set the @fill@ property of an element.
 fill :: Paint -> Map Text Text
 fill paint = [("fill", toAttributeValue paint)]
+
+             -- TODO: illustrated examples
+-- | The algorithm for filling complex shapes.
+--
+-- To determine whether a point is "inside" a complex path, we draw a
+-- ray from that point and look at how often it crosses the path
+-- left-to-right (@ltr@) and right-to-left (@rtl@). Then we apply the
+-- 'FillRule' to /the difference between the two/ (@ltr - rtl@) to
+-- determine whether the point counts as "inside" the path.
+--
+-- Note: this means that the order of points you specify in a path can
+-- affect which points count as "inside" and "outside", even if the
+-- path defines the same shape.
+--
+-- See MDN:
+-- [fill-rule](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule)
+data FillRule = NonZero
+              -- ^ A point counts as "inside" if @ltr - rtl ≠ 0@.
+              | EvenOdd
+              -- ^ A point counts as "inside" if @ltr - rtl@ is odd
+              -- and outside if @ltr - rtl@ is even.
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+  deriving ToAttributeValue via ShowLowercase FillRule
+  deriving ToAttributes via AsAttribute "fill-rule" FillRule
 
 -- ** Stroke
 

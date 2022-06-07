@@ -259,9 +259,8 @@ pattern_ :: forall a m t. Dom t m
          -- ^ Attributes
          -> m a
          -- ^ Pattern contents
-         -> m a
-pattern_ attributes body =
-  snd <$> svgDynAttr' "pattern" attributes body
+         -> m (Svg t, a)
+pattern_ = svgDynAttr' "pattern"
 
 -- ** Shapes
 

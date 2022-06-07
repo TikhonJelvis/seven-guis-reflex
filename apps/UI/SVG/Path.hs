@@ -4,7 +4,6 @@
 -- manipulating paths.
 module UI.SVG.Path where
 
-import           Data.Bool     (bool)
 import           Data.Hashable (Hashable)
 import qualified Data.Text     as Text
 
@@ -19,6 +18,7 @@ import           UI.Attributes (ToAttributeValue (..), ToAttributes (..))
 newtype Path = Path { toCommands :: [Command] }
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
+  deriving newtype (Semigroup, Monoid)
 
 instance IsList Path where
   type Item Path = Command
@@ -254,12 +254,10 @@ instance ToAttributeValue Command where
     T x y                      -> printf "T %f,%f" x y
     T' x y                     -> printf "t %f,%f" x y
     A rx ry θ large sweep x y  ->
-      printf "A %f %f %f %f %f,%f" rx ry θ (toF large) (toF sweep) x y
+      printf "A %f %f %f %d %d %f %f" rx ry θ (fromEnum large) (fromEnum sweep) x y
     A' rx ry θ large sweep x y ->
-      printf "a %f %f %f %f %f,%f" rx ry θ (toF large) (toF sweep) x y
+      printf "a %f %f %f %d %d %f %f" rx ry θ (fromEnum large) (fromEnum sweep) x y
     Z                          -> "Z"
-    where toF :: Bool -> Double
-          toF = bool 0 1
 
 -- | Apply a function to every point in the command (+ @rx@ and @ry@
 -- for elliptic curves).
