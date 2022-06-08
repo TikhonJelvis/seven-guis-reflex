@@ -24,6 +24,8 @@ import qualified GHCJS.DOM.WheelEvent        as WheelEvent
 
 import qualified Language.Javascript.JSaddle as Js
 
+import           Linear                      (V2 (..))
+
 import qualified Reflex
 import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (HasDomEvent, Reflex)
@@ -31,7 +33,6 @@ import           Reflex.Dom                  (HasDomEvent, Reflex)
 import           Text.Printf                 (printf)
 
 import           UI.IsElement                (IsElement (..))
-import           UI.Point
 
 -- * Types of Events
 
@@ -183,20 +184,20 @@ data MouseButton = Main
 
 -- | Information from when the event triggered.
 data MouseEventResult = MouseEventResult
-  { screen    :: !Point
+  { screen    :: !(V2 Double)
   -- ^ The cursor position in global (screen) coordinates.
 
-  , client    :: !Point
+  , client    :: !(V2 Double)
   -- ^ The cursor position in local (DOM content) coordinates.
 
-  , movement  :: !Point
+  , movement  :: !(V2 Double)
   -- ^ The cursor position relative to the last 'Dom.Mousemove'
   -- event.
   --
   -- Warning: this currently does not seem to work correctly on
   -- WebkitGtk, instead providing the same numbers as 'client'.
 
-  , offset    :: !Point
+  , offset    :: !(V2 Double)
   -- ^ The cursor position relative to the element of the event's
   -- target node. The relative position is calculated relative to the
   -- position of the padding edge of the target node.
@@ -221,10 +222,10 @@ data MouseEventResult = MouseEventResult
 -- | Build a 'MouseEvent' out of a raw JS mouse event.
 mouseEvent :: Js.MonadJSM m => MouseEvent.MouseEvent -> m MouseEventResult
 mouseEvent e = do
-  screen   <- point <$> MouseEvent.getScreenX e   <*> MouseEvent.getScreenY e
-  client   <- point <$> MouseEvent.getClientX e   <*> MouseEvent.getClientY e
-  movement <- point <$> MouseEvent.getMovementX e <*> MouseEvent.getMovementY e
-  offset   <- point <$> MouseEvent.getOffsetX e   <*> MouseEvent.getOffsetY e
+  screen   <- v2 <$> MouseEvent.getScreenX e   <*> MouseEvent.getScreenY e
+  client   <- v2 <$> MouseEvent.getClientX e   <*> MouseEvent.getClientY e
+  movement <- v2 <$> MouseEvent.getMovementX e <*> MouseEvent.getMovementY e
+  offset   <- v2 <$> MouseEvent.getOffsetX e   <*> MouseEvent.getOffsetY e
 
   ctrl  <- MouseEvent.getCtrlKey e
   shift <- MouseEvent.getShiftKey e
@@ -244,6 +245,7 @@ mouseEvent e = do
 
   pure MouseEventResult
     { screen, client, movement, offset, modifiers, button }
+  where v2 x y = V2 (fromIntegral x) (fromIntegral y)
 
 -- ** Wheel Events
 

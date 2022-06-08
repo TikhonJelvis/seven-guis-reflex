@@ -44,6 +44,8 @@ import qualified GHCJS.DOM.Types             as GHCJS
 
 import           Language.Javascript.JSaddle (MonadJSM)
 
+import           Linear                      (V2 (..))
+
 import qualified Reflex
 import           Reflex                      (Dynamic, Reflex)
 import qualified Reflex.Dom                  as Dom
@@ -54,7 +56,6 @@ import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
 import qualified UI.Event                    as Event
 import           UI.IsElement                (FromElement (..), IsElement (..),
                                               IsHtml (..), IsHtmlInput (..))
-import           UI.Point
 
 type PerformJS d m = ( MonadFix m
                      , MonadJSM m
@@ -225,7 +226,7 @@ setAttribute attribute value (rawElement -> element) = case value of
 
 -- | The position and dimensions of a rectangle on the screen.
 data Rectangle = Rectangle
-  { position :: !Point
+  { position :: !(V2 Double)
   -- ^ The x and y coordinates of the rectangle's top-left corner in
   -- px.
 
@@ -243,18 +244,18 @@ data Rectangle = Rectangle
 --
 -- Returns 'Nothing' if the rectangles do not overlap.
 --
--- >>> let r₁ = Rectangle (Point 5 10) 20 30
--- >>> let r₂ = Rectangle (Point 10 15) 16 20
+-- >>> let r₁ = Rectangle (V2 5 10) 20 30
+-- >>> let r₂ = Rectangle (V2 10 15) 16 20
 -- >>> overlap r₁ r₂
--- Just (Rectangle {position = Point {x = 10.0, y = 15.0}, width = 15.0, height = 20.0})
+-- Just (Rectangle {position = V2 10.0 15.0, width = 15.0, height = 20.0})
 --
--- >>> let r₁ = Rectangle (Point 5 10) 20 30
--- >>> let r₂ = Rectangle (Point 26 15) 16 20
+-- >>> let r₁ = Rectangle (V2 5 10) 20 30
+-- >>> let r₂ = Rectangle (V2 26 15) 16 20
 -- >>> overlap r₁ r₂
 -- Nothing
 overlap :: Rectangle -> Rectangle -> Maybe Rectangle
-overlap (Rectangle (Point x₁ y₁) w₁ h₁) (Rectangle (Point x₂ y₂) w₂ h₂) =
-  [ Rectangle { position = Point { x, y }, height, width } | doOverlap ]
+overlap (Rectangle (V2 x₁ y₁) w₁ h₁) (Rectangle (V2 x₂ y₂) w₂ h₂) =
+  [ Rectangle { position = V2 x y, height, width } | doOverlap ]
   where x = max x₁ x₂
         y = max y₁ y₂
         width = min (x₁ + w₁) (x₂ + w₂) - x
@@ -290,7 +291,7 @@ bounds (rawElement -> raw) = do
   width  <- GHCJS.getWidth rect
   height <- GHCJS.getHeight rect
 
-  pure Rectangle { position = Point { x, y }, width, height }
+  pure Rectangle { position = V2 x y, width, height }
 
 -- | The width and height of the element in px.
 --
@@ -311,7 +312,9 @@ dimensions element = do
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
 viewportPosition :: forall e m. (IsElement e, MonadJSM m)
                  => e
-                 -> m Point
+                 -- ^ element
+                 -> m (V2 Double)
+                 -- ^ viewport position
 viewportPosition element = position <$> bounds element
 
                            -- TODO: Does this work as expected with
@@ -329,13 +332,13 @@ viewportPosition element = position <$> bounds element
 --  * [HTMLElement.offsetLeft](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetTop)
 offsetPosition :: forall e m. (IsElement e, MonadJSM m)
                => e
-               -> m Point
+               -> m (V2 Double)
 offsetPosition element =
   GHCJS.castTo GHCJS.HTMLElement (rawElement element) >>= \case
     Just htmlElement -> do
       x <- HTMLElement.getOffsetLeft htmlElement
       y <- HTMLElement.getOffsetTop htmlElement
-      pure Point { x, y }
+      pure (V2 x y)
     Nothing -> elementOffset
   where elementOffset = do
           elementPosition <- viewportPosition element

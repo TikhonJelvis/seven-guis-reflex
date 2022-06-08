@@ -24,7 +24,6 @@ import           UI.Element                  (Dom, Html, area, elClass',
                                               elDynAttr', overlap)
 import           UI.IsElement                (IsElement, rawElement)
 import           UI.Main                     (Runnable (..), withCss)
-import           UI.Point                    (Point (..))
 import           UI.Style                    (duration, property, s,
                                               setProperty, transition,
                                               translate)
@@ -78,7 +77,7 @@ demo = void do
               Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
 
-        snapTo = transition smooth . translate (Point 0 0)
+        snapTo = transition smooth
         smooth = def { property = "transform", duration = s 0.5 }
 
         colorIf color flag

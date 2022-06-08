@@ -14,6 +14,8 @@ import           GHC.Generics        (Generic)
 import qualified GHCJS.DOM.Document  as Document
 import qualified GHCJS.DOM.Element   as Element
 
+import           Linear              (V2 (..), _x, _y, distance, project, unit)
+
 import qualified Reflex
 import           Reflex              (Dynamic, Event)
 import qualified Reflex.Dom          as Dom
@@ -27,7 +29,6 @@ import           UI.Event            (Modifier (Shift), MouseButton (..),
                                       mouseEvent, on, performJs)
 import           UI.IsElement        (rawElement)
 import           UI.Main             (Runnable (..), withCss)
-import           UI.Point            (Point (..), distance)
 import           UI.Style            (Angle (..), getComputedProperty,
                                       setProperty)
 import           UI.Widget           (Enabled (..), checkbox, enabledIf, label,
@@ -54,12 +55,12 @@ demo = void do
   dragAnywhere
   where withTransition p = addClass "smooth-drag" . translate p
 
-        xOnly Point { x } = translate (Point x 0)
-        yOnly Point { y } = translate (Point 0 y)
+        xOnly = translate . project (unit _x)
+        yOnly = translate . project (unit _y)
 
-        snapTo n Point { x, y } =
-          addClass "smooth-drag" . translate (Point (toGrid n x) (toGrid n y))
-        toGrid n x = x - fromInteger (round x `mod` n)
+        snapTo n p =
+          addClass "smooth-drag" . translate (toGrid n <$> p)
+        toGrid n x = fromInteger $ round x - (round x `mod` n)
 
         rotateByDistance p = rotate (Turn $ distance p 0 / 100)
 
@@ -105,7 +106,7 @@ demo = void do
           pure ()
         dragOrSnap = \case
           Just d  -> translate d
-          Nothing -> transition snap . translate (Point 0 0)
+          Nothing -> transition snap
         snap = def { property = "transform", duration = s 1}
 
         dragHandle = mdo
@@ -145,7 +146,7 @@ data Drags t = Drags
   { element  :: Html t
     -- ^ The element being dragged.
 
-  , current  :: Dynamic t (Maybe Point)
+  , current  :: Dynamic t (Maybe (V2 Double))
     -- ^ The x and y distance moved by the mouse during the currently
     -- active drag. 'Nothing' when the user is not dragging this
     -- element.
@@ -157,20 +158,20 @@ data Drags t = Drags
     -- isDragged = isJust <$> current
     -- @
 
-  , finished :: Dynamic t Point
+  , finished :: Dynamic t (V2 Double)
     -- ^ The total x and y distance moved by the mouse during /already
     -- finished/ drags. If the user is /currently/ dragging the
     -- element, the movement from that is not included.
 
-  , total    :: Dynamic t Point
+  , total    :: Dynamic t (V2 Double)
     -- ^ The total x and y distance moved by the mouse counting /both/
     -- 'finished' and, if applicable, 'current'.
 
-  , start    :: Event t Point
+  , start    :: Event t (V2 Double)
     -- ^ The user started dragging the element at the given client X
     -- and Y coordinates.
 
-  , end      :: Event t Point
+  , end      :: Event t (V2 Double)
     -- ^ The user stopped dragging the element at the given client X
     -- and Y coordinates.
   }
@@ -282,14 +283,14 @@ instance Default (DragConfig d t) where
 -- Restrict to x axis only:
 --
 -- @
--- doDrag Point { x } = translate (Point x 0)
+-- doDrag = translate . view _x
 -- @
 --
 -- Snap to a 10px grid:
 --
 -- @
--- doDrag Point { x, y } = translate (Point (toGrid x) (toGrid y))
---   where toGrid n = fromInteger $ round n `mod` 10
+-- doDrag = translate . fmap toGrid
+--   where toGrid n x = fromInteger $ round x - round x `mod` n
 -- @
 --
 -- Rotate based on the Euclidean distance the user drags:
@@ -344,15 +345,15 @@ drags DragConfig { container, enabled, mouseEventFilter } element = do
         Nothing -> pure ()
 
       -- current drag
-      startPosition <- Reflex.holdDyn (Point 0 0) start
+      startPosition <- Reflex.holdDyn (V2 0 0) start
       let moves = Reflex.attachWith (flip (-)) (Reflex.current startPosition) move
-          resets = Point 0 0 <$ end
+          resets = V2 0 0 <$ end
       movedBy <- Reflex.holdDyn Nothing $ Just <$> Reflex.leftmost [resets, moves]
       let current = toMaybe <$> isDragged <*> movedBy
 
       -- completed drags
       let endDelta = Reflex.attachWith (flip (-)) (Reflex.current startPosition) end
-      finished <- Reflex.foldDyn (+) (Point 0 0) endDelta
+      finished <- Reflex.foldDyn (+) (V2 0 0) endDelta
 
       let total = liftA2 (+) (fromMaybe 0 <$> current) finished
 

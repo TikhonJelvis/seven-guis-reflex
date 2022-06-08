@@ -10,6 +10,8 @@ import           Data.Maybe         (isJust)
 import           Data.Text          (Text)
 import qualified Data.Text          as Text
 
+import           Linear             (V2 (..))
+
 import           Reflex             (Dynamic)
 import qualified Reflex.Dom         as Dom
 
@@ -21,8 +23,7 @@ import qualified UI.Drag            as Drag
 import           UI.Drag            (DragConfig (..), Drags (..))
 import           UI.Element         (Dom, Html, elClass', elDynAttr')
 import           UI.Main            (Runnable (..), withCss)
-import           UI.Point           (Point (..))
-import           UI.Style           (Angle (..), flipAround, px, rotate, scale,
+import           UI.Style           (Angle (..), flipAround, rotate, scale,
                                      translate)
 import           UI.SVG             (Command (..), GradientUnits (..),
                                      Rectangle (..), Stop (..), a, defs, g_, h,
@@ -82,14 +83,14 @@ haskellBack = mdo
     rect (pure $ Rectangle "400" "600" "-200" "-300") (pure background)
 
     aroundLogo 400 600 110 $ pure $
-      translate (Point (-200) (-300)) $
+      translate (V2 (-200) (-300)) $
       with EvenOdd $
       stroke "none" <> fill (paintWith "lambda-pattern")
 
     -- center logo
     g_ (pure $ scale 6 [])
-      [ pair (translate $ Point 0 (-12))
-      , pair (flipAround (Deg 90) . translate (Point 0 12))
+      [ pair (translate $ V2 0 (-12))
+      , pair (flipAround (Deg 90) . translate (V2 0 12))
       ]
 
   where backgroundGradient =
@@ -112,7 +113,7 @@ haskellBack = mdo
 
         pair f = g_ (pure $ f [])
           [ logo (pure [])
-          , logo $ pure $ translate (Point 17 0) $ flipAround (Deg 0) []
+          , logo $ pure $ translate (V2 17 0) $ flipAround (Deg 0) []
           ]
 
         logo attributes = g_ (rotate (Deg 20) . origin 8.5 6 <$> attributes)
@@ -154,18 +155,18 @@ haskellBack = mdo
         -- ↓↑
         lambdaTile attributes = g_ attributes
           [ top []
-          , bottom (translate (Point (-1) 14) [])
+          , bottom (translate (V2 (-1) 14) [])
           ]
           where λ f = use "small-lambda" (pure $ f $ origin 8 6 [])
                 top attrs = g_ (pure attrs)
                   [ λ id
-                  , λ (flipAround (Deg 90) . translate (Point 8 0))
-                  , λ (translate (Point 16 0))
+                  , λ (flipAround (Deg 90) . translate (V2 8 0))
+                  , λ (translate (V2 16 0))
                   ]
                 bottom attrs = g_ (pure attrs)
-                  [ λ (rotate (Deg 180) . translate (Point 0 0))
-                  , λ (flipAround (Deg 0) . translate (Point 8 0))
-                  , λ (rotate (Deg 180) . translate (Point 16 0))
+                  [ λ (rotate (Deg 180))
+                  , λ (flipAround (Deg 0) . translate (V2 8 0))
+                  , λ (rotate (Deg 180) . translate (V2 16 0))
                   ]
 
         lambdaPattern attributes =

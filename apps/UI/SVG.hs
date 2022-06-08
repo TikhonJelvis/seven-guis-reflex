@@ -52,6 +52,9 @@ import           Data.Text.Display   (Display (..))
 
 import           GHC.Generics        (Generic)
 
+import           Linear              (V2)
+import           Linear.V2           (V2 (..))
+
 import           Reflex              (Dynamic, Reflex)
 import qualified Reflex.Dom          as Dom
 
@@ -62,7 +65,6 @@ import           UI.Color            (Color)
 import           UI.Element          (Dom, elDynAttrNs')
 import qualified UI.Event            as Event
 import           UI.IsElement        (FromElement (..), IsElement (..))
-import           UI.Point
 import           UI.SVG.Attributes
 import           UI.SVG.Path
 
@@ -185,7 +187,7 @@ g_ attributes = fmap fst . svgDynAttr' "g" attributes . sequenceA_
 -- @
 -- do
 --   defs [("myElement",
---          circle (pure Circle { center = Point 0 0, radius = 5 }))
+--          circle (pure Circle { center = V2 0 0, radius = 5 }))
 --        ]
 --   use "myElement" (pure [("x", "10"), ("y", "4")])
 -- @
@@ -219,7 +221,7 @@ defs (Map.toList -> definitions) =
 -- @
 -- do
 --   defs [("myElement",
---          circle (pure Circle { center = Point 0 0, radius = 5 }) (pure []))
+--          circle (pure Circle { center = V2 0 0, radius = 5 }) (pure []))
 --        ]
 --   use "myElement" (pure [("x", "10"), ("y", "4")])
 -- @
@@ -266,7 +268,7 @@ pattern_ = svgDynAttr' "pattern"
 
 -- | A circle.
 data Circle = Circle
-  { center :: !Point
+  { center :: !(V2 Double)
   -- ^ The (x, y) coordinates for the circle's center.
   , radius :: !Double
   -- ^ The circle's radius.
@@ -275,15 +277,15 @@ data Circle = Circle
   deriving anyclass (Hashable)
 
 instance ToAttributes Circle where
-  toAttributes Circle { center = Point cx cy, radius = r } =
+  toAttributes Circle { center = V2 cx cy, radius = r } =
     [ ("cx", toAttributeValue cx)
     , ("cy", toAttributeValue cy)
     , ("r", toAttributeValue r)
     ]
 
 instance Display Circle where
-  displayBuilder Circle { center, radius } =
-    "Circle at " <> displayBuilder center <>
+  displayBuilder Circle { center = V2 x y, radius } =
+    "Circle at (" <> displayBuilder x <> ", " <> displayBuilder y <> ")" <>
     " with radius = " <> displayBuilder radius
 
 -- | Create a circle element with the given settings.
@@ -408,12 +410,12 @@ linear stops attributes =
 
 -- | The start and end points of the line that a linear gradient
 -- follows.
-linearPath :: Point
+linearPath :: V2 Double
            -- ^ point corresponding to @offset = 0@
-           -> Point
+           -> V2 Double
            -- ^ point corresponding to @offset = 1@
            -> Map Text Text
-linearPath Point { x = x₁, y = y₁ } Point { x = x₂, y = y₂ } =
+linearPath (V2 x₁ y₁) (V2 x₂ y₂) =
   [ ("x1", toAttributeValue x₁), ("y1", toAttributeValue y₁)
   , ("x2", toAttributeValue x₂), ("y2", toAttributeValue y₂)
   ]
@@ -432,13 +434,13 @@ radial stops attributes =
   -- TODO: handle changing focal point/etc
 -- | The center and radius for the circle covered by a radial
 -- gradient.
-radialPath :: Point
+radialPath :: V2 Double
            -- ^ center of the circle, corresponding to @offset = 0@
            -> Double
            -- ^ radius of the circle; @offset = 1@ at points at least
            -- @radius@ away from @center@
            -> Map Text Text
-radialPath Point { x, y } r =
+radialPath (V2 x y) r =
   [("cx", toAttributeValue x), ("cy", toAttributeValue y), ("r", toAttributeValue r)]
 
 -- | A dynamic set of @stop@ elements.

@@ -59,10 +59,11 @@ import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
 import           GHCJS.DOM.Types               (MonadDOM)
 import           GHCJS.DOM.Window              as Window
 
+import           Linear                        (V2 (..), V3 (..))
+
 import           Text.Printf                   (printf)
 
 import           UI.IsElement                  (IsElement, rawElement)
-import           UI.Point                      (Point (..), Point3D (..))
 
 -- * CSS Properties
 
@@ -96,17 +97,17 @@ instance ToCss a => ToCss [a] where
 
 -- | Convert to @(x, y)@.
 --
--- >>> toCss (Point 1 2)
+-- >>> toCss (V2 1.0 2.0)
 -- "(1.0, 2.0)"
-instance ToCss Point where
-  toCss Point { x, y } = "(" <> toCss x <> ", " <> toCss y <> ")"
+instance ToCss (V2 Double) where
+  toCss (V2 x y) = "(" <> toCss x <> ", " <> toCss y <> ")"
 
 -- | Convert to @(x, y, z)@.
 --
--- >>> toCss (Point3D 1 2 3)
+-- >>> toCss (V3 1.0 2.0 3.0)
 -- "(1.0, 2.0, 3.0)"
-instance ToCss Point3D where
-  toCss Point3D { x, y, z } =
+instance ToCss (V3 Double) where
+  toCss (V3 x y z) =
     "(" <> toCss x <> ", " <> toCss y <> ", " <> toCss z <> ")"
 
 -- * Units
@@ -364,7 +365,7 @@ data Transform = Matrix3D !(Vector Double)
                --  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
                --  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
 
-               | Rotate3D !Point3D !Angle
+               | Rotate3D !(V3 Double) !Angle
                -- ^ Rotate the element in 3D around an axis of
                -- rotation (specified as an @(x, y, z)@ point).
                --
@@ -378,7 +379,7 @@ data Transform = Matrix3D !(Vector Double)
                -- See MDN:
                -- [scale3](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/scale3)
 
-               | Scale3D !Point3D
+               | Scale3D !(V3 Double)
                -- ^ Scale the element by the given factor along the X,
                -- Y and Z axes respectively.
                --
@@ -414,17 +415,17 @@ data Transform = Matrix3D !(Vector Double)
 -- >>> toCss (Rotate (Rad 10))
 -- "rotate(10.0rad)"
 --
--- >>> toCss (Rotate3D (Point3D 1 2 3) (Deg 10))
--- "rotate3d(1.0, 2.0, 3.0, 10.0deg)"
+-- >>> toCss (Rotate3D (V3 1 2 3) (Deg 10))
+-- "rotate3d(1.0, 2.0, 3.0, 0.17453292519943295rad)"
 --
 -- >>> toCss (Scale "2" "10%")
 -- "scale(2, 10%)"
 --
--- >>> toCss (Scale3D (Point3D 1 2 3))
+-- >>> toCss (Scale3D (V3 1 2 3))
 -- "scale3d(1.0, 2.0, 3.0)"
 --
 -- >>> toCss (Skew (Deg 5) (Deg 7))
--- "skew(5.0deg, 7.0deg)"
+-- "skew(8.726646259971647e-2rad, 0.12217304763960307rad)"
 --
 -- >>> toCss (Translate "10%" "5px" "10cm")
 -- "translate3d(10%, 5px, 10cm)"
@@ -439,11 +440,11 @@ instance ToCss Transform where
       "perspective(" <> toCss a <> ")"
     Rotate a ->
       "rotate(" <> toCss a <> ")"
-    Rotate3D Point3D { x, y, z } a ->
+    Rotate3D (V3 x y z) a ->
       "rotate3d(" <> commas [toCss x, toCss y, toCss z, toCss a] <> ")"
     Scale x y ->
       "scale(" <> commas [x, y] <> ")"
-    Scale3D Point3D { x, y, z } ->
+    Scale3D (V3 x y z) ->
       "scale3d(" <> commas [x, y, z] <> ")"
     Skew ax ay ->
       "skew(" <> commas [ax, ay] <> ")"
@@ -473,8 +474,8 @@ setTransform :: [Transform] -> Map Text Text -> Map Text Text
 setTransform (toCss -> transforms) = setProperty "transform" transforms
 
 -- | Translate an element along the given X and Y distances in @px@.
-translate :: Point -> Map Text Text -> Map Text Text
-translate Point { x, y } = addTransform $ Translate (px x) (px y) "0"
+translate :: V2 Double -> Map Text Text -> Map Text Text
+translate (V2 x y) = addTransform $ Translate (px x) (px y) "0"
 
 -- | Rotate an element in 2D around its @transform-origin@.
 --

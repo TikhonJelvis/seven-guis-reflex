@@ -8,6 +8,8 @@ import           Data.Maybe          (fromMaybe)
 import qualified Data.Text           as Text
 import           Data.Text.Display   (Display, ShowInstance (..))
 
+import           Linear              (V2 (..))
+
 import qualified Reflex
 import           Reflex              (Dynamic, Event, (<@), (<@>))
 import qualified Reflex.Dom          as Dom
@@ -23,7 +25,6 @@ import           UI.Event
 import qualified UI.History          as History
 import           UI.History          (Undos (..))
 import           UI.Main             (Runnable (..), withCss)
-import           UI.Point
 import qualified UI.PushMap          as PushMap
 import           UI.PushMap          (PushMap)
 import           UI.SVG              (Circle (..), Stroke (..), Svg, circle,
@@ -149,12 +150,12 @@ circleDialog beingModified targetCircle = do
         maxRadius = 500
         message = Text.pack . Text.printf "Adjust diameter of circle at %s" . show
 
-        blank = Circle { center = Point { x = 0, y = 0 }, radius = 0 }
+        blank = Circle { center = V2 0 0, radius = 0 }
 
 -- * Editing Actions
 
 -- | Editing actions we can take in the UI
-data Action = AddCircle !Point
+data Action = AddCircle !(V2 Double)
             -- ^ Add a circle with the standard radius at the given
             -- point.
             | ChangeRadius !Int !(Diff Double)

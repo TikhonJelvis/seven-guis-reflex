@@ -67,7 +67,6 @@ executable guis
     UI.History
     UI.IsElement
     UI.Main
-    UI.Point
     UI.PushMap
     UI.Style
     UI.SVG
@@ -89,6 +88,7 @@ executable guis
     , jsaddle
     , jsaddle-webkit2gtk
     , lens
+    , linear
     , modern-uri
     , mtl
     , reflex
