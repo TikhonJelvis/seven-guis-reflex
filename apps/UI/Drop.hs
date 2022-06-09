@@ -55,11 +55,11 @@ demo = void do
                     colorHover   <- colorIf "green" . isHovering <$> hovering
                     colorDropped <- colorIf "red" <$> wasDropped
                     pure $ move $ colorDropped $ colorHover [("class", "draggable")]
-                  isHovering = maybe False (> 0) . Map.lookup 0
+                  isHovering = maybe False (> 0) . Map.lookup ()
 
               drags@Drags { total } <-
                 Drag.drags def { container = Just container } element
-              Drops { hovering, dropped } <- drops target $ pure [(0, drags)]
+              Drops { hovering, dropped } <- drops target $ pure [((), drags)]
           pure ()
 
         moveElement :: Html t -> m ()
@@ -76,7 +76,7 @@ demo = void do
 
               drags@Drags { current, start, end } <-
                 Drag.drags def { container = Just container } element
-              Drops { dropped } <- drops target $ pure [(0, drags)]
+              Drops { dropped } <- drops target $ pure [((), drags)]
               Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
 
@@ -101,15 +101,31 @@ demo = void do
 -- overlaps with the target to any extent.
 --
 -- __Examples__
+--
+-- Move droppable elements into target element when dropped:
+--
+-- @
+-- movable :: (Ord k, Dom t m) => Map k (Drags t) -> m ()
+-- movable droppables = mdo
+--   (target, _) <- elClass' "div" "drop-target" (pure ())
+--   Drops { dropped } <- drops target $ pure droppables
+--   Reflex.performEvent_ $ mapM_ move . Map.keys <$> dropped
+--   where move k = case Map.lookup k droppables of
+--           Just (Drags { element }) -> append element target
+--           Nothing                  -> pure ()
+--         append (rawElement -> e) (rawElement -> t) =
+--           Node.appendChild_ e t
+-- @
 drops :: forall k e m t. (Ord k, IsElement e, Dom t m)
       => e
-      -- ^ the target element
+      -- ^ target element
       -> Dynamic t (Map k (Drags t))
       -- ^ a dynamic set of droppable elements
       -> m (Drops k t)
 drops target droppables = do
   let elements = Reflex.switchDyn $ mergeWith droppedElement
-  dropped <- Reflex.performEvent $ getOverlaps (> 0) <$> elements
+  dropped <- Witherable.filter (not . Map.null) <$>
+    Reflex.performEvent (getOverlaps (> 0) <$> elements)
 
   let active = Reflex.switchDyn $ mergeWith draggedElement
   hoverEvents <- Reflex.performEvent $ getOverlaps (const True) <$> active
@@ -166,7 +182,7 @@ data Drops k t = Drops
 -- overlaps over the /target/ element's bounding box. Will always be
 -- in the range (0, 1].
 --
--- See 'bounds' and MDN
+-- See 'overlap', 'bounds' and MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
 type Overlap = Double
 
@@ -176,7 +192,7 @@ type Overlap = Double
 -- For 'Drops', this will be the proportion of the /droppable/ element
 -- that overlaps the /target/ element.
 --
--- See 'bounds' and MDN
+-- See 'overlap', 'bounds' and MDN
 -- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
 overlapProportion :: forall e e' m. (IsElement e, IsElement e', MonadJSM m)
         => e
