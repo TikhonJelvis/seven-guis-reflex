@@ -1,6 +1,7 @@
+{-# LANGUAGE MonadComprehensions #-}
 module UI.Drop where
 
-import           Control.Monad               (forM, void)
+import           Control.Monad               (void)
 
 import           Data.Default.Class          (def)
 import           Data.Map.Strict             (Map)
@@ -29,6 +30,8 @@ import           UI.Style                    (duration, property, s,
                                               translate)
 import           UI.Widget                   (label, ul)
 
+import qualified Witherable
+
 demo :: forall m t. Dom t m => m ()
 demo = void do
   ul (pure [("class", "drop-demo")])
@@ -49,14 +52,14 @@ demo = void do
 
               let attributes = do
                     move         <- translate <$> total
-                    colorHover   <- colorIf "green" . (not . Map.null) <$> hovering
+                    colorHover   <- colorIf "green" . isHovering <$> hovering
                     colorDropped <- colorIf "red" <$> wasDropped
                     pure $ move $ colorDropped $ colorHover [("class", "draggable")]
+                  isHovering = maybe False (> 0) . Map.lookup 0
 
               drags@Drags { total } <-
                 Drag.drags def { container = Just container } element
-              Drops { hovering, dropped } <-
-                drops drags [('a', target)]
+              Drops { hovering, dropped } <- drops target $ pure [(0, drags)]
           pure ()
 
         moveElement :: Html t -> m ()
@@ -73,7 +76,7 @@ demo = void do
 
               drags@Drags { current, start, end } <-
                 Drag.drags def { container = Just container } element
-              Drops { dropped } <- drops drags [('a', target)]
+              Drops { dropped } <- drops target $ pure [(0, drags)]
               Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
 
@@ -87,89 +90,109 @@ demo = void do
         moveTo (rawElement -> element) (rawElement -> parent) =
           Node.appendChild_ parent element
 
--- | Keeps track of how a draggable element is dropped on a set of
--- target elements.
+-- | Keeps track of how draggable elements are dropped onto a
+-- target. The set of droppable elements can change over time.
 --
--- This is designed to be combined with 'UI.Drag.drags', providing a
--- flexible foundation for drag-and-drop logic.
+-- The set of elements is tracked as a map of 'Drags' values, as
+-- returned by 'Drag.drags'. Each droppable element is associated with
+-- a key to track /which/ element was dropped.
+--
+-- An element is considered /over/ the target when its bounding box
+-- overlaps with the target to any extent.
 --
 -- __Examples__
---
--- Set up a draggable element with a drop target; change the element's
--- color when it's hovering and again after it's been dropped.
---
--- @
--- dragAndDrop container target = mdo
---   (element, _) <- elDynAttr' "div" attributes (pure ())
---   let attributes = do
---         move <- translate <$> total
---         colorHover   <- colorIf "green" (not . Map.null) <$> hovering
---         colorDropped <- colorIf "red" <$> wasDropped
---         pure $ move $ colorDropped $ colorHover []
---
---   drags@Drags { total } <-
---     Drag.drags def { container = Just container } element
---   Drops { hovering, dropped } <-
---     drops element drags [('a', target)]
---   wasDropped <- Reflex.holdDyn False $ not . Map.null <$> dropped
---   pure ()
--- @
---
--- Move element into drop target:
---
--- @
---
--- @
 drops :: forall k e m t. (Ord k, IsElement e, Dom t m)
-      => Drags t
-      -- ^ drag events + dynamics for the element
-      -> Map k e
-      -- ^ target elements
-      --
-      -- The 'Drops' value returned will track the key(s) of the
-      -- element(s) being hovered or dropped on.
+      => e
+      -- ^ the target element
+      -> Dynamic t (Map k (Drags t))
+      -- ^ a dynamic set of droppable elements
       -> m (Drops k t)
-drops Drags { element, current, end } targets = do
-  dropped  <- Reflex.performEvent $ getOverlaps <$ end
-  dragged  <- Reflex.performEvent $ getOverlaps <$ Reflex.updated current
-  hovering <- Reflex.holdDyn [] dragged
+drops target droppables = do
+  let elements = Reflex.switchDyn $ mergeWith droppedElement
+  dropped <- Reflex.performEvent $ getOverlaps (> 0) <$> elements
+
+  let active = Reflex.switchDyn $ mergeWith draggedElement
+  hoverEvents <- Reflex.performEvent $ getOverlaps (const True) <$> active
+  hovering    <- Reflex.holdDyn mempty hoverEvents
+
   pure Drops { dropped, hovering }
-  where getOverlaps = do
-          overlaps <- forM (Map.toList targets) \ (k, target) ->
-            (k,) <$> overlapProportion element target
-          pure $ Map.fromList
-            [(k, overlapped) | (k, overlapped) <- overlaps, overlapped /= 0]
+  where mergeWith f = Reflex.mergeMap . fmap f <$> droppables
 
--- | Information about how an element is dropped on a set of targets.
+        droppedElement :: Drags t -> Event t (Html t)
+        droppedElement Drags { element, end } =
+          element <$ end
+
+        draggedElement :: Drags t -> Event t (Html t)
+        draggedElement Drags { element, current } =
+          element <$ Reflex.updated current
+
+        getOverlaps :: MonadJSM m'
+                    => (Overlap -> Bool)
+                    -> Map k (Html t)
+                    -> m' (Map k Overlap)
+        getOverlaps cond = Witherable.witherM \ e -> do
+          proportion <- overlapProportion e target
+          pure [proportion | cond proportion]
+
+-- | Tracking how a set of droppable elements interacts with a drop
+-- target.
 data Drops k t = Drops
-  { dropped  :: Event t (Map k Double)
-    -- ^ An event that will fire each time a drop is detected. Each
-    -- target the element overlaps will have its overlap area in the
-    -- map.
+  { dropped  :: Event t (Map k Overlap)
+    -- ^ Fires when a droppable element is dropped and overlaps the
+    -- target.
     --
-    -- This event will /only/ fire when the input event to 'drops'
-    -- fires.
+    -- Returns a map of keys in case multiple elements are dropped
+    -- simultaneously. Only the elements that were dropped /over the
+    -- target/ will be in the map.
+    --
+    -- This event will /only/ fire when a droppable element's 'end'
+    -- event fires. If the element's 'end' event fires but it does not
+    -- overlap the target, the corresponding 'dropped' event will
+    -- /not/ fire, so the overlap reported will always be > 0.
 
-  , hovering :: Dynamic t (Map k Double)
-    -- ^ A dynamic that tracks which targets are being hovered the
-    -- dragged element, and how much the element overlaps the target.
+  , hovering :: Dynamic t (Map k Overlap)
+    -- ^ A map containing each /actively dragged element/ and how much
+    -- it overlaps the target. If an element is being dragged but is
+    -- not over the target, its overlap will be 0.
+    --
+    -- If an element is /not/ being dragged (ie 'current' is
+    -- 'Nothing'), it will not be in this map.
   }
   deriving stock (Generic)
 
 -- * Drop Calculations
 
--- | Calculate how much of an element overlaps the target element.
+-- | The proportion of the /droppable/ element's __bounding box__ that
+-- overlaps over the /target/ element's bounding box. Will always be
+-- in the range (0, 1].
+--
+-- See 'bounds' and MDN
+-- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
+type Overlap = Double
+
+-- | The proportion of one element's __bounding box__ overlapping
+-- another element's bounding box. Will always be in the range [0, 1].
+--
+-- For 'Drops', this will be the proportion of the /droppable/ element
+-- that overlaps the /target/ element.
+--
+-- See 'bounds' and MDN
+-- [getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
 overlapProportion :: forall e e' m. (IsElement e, IsElement e', MonadJSM m)
         => e
-        -- ^ Dropped element
+        -- ^ Droppable element
+        --
+        -- The returned 'Overlap' is a fraction of /this/ element's
+        -- bounding box
         -> e'
         -- ^ Target element
         -> m Double
 overlapProportion element target = do
   droppedBounds <- Element.bounds element
   targetBounds  <- Element.bounds target
-  pure $ maybe 0 area (overlap droppedBounds targetBounds) / area droppedBounds
-
+  pure case overlap droppedBounds targetBounds of
+    Just overlapped -> area overlapped / area droppedBounds
+    Nothing         -> 0
 
 main :: IO ()
 main = withCss "css/ui-demo.css" (Runnable demo)
