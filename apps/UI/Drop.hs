@@ -7,7 +7,6 @@ import           Data.Default.Class          (def)
 import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
 import           Data.Maybe                  (fromMaybe)
-import           Data.Text                   (Text)
 
 import           GHC.Generics                (Generic)
 
@@ -21,63 +20,72 @@ import           Reflex                      (Dynamic, Event)
 import qualified UI.Drag                     as Drag
 import           UI.Drag                     (DragConfig (..), Drags (..))
 import qualified UI.Element                  as Element
-import           UI.Element                  (Dom, Html, area, elClass',
+import           UI.Element                  (Dom, Html, area, el', elClass',
                                               elDynAttr', overlap)
 import           UI.IsElement                (IsElement, rawElement)
 import           UI.Main                     (Runnable (..), withCss)
 import           UI.Style                    (duration, property, s,
                                               setProperty, transition,
                                               translate)
-import           UI.Widget                   (label, ul)
+import           UI.Widget                   (label, output, range, ul)
 
 import qualified Witherable
 
 demo :: forall m t. Dom t m => m ()
 demo = void do
   ul (pure [("class", "drop-demo")])
-    [ example "Change color on hover and drop" changeColor
-    , example "Move element to target" moveElement
+    [ changeColor
+    , moveElement
     ]
-  where example :: Text -> (Html t -> m a) -> m ()
-        example description body = do
-          label description
-          rec (container, _) <- elClass' "div" "draggable drop-example" $
-                body container
+  where changeColor = mdo
+          label "change color on hover, count drops"
+          (_, atLeast) <- el' "div" do
+            label "how much needed to overlap?"
+            range Reflex.never
+
+          (container, _) <- elClass' "div" "draggable drop-example" mdo
+            (target, _)  <- elClass' "div" "drop-target" (pure ())
+            (element, _) <- elDynAttr' "div" attributes do
+              let validDropped =
+                    Reflex.attachWithMaybe validOverlap (Reflex.current atLeast) dropped
+                  validOverlap threshold m = (>= threshold) <$> Map.lookup () m
+              
+              count <- Reflex.count $ Witherable.filter id validDropped
+              output @Int count
+
+            let attributes = do
+                  threshold <- atLeast
+                  let isHovering =
+                        maybe False (> threshold) . Map.lookup ()
+                  colorHover <- colorIf "green" . isHovering <$> hovering
+
+                  move <- translate <$> total
+                  pure $ move $ colorHover [("class", "draggable")]
+
+
+            drags@Drags { total } <-
+              Drag.drags def { container = Just container } element
+            Drops { hovering, dropped } <- drops target $ pure [((), drags)]
+            pure ()
           pure ()
 
-        changeColor container = do
-          rec (target, _)  <- elClass' "div" "drop-target" (pure ())
-              (element, _) <- elDynAttr' "div" attributes (pure ())
-              wasDropped <- Reflex.holdDyn False $ not . Map.null <$> dropped
+        moveElement = mdo
+          label "Move element to target when dropped"
+          (container, _) <- elClass' "div" "draggable drop-example" mdo
+            (target, _) <- elClass' "div" "drop-target" (pure ())
+            (element, _) <- elDynAttr' "div" attributes (pure ())
+            snapping <- Reflex.holdDyn id $
+              Reflex.leftmost [id <$ start, snapTo <$ end]
+            let attributes = do
+                  let base = [("class", "draggable")]
+                  move    <- translate . fromMaybe 0 <$> current
+                  animate <- snapping
+                  pure $ animate $ move base
 
-              let attributes = do
-                    move         <- translate <$> total
-                    colorHover   <- colorIf "green" . isHovering <$> hovering
-                    colorDropped <- colorIf "red" <$> wasDropped
-                    pure $ move $ colorDropped $ colorHover [("class", "draggable")]
-                  isHovering = maybe False (> 0) . Map.lookup ()
-
-              drags@Drags { total } <-
-                Drag.drags def { container = Just container } element
-              Drops { hovering, dropped } <- drops target $ pure [((), drags)]
-          pure ()
-
-        moveElement :: Html t -> m ()
-        moveElement container = do
-          rec (target, _) <- elClass' "div" "drop-target" (pure ())
-              (element, _) <- elDynAttr' "div" attributes (pure ())
-              snapping <- Reflex.holdDyn id $
-                Reflex.leftmost [id <$ start, snapTo <$ end]
-              let attributes = do
-                    let base = [("class", "draggable")]
-                    move    <- translate . fromMaybe 0 <$> current
-                    animate <- snapping
-                    pure $ animate $ move base
-
-              drags@Drags { current, start, end } <-
-                Drag.drags def { container = Just container } element
-              Drops { dropped } <- drops target $ pure [((), drags)]
-              Reflex.performEvent_ $ moveTo element target <$ dropped
+            drags@Drags { current, start, end } <-
+              Drag.drags def { container = Just container } element
+            Drops { dropped } <- drops target $ pure [((), drags)]
+            Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
 
         snapTo = transition smooth
@@ -134,21 +142,23 @@ drops target droppables = do
   pure Drops { dropped, hovering }
   where mergeWith f = Reflex.mergeMap . fmap f <$> droppables
 
-        droppedElement :: Drags t -> Event t (Html t)
+        droppedElement :: Drags t -> Event t (Maybe (Html t))
         droppedElement Drags { element, end } =
-          element <$ end
+          Just element <$ end
 
-        draggedElement :: Drags t -> Event t (Html t)
+        draggedElement :: Drags t -> Event t (Maybe (Html t))
         draggedElement Drags { element, current } =
-          element <$ Reflex.updated current
+          (element <$) <$> Reflex.updated current
 
         getOverlaps :: MonadJSM m'
                     => (Overlap -> Bool)
-                    -> Map k (Html t)
+                    -> Map k (Maybe (Html t))
                     -> m' (Map k Overlap)
-        getOverlaps cond = Witherable.witherM \ e -> do
-          proportion <- overlapProportion e target
-          pure [proportion | cond proportion]
+        getOverlaps cond = Witherable.witherM \case
+          Just e -> do
+            proportion <- overlapProportion e target
+            pure [proportion | cond proportion]
+          Nothing -> pure Nothing
 
 -- | Tracking how a set of droppable elements interacts with a drop
 -- target.
@@ -167,12 +177,12 @@ data Drops k t = Drops
     -- /not/ fire, so the overlap reported will always be > 0.
 
   , hovering :: Dynamic t (Map k Overlap)
-    -- ^ A map containing each /actively dragged element/ and how much
-    -- it overlaps the target. If an element is being dragged but is
-    -- not over the target, its overlap will be 0.
+    -- ^ A map containing draggable elements /that are actively being
+    -- dragged/ and how much they overlap the target.
     --
-    -- If an element is /not/ being dragged (ie 'current' is
-    -- 'Nothing'), it will not be in this map.
+    -- If an element is being dragged but is not over the target, its
+    -- overlap will be 0. If an element overlaps the target but is not
+    -- actively being dragged, it will not be in the map.
   }
   deriving stock (Generic)
 

@@ -311,7 +311,7 @@ selectEnum = do
 -- If you do not want to set the element, you can use
 --
 -- @
--- range never
+-- range Reflex.never
 -- @
 --
 -- Returns the position as a 'Double' between 0 and 1.
