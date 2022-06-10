@@ -3,10 +3,13 @@ module Cards.UI.Card where
 
 import           Cards.Card         (Card (..), Rank (..), Suit (..), rankName,
                                      suitName)
+import           Cards.Place        (Face (..))
 
 import           Control.Monad      (void)
 
+import           Data.Bool          (bool)
 import           Data.Default.Class (Default, def)
+import           Data.Functor       ((<&>))
 import           Data.Map           (Map)
 import           Data.Maybe         (fromMaybe, isJust)
 import           Data.Text          (Text)
@@ -14,16 +17,17 @@ import qualified Data.Text          as Text
 
 import           GHC.Generics       (Generic)
 
-import           Linear             (V2 (..))
+import           Linear             (V2 (..), V3 (..))
 
-import           Reflex             (Dynamic)
+import           Reflex             (Dynamic, toggle)
 import qualified Reflex.Dom         as Dom
 
 import           Text.Printf        (printf)
 import qualified Text.URI           as URI
 
-import           UI.Attributes      (addClass, removeClass, setClass,
-                                     setProperty, toAttributes, with)
+import           UI.Attributes      (Transform (..), addClass, addTransform,
+                                     removeClass, setClass, setProperty,
+                                     toAttributes, with)
 import qualified UI.Drag            as Drag
 import           UI.Drag            (DragConfig (..), Drags (..))
 import           UI.Element         (Dom, Html, elClass', elDynAttr')
@@ -38,17 +42,25 @@ import           UI.SVG             (Command (..), GradientUnits (..),
 import           UI.SVG.Attributes  (FillRule (..), Stroke (..), fill,
                                      paintWith, stroke)
 import           UI.SVG.Haskell     (HaskellPaths (..), haskellPaths)
-import           UI.Widget          (Enabled (..), image, label)
+import           UI.Widget          (Enabled (..), button', image, label)
 
 demo :: forall m t. Dom t m => m ()
 demo = void $ elClass' "div" "card-demo" do
   label "Cards draggable across body"
+
+  faceUp <- Reflex.toggle True =<< button' (pure "flip cards") (pure Enabled)
+  let facing = bool FaceDown FaceUp <$> faceUp
+
   rec CardElement { drags } <-
-        draggable (Card Ace Spades) def { attributes = attributes' drags }
+        draggable (Card Ace Spades) facing
+          def { attributes = dragAttributes drags }
+
   rec CardElement { drags } <-
-        draggable (Card King Hearts) def { attributes = attributes' drags }
+        draggable (Card King Hearts) facing
+          def { attributes = dragAttributes drags }
+
   pure ()
-  where attributes' Drags { current } =
+  where dragAttributes Drags { current } =
           Just $ whenDragged . isJust <$> current <*> pure []
         whenDragged True  =
           setProperty "z-index" "100" . rotate (Deg 5) . addClass "dragging"
@@ -103,16 +115,20 @@ data CardElement t = CardElement
 -- @
 draggable :: forall m t. Dom t m
           => Card
+          -> Dynamic t Face
           -> CardConfig t
           -> m (CardElement t)
-draggable card@Card { rank, suit } CardConfig { container, dragging, attributes } = mdo
+draggable card@Card { rank, suit } face CardConfig { container, dragging, attributes } = mdo
   let attributes' = do
         move <- translate <$> total
         draggingClass <- setClass "dragging" . isJust <$> current
         move . draggingClass . static <$> fromMaybe (pure []) attributes
 
   (element, _) <- elDynAttr' "div" attributes' do
-    Dom.elClass "div" "center" do
+    let facing = face <&> \case
+          FaceUp   -> id
+          FaceDown -> addTransform (Rotate3D (V3 0 1 0) (Deg 180))
+    Dom.elDynAttr "div" (facing <*> pure [("class", "center")]) do
       front card (pure [])
       back haskellBack (pure [])
 

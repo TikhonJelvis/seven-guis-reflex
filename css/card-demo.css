@@ -8,13 +8,27 @@
   width: 223px;
   height: 324px;
 
-  border-radius: 9px;
-  box-shadow: 5px 5px 12px  rgba(0, 0, 0, 0.3);
-
   -webkit-user-select: none;
   user-select: none;
 
+  background: none;
+}
+
+.card .center {
+  position: relative;
+
+  width: 100%;
+  height: 100%;
+
   perspective: 20cm;
+
+  transition: transform 0.8s;
+  transform-style: preserve-3d;
+
+  border-radius: 9px;
+  box-shadow: 5px 5px 12px  rgba(0, 0, 0, 0.3);
+
+  background: none;
 }
 
 .card img {
@@ -26,19 +40,6 @@
 
 .card.dragging {
   box-shadow: 12px 12px 12px rgba(0, 0, 0, 0.3);
-}
-
-.card .center {
-  position: relative;
-  width: 100%;
-  height: 100%;
-
-  transition: transform 0.8s;
-  transform-style: preserve-3d;
-}
-
-.card:hover .center {
-  transform: rotateY(180deg);
 }
 
 .card .front, .card .back {
