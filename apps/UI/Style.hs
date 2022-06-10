@@ -2,7 +2,7 @@
 -- | Functionality for working with element's @style@ attributes as
 -- well as their /computed/ styles.
 module UI.Style
-  ( ToCss
+  ( ToCss (..)
 
   , Length
   , px
@@ -35,6 +35,9 @@ module UI.Style
   , Transition (..)
   , transition
   , removeTransition
+
+  , BackfaceVisibility (..)
+  , backfaceVisibility
 
   , getComputedProperty)
 where
@@ -324,7 +327,9 @@ setUserSelect :: Text -> Map Text Text -> Map Text Text
 setUserSelect value =
   setProperty "user-select" value . setProperty "-webkit-user-select" value
 
--- * CSS Transforms
+-- * CSS Properties
+
+-- ** Transforms
 
 -- $ The CSS @transform@ property lets you translate, scale, rotate
 -- and skew how an element is rendered in three dimensions. The value
@@ -550,7 +555,7 @@ matrix [a, b, c, d, tx, ty] = addTransform $
 matrix invalid =
   error $ printf "Invalid matrix: %s" (show invalid)
 
--- * Transitions
+-- ** Transitions
 
 -- | The CSS @transition@ property lets us animate changes in values
 -- of other properties like colors, sizes and positions.
@@ -600,6 +605,20 @@ removeTransition (Property property) =
         overProperties f = Text.intercalate ", " . f . parseProperties
         parseProperties = map Text.strip . Text.split (== ',')
 
+-- ** Misc
+
+data BackfaceVisibility = Visible | Hidden
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+
+instance ToCss BackfaceVisibility where
+  toCss Visible = "visible"
+  toCss Hidden  = "hidden"
+
+-- | Set the @backface-visibility@ CSS property.
+backfaceVisibility :: BackfaceVisibility -> Map Text Text -> Map Text Text
+backfaceVisibility = setProperty "backface-visibility" . toCss
+  
 -- * Computed Styles
 
 -- $ Functions for working with the /computed/ style of DOM
