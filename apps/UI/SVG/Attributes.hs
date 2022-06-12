@@ -1,16 +1,212 @@
 module UI.SVG.Attributes where
 
-import qualified Data.Colour        as Colour
-import           Data.Default.Class (Default (..))
-import           Data.Hashable      (Hashable)
-import           Data.Map           (Map)
-import           Data.String        (IsString (..))
-import           Data.Text          (Text)
+import           Data.Hashable (Hashable)
+import           Data.Map      (Map)
+import           Data.String   (IsString (..))
+import           Data.Text     (Text)
 
-import           GHC.Generics       (Generic)
+import           GHC.Generics  (Generic)
 
-import           UI.Attributes      (AsAttributeValue (..), Lowercase (..))
-import           UI.Color           (Color, fromColour)
+import           UI.Attributes (AsAttributeValue (..), Attribute (..),
+                                AttributeValue, Lowercase (..))
+import           UI.Color      (Color)
+import           UI.SVG.Path   (Path)
+
+-- * Sizes and Positions
+
+-- | The x coordinate of an element in the user coordinate system.
+x :: Attribute "x" '["image", "rect", "svg", "use"]
+x = Attribute
+
+type instance AttributeValue "x" '["image", "rect", "svg", "use"] = Double
+
+-- | The y coordinate of an element in the user coordinate system.
+y :: Attribute "y" '["image", "rect", "svg", "use"]
+y = Attribute
+
+type instance AttributeValue "y" '["image", "rect", "svg", "use"] = Double
+
+-- | The x coordinate of the start point in a line.
+x1 :: Attribute "x1" '["line", "linearGradient"]
+x1 = Attribute
+
+-- | 'x1' but cool
+x₁ :: Attribute "x1" '["line", "linearGradient"]
+x₁ = x1
+
+type instance AttributeValue "x1" '["line", "linearGradient"] = Double
+
+-- | The x coordinate of the end point in a line.
+x2 :: Attribute "x2" '["line", "linearGradient"]
+x2 = Attribute
+
+-- | 'x2' but cool
+x₂ :: Attribute "x2" '["line", "linearGradient"]
+x₂ = x2
+
+type instance AttributeValue "x2" '["line", "linearGradient"] = Double
+
+-- | The x coordinate of the start point in a line.
+y1 :: Attribute "y1" '["line", "linearGradient"]
+y1 = Attribute
+
+-- | 'y1' but cool
+y₁ :: Attribute "y1" '["line", "linearGradient"]
+y₁ = y1
+
+type instance AttributeValue "y1" '["line", "linearGradient"] = Double
+
+-- | The x coordinate of the start point in a line.
+y2 :: Attribute "y2" '["line", "linearGradient"]
+y2 = Attribute
+
+-- | 'y2' but cool
+y₂ :: Attribute "y2" '["line", "linearGradient"]
+y₂ = y2
+
+type instance AttributeValue "y2" '["line", "linearGradient"] = Double
+
+-- | The horizontal length of an element in the user coordinate system.
+width :: Attribute "width" '["image", "mask", "pattern", "rect", "svg", "use"]
+width = Attribute
+
+type instance AttributeValue "width" '["image", "mask", "pattern", "rect", "svg", "use"] = Double
+
+-- | The vertical length of an element in the user coordiante system.
+height :: Attribute "height" '["image", "mask", "pattern", "rect", "svg", "use"]
+height = Attribute
+
+type instance AttributeValue "height" '["image", "mask", "pattern", "rect", "svg", "use"] = Double
+
+-- | The x coordinate of the shape's center.
+cx :: Attribute "cx" '["circle", "ellipse", "radialGradient"]
+cx = Attribute
+
+type instance AttributeValue "cx" '["circle", "ellipse", "radialGradient"] = Double
+
+-- | The y coordinate of the shape's center.
+cy :: Attribute "cy" '["circle", "ellipse", "radialGradient"]
+cy = Attribute
+
+type instance AttributeValue "cy" '["circle", "ellipse", "radialGradient"] = Double
+
+-- | The radius of the shape.
+r :: Attribute "r" '["circle", "radialGradient"]
+r = Attribute
+
+type instance AttributeValue "r" '["circle", "radialGradient"] = Double
+
+
+-- * Paths
+
+-- | The @d@ attribute that specifies the shape of a path.
+--
+-- See 'Path' for details and examples.
+d :: Attribute "d" '["path", "glyph", "missing-glyph"]
+d = Attribute
+
+type instance AttributeValue "d" '["path", "glyph", "missing-glyph"] = Path
+
+-- | The total length of a path in user units. Setting this scales the
+-- distance for drawing an element by @pathLength/computedLength)@.
+pathLength :: Attribute "pathLength"
+  '["circle", "ellipse", "line", "path", "polygon", "polyline", "rect"]
+pathLength = Attribute
+
+type instance AttributeValue "pathLength"
+  '["circle", "ellipse", "line", "path", "polygon", "polyline", "rect"] = Double
+
+-- * Gradients
+
+-- | SVG has two kind of gradient elements: linear gradients and
+-- radial gradients.
+type Gradients = '["linearGradient", "radialGradient"]
+
+-- | How a gradient should behave outside of its bounds—what to do
+-- when @offset@ would logically be below 0 or above 1?
+--
+-- >>> toAttributeValue Reflect
+-- "reflect"
+data SpreadMethod = Pad
+                  -- ^ Fill out the remainder of the space with a solid
+                  -- color from @offset = 0@ or @offset = 1@ as
+                  -- appropriate.
+
+                  | Reflect
+                  -- ^ Render the gradient /inverted/ (ie treat the offset
+                  -- as @1 - offset@).
+
+                  | Repeat
+                  -- ^ Repeat the gradient, resetting @offset@ to @0..1@.
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+  deriving AsAttributeValue via Lowercase SpreadMethod
+
+-- | How a gradient should behave outside of its bounds.
+--
+-- See 'SpreadMethod'.
+spreadMethod :: Attribute "spreadMethod" Gradients
+spreadMethod = Attribute
+
+type instance AttributeValue "spreadMethod" Gradients = SpreadMethod
+
+-- | The coordinate system for a gradient.
+--
+-- This defines how gradient coordinates are translated to actual
+-- coordinates when the gradient is used.
+--
+-- >>> toAttributeValue UserSpaceOnUse
+-- "userSpaceOnUse"
+data GradientUnits = UserSpaceOnUse
+                     -- ^ Use the __user coordinates__ at the time and
+                     -- place the gradient is applied.
+                     --
+                     -- Percentage values are computed relative to the
+                     -- /current SVG viewport/.
+
+                   | ObjectBoundingBox
+                     -- ^ Use coordinates defined based on the
+                     -- /bounding box/ of the element the gradient
+                     -- applies to.
+                     --
+                     -- Percentage values are computed relative to the
+                     -- bounding box.
+  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+
+instance AsAttributeValue GradientUnits where
+  toAttributeValue = \case
+    UserSpaceOnUse    -> "userSpaceOnUse"
+    ObjectBoundingBox -> "objectBoundingBox"
+
+  fromAttributeValue = \case
+    "userSpaceOnUse"    -> Just UserSpaceOnUse
+    "objectBoundingBox" -> Just ObjectBoundingBox
+    _                   -> Nothing
+
+-- | The coordinate system for the gradient.
+--
+-- See 'GradientUnits'
+gradientUnits :: Attribute "gradientUnits" Gradients
+gradientUnits = Attribute
+
+type instance AttributeValue "gradientUnits" Gradients = GradientUnits
+
+-- ** Gradient Stops
+
+-- | The color for a gradient stop.
+--
+-- See 'linear' and 'radial' for details.
+stop_color :: Attribute "stop-color" '["stop"]
+stop_color = Attribute
+
+type instance AttributeValue "stop-color" '["stop"] = Color
+
+-- | How far along the gradient to place this stop.
+offset :: Attribute "offset" '["stop"]
+offset = Attribute
+
+type instance AttributeValue "offset" '["stop"] = Double
 
 -- * Presentation
 
@@ -45,25 +241,6 @@ data FillRule = Nonzero
   deriving AsAttributeValue via Lowercase FillRule
 
 -- ** Stroke
-
--- | How to draw the lines of a shape.
-data Stroke = Stroke
-  { color    :: Color
-  , width    :: Double
-  -- ^ stroke width in px
-  , linecap  :: Linecap
-  , linejoin :: Linejoin
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (Hashable)
-
-instance Default Stroke where
-  def = Stroke
-    { color    = fromColour Colour.black
-    , width    = 0
-    , linecap  = Butt
-    , linejoin = Miter
-    }
 
 -- | Set just the @stroke@ attribute.
 stroke :: Paint -> Map Text Text

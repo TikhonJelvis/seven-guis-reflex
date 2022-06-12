@@ -2,6 +2,7 @@ module UI.SVG
   ( Svg
 
   , svg
+  , svg'
 
   , g
   , g_
@@ -16,60 +17,46 @@ module UI.SVG
   , module UI.SVG.Attributes
 
   , circle
-  , Circle (..)
-
   , rect
-  , Rectangle (..)
 
   , module UI.SVG.Path
   , path
 
   , Stop (..)
   , linear
-  , linearPath
   , radial
-  , radialPath
-  , Spread (..)
-  , GradientUnits (..)
 
   , svgAttribute
   , svgAttributes
   )
 where
 
-import           Control.Applicative (liftA2)
-import           Control.Monad       (forM)
+import           Control.Monad     (forM)
 
-import           Data.Foldable       (sequenceA_)
-import           Data.Functor        ((<&>))
-import           Data.Hashable       (Hashable (..))
-import           Data.Map            (Map)
-import qualified Data.Map            as Map
-import           Data.Proxy          (Proxy (..))
-import           Data.Text           (Text)
-import qualified Data.Text           as Text
+import           Data.Foldable     (sequenceA_)
+import           Data.Functor      ((<&>))
+import           Data.Hashable     (Hashable (..))
+import           Data.Map          (Map)
+import qualified Data.Map          as Map
+import           Data.Proxy        (Proxy (..))
+import           Data.Text         (Text)
+import qualified Data.Text         as Text
 
-import           GHC.Generics        (Generic)
-import           GHC.TypeLits        (KnownSymbol, symbolVal)
+import           GHC.Generics      (Generic)
+import           GHC.TypeLits      (KnownSymbol, symbolVal)
 
-import           Linear              (V2(..), _x, _y)
+import           Reflex            (Dynamic, Reflex)
+import qualified Reflex.Dom        as Dom
 
-import           Reflex              (Dynamic, Reflex)
-import qualified Reflex.Dom          as Dom
-
-import           UI.Attributes       (AsAttributeValue (..), Attribute (..),
-                                      AttributeSet, AttributeValue,
-                                      Lowercase (..), href, id_, toDom, (=:),
-                                      (==:))
-import           UI.Color            (Color)
-import           UI.Element          (Dom, createElement)
-import qualified UI.Event            as Event
-import           UI.Id               (Id (..))
-import           UI.IsElement        (FromElement (..), IsElement (..))
+import           UI.Attributes     (AttributeSet, href, id_, toDom, (=:))
+import           UI.Color          (Color)
+import           UI.Element        (Dom, createElement)
+import qualified UI.Event          as Event
+import           UI.Id             (Id (..))
+import           UI.IsElement      (FromElement (..), IsElement (..))
 import           UI.SVG.Attributes
 import           UI.SVG.Path
-import qualified UI.Url              as Url
-import Control.Lens (view)
+import qualified UI.Url            as Url
 
 -- * SVG Elements
 
@@ -95,8 +82,12 @@ instance Reflex t => Dom.HasDomEvent t (Svg t) en where
 --
 -- __Example__
 --
+-- An @svg@ tag containing two circles:
+--
 -- @
--- html @"circle" [class_ =: "ball"] (pure ())
+-- svg @"svg" [] do
+--   svg @"circle" [class_ =: "ball"] (pure ())
+--   svg' @"circle" [class_ =: "ball"]
 -- @
 svg :: forall element a m t. (KnownSymbol element, Dom t m)
     => AttributeSet t element "SVG"
@@ -107,6 +98,22 @@ svg :: forall element a m t. (KnownSymbol element, Dom t m)
 svg = createElement Nothing tag . toDom
   where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
 {-# INLINABLE svg #-}
+
+-- | Create an SVG element with no body.
+--
+-- If the @element@ type variable is ambiguous, you can specify it
+-- with a type application.
+--
+-- __Example__
+--
+-- @
+-- svg' @"circle" [class_ =: "ball"]
+-- @
+svg' :: forall element m t. (KnownSymbol element, Dom t m)
+     => AttributeSet t element "SVG"
+     -> m (Svg t)
+svg' attributes = fst <$> svg attributes (pure ())
+{-# INLINABLE svg' #-}
 
 -- ** Grouping
 
@@ -154,7 +161,7 @@ defs :: forall a m t. Dom t m
      -- ^ A list of definitions.
      -> m (Map Id a)
 defs definitions =
-  snd <$> svg [] do
+  snd <$> svg @"defs" [] do
     Map.fromList <$> forM definitions \ (Def name create base) -> do
       result <- create $ base <> [id_ =: name]
       pure (name, result)
@@ -217,8 +224,7 @@ use :: forall m t. Dom t m
     -- See MDN:
     -- [use](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use)
     -> m (Svg t)
-use elementId attributes =
-  fst <$> svg (attributes <> [ href =: Url.byId elementId ]) (pure ())
+use elementId attributes = svg' $ attributes <> [ href =: Url.byId elementId ]
 
 -- | A @pattern@ element defines an object that can be tiled along x-
 -- and y-coordinate intervals.
@@ -243,16 +249,6 @@ pattern_ = svg
 
 -- ** Shapes
 
--- | A circle with a given center and radius.
-data Circle = Circle
-  { center :: !(V2 Double)
-  -- ^ The (x, y) coordinates for the circle's center.
-  , radius :: !Double
-  -- ^ The circle's radius.
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (Hashable)
-
 -- | Create a circle element with the given settings.
 --
 -- __Example__
@@ -260,74 +256,46 @@ data Circle = Circle
 -- A circle with a static center and radius:
 --
 -- @
--- let c = Circle { center = (50, 50), radius = 50}
--- in
--- circle (pure c) [stroke_width =: 4, stroke =: "#3366ff"]
+-- circle [ cx =: 0
+--        , cy =: 5
+--        , r  =: 14
+--        , stroke_width =: 4
+--        , stroke =: "#3366ff"
+--        ]
 -- @
 circle :: forall m t. Dom t m
-       => Dynamic t Circle
-       -- ^ The circle shape itself
-       -> AttributeSet t "circle" "SVG"
-       -- ^ Additional attributes. The 'Circle' argument will override
-       -- @cx@, @cy@ and @r@.
+       => AttributeSet t "circle" "SVG"
+       -- ^ attributes
        -> m (Svg t)
-circle shape attributes = fst <$> svg (attributes <> override) (pure ())
-  where override = [ cx ==: view _x . center <$> shape
-                   , cy ==: view _y . center <$> shape
-                   ,  r ==: radius <$> shape
-                   ]
-
--- | The x coordinate of the shape's center.
-cx :: Attribute "cx" '["circle", "ellipse", "radialGradient"]
-cx = Attribute
-
-type instance AttributeValue "cx" '["circle", "ellipse", "radialGradient"] = Double
-
--- | The y coordinate of the shape's center.
-cy :: Attribute "cy" '["circle", "ellipse", "radialGradient"]
-cy = Attribute
-
-
-type instance AttributeValue "cy" '["circle", "ellipse", "radialGradient"] = Double
-
--- | The radius of the shape.
-r :: Attribute "r" '["circle", "radialGradient"]
-r = Attribute
-
-type instance AttributeValue "r" '["circle", "radialGradient"] = Double
-
-
--- | A rectangle specified as a point along with a width and a height.
-data Rectangle = Rectangle
-  { position :: !(V2 Double)
-  , width    :: !Double
-  , height   :: !Double
-  }
-  deriving stock (Show, Eq, Ord, Generic)
-  deriving anyclass (Hashable)
+circle = svg'
 
 -- | Create a retangle (@rect@ element).
+--
+-- __Example__
+--
+-- A 10 × 10 rectangle at the origin:
+--
+-- @
+-- rect [ x =: 0
+--      , y =: 0
+--      , width =: 10
+--      , height =: 10
+--      ]
+-- @
 rect :: forall m t. Dom t m
-     => Dynamic t Rectangle
-     -- ^ Position and dimensions
-     -> Dynamic t (Map Text Text)
-     -- ^ Additional attributes. The 'Rectangle' argument will
-     -- override @x@, @y@, @width@ and @height@ here.
+     => AttributeSet t "rect" "SVG"
+     -- ^ attributes
      -> m (Svg t)
-rect rectangle attributes =
-  fst <$> svgDynAttr' "rect" (liftA2 with rectangle attributes) (pure ())
+rect = svg'
 
--- | The @path@ element with a dynamic @d@ attribute.
+-- | A @path@ element.
+--
+-- The shape of the path is specified by the @d@ attribute.
 path :: forall m t. Dom t m
-     => Dynamic t Path
-     -- ^ @d@ attribute for the @path@ which specifies the geometry of
-     -- the path itself.
-     -> Dynamic t (Map Text Text)
-     -- ^ Other attributes of the @path@. A value for the @d@
-     -- attribute here will be overwritten.
+     => AttributeSet t "path" "SVG"
+     -- ^ attributes
      -> m (Svg t)
-path d attributes =
-  fst <$> svgDynAttr' "path" (liftA2 with d attributes) (pure ())
+path = svg'
 
 -- ** Gradients
 
@@ -359,13 +327,7 @@ path d attributes =
 
 -- | A gradient is made up of multiple __stops__ that specify the
 -- color to transition part of the way through the gradient.
-data Stop = Stop
-  { offset :: Double
-    -- ^ A number between 0 and 1 specifying how far along the
-    -- gradient to position the stop.
-  , color  :: Color
-    -- ^ The color for this stop.
-  }
+data Stop = Stop Double Color
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
@@ -378,107 +340,37 @@ data Stop = Stop
 linear :: forall m t. Dom t m
        => Dynamic t [Stop]
        -- ^ Gradient stops
-       -> Dynamic t (Map Text Text)
+       -> AttributeSet t "linearGradient" "SVG"
        -- ^ Attributes
        -> m (Svg t)
-linear stops attributes =
-  fst <$> svgDynAttr' "linearGradient" attributes (dynStops stops)
-
--- | The start and end points of the line that a linear gradient
--- follows.
-linearPath :: V2 Double
-           -- ^ point corresponding to @offset = 0@
-           -> V2 Double
-           -- ^ point corresponding to @offset = 1@
-           -> Map Text Text
-linearPath (V2 x₁ y₁) (V2 x₂ y₂) =
-  [ ("x1", toAttributeValue x₁), ("y1", toAttributeValue y₁)
-  , ("x2", toAttributeValue x₂), ("y2", toAttributeValue y₂)
-  ]
+linear stops attributes = fst <$> svg attributes (dynStops stops)
 
 -- | A radial gradient which transitions colors from a center point
 -- (@offset = 0@) out in a circle up to some radius (@offset = 1@).
 radial :: forall m t. Dom t m
        => Dynamic t [Stop]
        -- ^ Gradient stops
-       -> Dynamic t (Map Text Text)
+       -> AttributeSet t "radialGradient" "SVG"
        -- ^ Attributes
        -> m (Svg t)
-radial stops attributes =
-  fst <$> svgDynAttr' "radialGradient" attributes (dynStops stops)
+radial stops attributes = fst <$> svg attributes (dynStops stops)
 
-  -- TODO: handle changing focal point/etc
--- | The center and radius for the circle covered by a radial
--- gradient.
-radialPath :: V2 Double
-           -- ^ center of the circle, corresponding to @offset = 0@
-           -> Double
-           -- ^ radius of the circle; @offset = 1@ at points at least
-           -- @radius@ away from @center@
-           -> Map Text Text
-radialPath (V2 x y) r =
-  [("cx", toAttributeValue x), ("cy", toAttributeValue y), ("r", toAttributeValue r)]
+-- | A gradient stop. Defines a color and a position that the gradient
+-- will transition through.
+stop :: forall m t. Dom t m
+     => AttributeSet t "stop" "SVG"
+     -- ^ attributes
+     -> m (Svg t)
+stop = svg'
 
 -- | A dynamic set of @stop@ elements.
 dynStops :: forall m t. Dom t m
          => Dynamic t [Stop]
          -> m ()
-dynStops stops = Dom.dyn_ $ stops <&> mapM_ \ stop ->
-  svgAttr' "stop" (toAttributes stop) (pure ())
-
--- | How a gradient should behave outside of its bounds—what to do
--- when @offset@ would logically be below 0 or above 1?
---
--- >>> toAttributes Pad
--- fromList [("spreadMethod","pad")]
-data Spread = Pad
-              -- ^ Fill out the remainder of the space with a solid
-              -- color from @offset = 0@ or @offset = 1@ as
-              -- appropriate.
-
-            | Reflect
-              -- ^ Render the gradient /inverted/ (ie treat the offset
-              -- as @1 - offset@).
-
-            | Repeat
-              -- ^ Repeat the gradient, resetting @offset@ to @0..1@.
-  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
-  deriving anyclass (Hashable)
-  deriving AsAttributeValue via Lowercase Spread
-
--- | The coordinate system for a gradient.
---
--- This defines how gradient coordinates are translated to actual
--- coordinates when the gradient is used.
---
--- >>> toAttributes UserSpaceOnUse
--- fromList [("gradientUnits","userSpaceOnUse")]
-data GradientUnits = UserSpaceOnUse
-                     -- ^ Use the __user coordinates__ at the time and
-                     -- place the gradient is applied.
-                     --
-                     -- Percentage values are computed relative to the
-                     -- /current SVG viewport/.
-
-                   | ObjectBoundingBox
-                     -- ^ Use coordinates defined based on the
-                     -- /bounding box/ of the element the gradient
-                     -- applies to.
-                     --
-                     -- Percentage values are computed relative to the
-                     -- bounding box.
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
-  deriving anyclass (Hashable)
-
-instance AsAttributeValue GradientUnits where
-  toAttributeValue = \case
-    UserSpaceOnUse    -> "userSpaceOnUse"
-    ObjectBoundingBox -> "objectBoundingBox"
-
-  fromAttributeValue = \case
-    "userSpaceOnUse"    -> Just UserSpaceOnUse
-    "objectBoundingBox" -> Just ObjectBoundingBox
-    _                   -> Nothing
+dynStops stops = Dom.dyn_ $ stops <&> mapM_ \ (Stop off color) ->
+  stop [ stop_color =: color
+       , offset =: off
+       ]
 
 -- * SVG Namespace
 
