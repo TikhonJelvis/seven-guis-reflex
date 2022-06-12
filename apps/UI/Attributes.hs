@@ -65,10 +65,8 @@ import           UI.Url                     (Url)
 --   ...
 -- }
 -- @
-id_ :: Attribute "id" ["HTML", "SVG"]
-id_ = Attribute
-
-type instance AttributeValue "id" ["HTML", "SVG"] = Id
+id_ :: Attribute ["HTML", "SVG"] Id
+id_ = Attribute "id"
 
 -- ** CSS Classes
 
@@ -98,10 +96,8 @@ type instance AttributeValue "id" ["HTML", "SVG"] = Id
 --     , class_ :== classIf "dragged" <$> beingDragged
 --     ]
 -- @
-class_ :: Attribute "class" ["HTML", "SVG"]
-class_ = Attribute
-
-type instance AttributeValue "class" ["HTML", "SVG"] = Set ClassName
+class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
+class_ = Attribute "class"
 
 -- * Element Attributes
 
@@ -112,7 +108,5 @@ type instance AttributeValue "class" ["HTML", "SVG"] = Set ClassName
 -- @
 -- a [href := "https://example.com"] "link to example.com"
 -- @
-href :: Attribute "href" ["a", "area", "base", "link", "use"]
-href = Attribute
-
-type instance AttributeValue "href" ["a", "area", "base", "link", "use"] = Url
+href :: Attribute ["a", "area", "base", "link", "use"] Url
+href = Attribute "href"

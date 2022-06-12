@@ -8,113 +8,84 @@ import           Data.Text     (Text)
 import           GHC.Generics  (Generic)
 
 import           UI.Attributes (AsAttributeValue (..), Attribute (..),
-                                AttributeValue, Lowercase (..))
+                                Lowercase (..))
 import           UI.Color      (Color)
 import           UI.SVG.Path   (Path)
 
 -- * Sizes and Positions
 
 -- | The x coordinate of an element in the user coordinate system.
-x :: Attribute "x" '["image", "rect", "svg", "use"]
-x = Attribute
-
-type instance AttributeValue "x" '["image", "rect", "svg", "use"] = Double
+x :: Attribute '["image", "rect", "svg", "use"] Double
+x = Attribute "x"
 
 -- | The y coordinate of an element in the user coordinate system.
-y :: Attribute "y" '["image", "rect", "svg", "use"]
-y = Attribute
-
-type instance AttributeValue "y" '["image", "rect", "svg", "use"] = Double
+y :: Attribute '["image", "rect", "svg", "use"] Double
+y = Attribute "y"
 
 -- | The x coordinate of the start point in a line.
-x1 :: Attribute "x1" '["line", "linearGradient"]
-x1 = Attribute
+x1 :: Attribute '["line", "linearGradient"] Double
+x1 = Attribute "x1"
 
 -- | 'x1' but cool
-x₁ :: Attribute "x1" '["line", "linearGradient"]
+x₁ :: Attribute '["line", "linearGradient"] Double
 x₁ = x1
 
-type instance AttributeValue "x1" '["line", "linearGradient"] = Double
-
 -- | The x coordinate of the end point in a line.
-x2 :: Attribute "x2" '["line", "linearGradient"]
-x2 = Attribute
+x2 :: Attribute '["line", "linearGradient"] Double
+x2 = Attribute "x2"
 
 -- | 'x2' but cool
-x₂ :: Attribute "x2" '["line", "linearGradient"]
+x₂ :: Attribute '["line", "linearGradient"] Double
 x₂ = x2
 
-type instance AttributeValue "x2" '["line", "linearGradient"] = Double
-
 -- | The x coordinate of the start point in a line.
-y1 :: Attribute "y1" '["line", "linearGradient"]
-y1 = Attribute
+y1 :: Attribute '["line", "linearGradient"] Double
+y1 = Attribute "y1"
 
 -- | 'y1' but cool
-y₁ :: Attribute "y1" '["line", "linearGradient"]
+y₁ :: Attribute '["line", "linearGradient"] Double
 y₁ = y1
 
-type instance AttributeValue "y1" '["line", "linearGradient"] = Double
-
 -- | The x coordinate of the start point in a line.
-y2 :: Attribute "y2" '["line", "linearGradient"]
-y2 = Attribute
+y2 :: Attribute '["line", "linearGradient"] Double
+y2 = Attribute "y2"
 
 -- | 'y2' but cool
-y₂ :: Attribute "y2" '["line", "linearGradient"]
+y₂ :: Attribute '["line", "linearGradient"] Double
 y₂ = y2
 
-type instance AttributeValue "y2" '["line", "linearGradient"] = Double
-
 -- | The horizontal length of an element in the user coordinate system.
-width :: Attribute "width" '["image", "mask", "pattern", "rect", "svg", "use"]
-width = Attribute
-
-type instance AttributeValue "width" '["image", "mask", "pattern", "rect", "svg", "use"] = Double
+width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Double
+width = Attribute "width"
 
 -- | The vertical length of an element in the user coordiante system.
-height :: Attribute "height" '["image", "mask", "pattern", "rect", "svg", "use"]
-height = Attribute
-
-type instance AttributeValue "height" '["image", "mask", "pattern", "rect", "svg", "use"] = Double
+height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Double
+height = Attribute "height"
 
 -- | The x coordinate of the shape's center.
-cx :: Attribute "cx" '["circle", "ellipse", "radialGradient"]
-cx = Attribute
-
-type instance AttributeValue "cx" '["circle", "ellipse", "radialGradient"] = Double
+cx :: Attribute '["circle", "ellipse", "radialGradient"] Double
+cx = Attribute "cx"
 
 -- | The y coordinate of the shape's center.
-cy :: Attribute "cy" '["circle", "ellipse", "radialGradient"]
-cy = Attribute
-
-type instance AttributeValue "cy" '["circle", "ellipse", "radialGradient"] = Double
+cy :: Attribute '["circle", "ellipse", "radialGradient"] Double
+cy = Attribute "cy"
 
 -- | The radius of the shape.
-r :: Attribute "r" '["circle", "radialGradient"]
-r = Attribute
-
-type instance AttributeValue "r" '["circle", "radialGradient"] = Double
-
+r :: Attribute '["circle", "radialGradient"] Double
+r = Attribute "r"
 
 -- * Paths
 
 -- | The @d@ attribute that specifies the shape of a path.
 --
 -- See 'Path' for details and examples.
-d :: Attribute "d" '["path", "glyph", "missing-glyph"]
-d = Attribute
-
-type instance AttributeValue "d" '["path", "glyph", "missing-glyph"] = Path
+d :: Attribute '["path", "glyph", "missing-glyph"] Path 
+d = Attribute "d"
 
 -- | The total length of a path in user units. Setting this scales the
 -- distance for drawing an element by @pathLength/computedLength)@.
-pathLength :: Attribute "pathLength"
-  '["circle", "ellipse", "line", "path", "polygon", "polyline", "rect"]
-pathLength = Attribute
-
-type instance AttributeValue "pathLength"
-  '["circle", "ellipse", "line", "path", "polygon", "polyline", "rect"] = Double
+pathLength :: Attribute '["circle", "ellipse", "pathLength", "line", "path", "polygon", "polyline", "rect"] Double
+pathLength = Attribute "pathLength"
 
 -- * Gradients
 
@@ -145,10 +116,8 @@ data SpreadMethod = Pad
 -- | How a gradient should behave outside of its bounds.
 --
 -- See 'SpreadMethod'.
-spreadMethod :: Attribute "spreadMethod" Gradients
-spreadMethod = Attribute
-
-type instance AttributeValue "spreadMethod" Gradients = SpreadMethod
+spreadMethod :: Attribute Gradients SpreadMethod
+spreadMethod = Attribute "spreadMethod"
 
 -- | The coordinate system for a gradient.
 --
@@ -187,26 +156,20 @@ instance AsAttributeValue GradientUnits where
 -- | The coordinate system for the gradient.
 --
 -- See 'GradientUnits'
-gradientUnits :: Attribute "gradientUnits" Gradients
-gradientUnits = Attribute
-
-type instance AttributeValue "gradientUnits" Gradients = GradientUnits
+gradientUnits :: Attribute Gradients GradientUnits
+gradientUnits = Attribute "gradientUnits"
 
 -- ** Gradient Stops
 
 -- | The color for a gradient stop.
 --
 -- See 'linear' and 'radial' for details.
-stop_color :: Attribute "stop-color" '["stop"]
-stop_color = Attribute
-
-type instance AttributeValue "stop-color" '["stop"] = Color
+stop_color :: Attribute '["stop"] Color
+stop_color = Attribute "stop-color"
 
 -- | How far along the gradient to place this stop.
-offset :: Attribute "offset" '["stop"]
-offset = Attribute
-
-type instance AttributeValue "offset" '["stop"] = Double
+offset :: Attribute '["stop"] Double
+offset = Attribute "offset"
 
 -- * Presentation
 

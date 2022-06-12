@@ -25,14 +25,12 @@ import           Data.Type.Bool
 import           Data.Type.Equality
 
 import           GHC.Exts                (IsList (..))
-import           GHC.TypeLits            (ErrorMessage (..), KnownSymbol,
-                                          Symbol, TypeError)
+import           GHC.TypeLits            (ErrorMessage (..), Symbol, TypeError)
 
 import           Reflex                  (Dynamic, Reflex, zipDynWith)
 
 import qualified UI.Attributes.Attribute as Attribute
-import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute (..),
-                                          AttributeValue)
+import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute (..))
 import           UI.Type.List            (Elem, KnownSymbols, ShowList)
 
 import qualified Unsafe.Coerce           as Unsafe
@@ -139,9 +137,7 @@ singleton :: forall (element :: Symbol) (namespace :: Symbol) t. Reflex t
           => SetAttribute t element namespace
           -> AttributeSet t element namespace
 singleton = \case
-  Constant attribute value ->
-    AttributeSet $ DMap.singleton (AttributeKey attribute) (pure value)
-  Dynamic attribute value ->
+  SetAttribute attribute value ->
     AttributeSet $ DMap.singleton (AttributeKey attribute) value
 
 instance Display (AttributeSet t element namespace) where
@@ -158,10 +154,8 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
     where go :: SetAttribute t element namespace
              -> DMap (AttributeKey element namespace) (Dynamic t)
              -> DMap (AttributeKey element namespace) (Dynamic t)
-          go (Constant attribute v) m =
-            DMap.insertWithKey' combineDyn (AttributeKey attribute) (pure v) m
-          go (Dynamic attribute v) m =
-            DMap.insertWithKey' combineDyn (AttributeKey attribute) v m
+          go (SetAttribute attribute v)=
+            DMap.insertWithKey' combineDyn (AttributeKey attribute) v
 
           combineDyn _ = Reflex.zipDynWith combineAttributeValues
 
@@ -171,7 +165,7 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
              -> Dynamic t v
              -> [SetAttribute t element namespace]
              -> [SetAttribute t element namespace]
-          go (AttributeKey attribute) v sets = Dynamic attribute v : sets
+          go (AttributeKey attribute) v sets = SetAttribute attribute v : sets
 
 -- * AttributeKey
 
@@ -179,12 +173,10 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
 -- each value corresponding to an attribute in the set
 -- (@AttributeValue name supports@).
 data AttributeKey element namespace (a :: Type) where
-  AttributeKey :: ( KnownSymbol name
-                  , KnownSymbols supports
-                  , Compatible element namespace name supports
-                  , a ~ AttributeValue name supports
+  AttributeKey :: ( KnownSymbols supports
+                  , Compatible element namespace supports
                   , AsAttributeValue a)
-               => Attribute name supports
+               => Attribute supports a
                -> AttributeKey element namespace a
 
 instance Show (AttributeKey element namespace a) where
@@ -200,15 +192,12 @@ instance GEq (AttributeKey element namespace) where
     | Attribute.name a == Attribute.name b &&
       Attribute.supports a == Attribute.supports b =
       Just $ Unsafe.unsafeCoerce Refl
-      -- a in AttributeKey a is uniquely determined by the name and
-      -- elements of the attribute:
+      -- this is safe as long as we don't define and use an attribute
+      -- with the same name and supported elements but different types
       --
-      -- AttributeKey :: Attribute name supports
-      --              -> AttributeKey (AttributeValue name supports)
-      --
-
-      -- TODO: there's probably some way to produce a witness for
-      -- this, but I don't want to figure it out just now...
+      -- I had an earlier design of the code that kept track of
+      -- attribute names at the type level and prevented this
+      -- possibility, but the extra complexity did not seem worth it
 
     | otherwise = Nothing
 
@@ -246,41 +235,30 @@ instance GCompare (AttributeKey element namespace) where
 -- To accomplish this we need to do a bit of type-level computation to
 -- match things up.
 
-type family Compatible element namespace name supports :: Constraint where
-  Compatible element namespace name supports =
+type family Compatible element namespace supports :: Constraint where
+  Compatible element namespace supports =
     If (Elem element supports || Elem namespace supports)
        (() :: Constraint)
-       (Incompatible element namespace name supports)
+       (Incompatible element namespace supports)
 
-type family Incompatible element namespace name supports :: Constraint where
-  Incompatible element namespace name supports = TypeError
-    ( 'Text name ':<>: 'Text " is not compatible with the " ':<>:
-      'Text namespace ':<>: 'Text " element " ':<>: 'Text element ':$$:
-      'Text name ':<>: 'Text " supports " ':<>: 'Text (ShowList supports)
-    )
+type family Incompatible element namespace supports :: Constraint where
+  Incompatible element namespace supports = TypeError
+    ('Text "Incompatible attribute" ':$$:
+     'Text "Element: " ':<>: 'Text element ':<>:
+     'Text "(" ':<>: 'Text namespace ':<>: 'Text ")" ':$$:
+     'Text "Attribute supports: " ':<>: 'Text (ShowList supports))
 
 -- * SetAttribute
 
--- | How to set an attribute, covering both 'Constant' values that
--- don't change over time and 'Dynamic' values that /can/ change over
--- time.
+-- | Set an attribute to a value of a compatible type.
 data SetAttribute t element namespace where
-  Constant :: ( KnownSymbol name
-              , KnownSymbols supports
-              , AsAttributeValue (AttributeValue name supports)
-              , Compatible element namespace name supports
-              )
-           => Attribute name supports
-           -> AttributeValue name supports
-           -> SetAttribute t element namespace
-  Dynamic  :: ( KnownSymbol name
-              , KnownSymbols supports
-              , AsAttributeValue (AttributeValue name supports)
-              , Compatible element namespace name supports
-              )
-           => Attribute name supports
-           -> Dynamic t (AttributeValue name supports)
-           -> SetAttribute t element namespace
+  SetAttribute :: ( KnownSymbols supports
+                  , AsAttributeValue a
+                  , Compatible element namespace supports
+                  )
+               => Attribute supports a
+               -> Dynamic t a
+               -> SetAttribute t element namespace
 
 -- ** Rendering to reflex-dom
 

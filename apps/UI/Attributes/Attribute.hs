@@ -1,5 +1,5 @@
-{-# LANGUAGE AllowAmbiguousTypes    #-}
-{-# LANGUAGE StandaloneDeriving     #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 -- | The 'Attribute' type represents HTML/SVG/XML
 -- attributes.
 --
@@ -15,9 +15,9 @@
 -- The @class@ attribute, global across all HTML and SVG elements:
 --
 -- @
--- class_ :: Attribute "class" ["HTML", "SVG"] (Set ClassName)
---                        ↑            ↑              ↑
---                     attribute    supports    type of values
+-- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
+--                            ↑            ↑
+--                         supports    type of values
 -- @
 --
 -- Note: when a name overlaps with a reserved word or Prelude function
@@ -28,7 +28,7 @@
 -- elements:
 --
 -- @
--- placeholder :: Attribute "placeholder" ["input"] Text
+-- placeholder :: Attribute ["input"] Text
 -- @
 --
 -- Note: this module is designed to be imported qualified. Common
@@ -41,12 +41,9 @@
 module UI.Attributes.Attribute
   ( Attribute (Attribute)
   , name
-  , name'
 
   , supports
   , supports'
-
-  , AttributeValue
 
   , AsAttributeValue (..)
   , ShowRead (..)
@@ -59,7 +56,6 @@ where
 
 import qualified Data.Char              as Char
 import           Data.Hashable          (Hashable)
-import           Data.Proxy             (Proxy (..))
 import           Data.Set               (Set)
 import           Data.Text              (Text)
 import qualified Data.Text              as Text
@@ -67,7 +63,7 @@ import           Data.Text.Display      (Display (..))
 import qualified Data.Text.Lazy.Builder as Builder
 
 import           GHC.Generics           (Generic)
-import           GHC.TypeLits           (KnownSymbol, Symbol, symbolVal)
+import           GHC.TypeLits           (Symbol)
 
 import           Numeric.Natural        (Natural)
 
@@ -93,7 +89,8 @@ import           UI.Type.List           (KnownSymbols, knownSymbols)
 -- An attribute that can be set on /any/ HTML or SVG element:
 --
 -- @
--- class_ :: Attribute "class" ["HTML", "SVG"] (Set ClassName)
+-- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
+-- class_ = Attribute "class"
 -- @
 --
 -- Note: when a name overlaps with a reserved word or Prelude function
@@ -103,51 +100,27 @@ import           UI.Type.List           (KnownSymbols, knownSymbols)
 -- An attribute that can be set on HTML @input@ elements:
 --
 -- @
--- placeholder :: Attribute "placeholder" ["input"] Text
+-- placeholder :: Attribute ["input"] Text
+-- placeholder = Attribute "placeholder"
 -- @
-data Attribute (name :: Symbol) (supports :: [Symbol]) = Attribute
+newtype Attribute (supports :: [Symbol]) a = Attribute { name :: Text }
   deriving stock (Eq, Ord, Generic)
   deriving anyclass (Hashable)
 
 -- | A Haskell literal with an explicit type annotation:
 --
 -- >>> show class_
--- "(Attribute :: Attribute \"class\" '[\"HTML\",\"SVG\"])"
-instance (KnownSymbol name, KnownSymbols supports) =>
-  Show (Attribute name supports) where
-  show attribute = "(Attribute :: Attribute "
-                <> show (name attribute)
-                <> " '"
-                <> show (supports attribute)
-                <> ")"
+-- "(Attribute \"class\" :: Attribute \"class\" '[\"HTML\",\"SVG\"])"
+instance KnownSymbols supports => Show (Attribute supports a) where
+  show attribute@Attribute { name } =
+    "(Attribute " <> show name <> " :: Attribute '" <> show (supports attribute) <> ")"
 
 -- | Just the attribute name
 --
 -- >>> display class_
 -- "class"
-instance KnownSymbol name => Display (Attribute name supports) where
+instance Display (Attribute supports a) where
   displayBuilder = Builder.fromText . name
-
--- | Get the name of an attribute.
---
--- >>> name class_
--- "class"
-name :: forall (name :: Symbol) supports. KnownSymbol name
-     => Attribute name supports
-     -- ^ attribute
-     -> Text
-     -- ^ attribute name
-name _ = name' @name
-
--- | Get the name of an attribute from a type variable.
---
--- This has an ambiguous type variable, so it need to be used with an
--- explicit type application:
---
--- >>> name' @"class"
--- "class"
-name' :: forall (name :: Symbol). KnownSymbol name => Text
-name' = Text.pack $ symbolVal (Proxy :: Proxy name)
 
 -- | Get the elements an attribute supports.
 --
@@ -156,9 +129,8 @@ name' = Text.pack $ symbolVal (Proxy :: Proxy name)
 --
 -- >>> supports href
 -- ["a","area","base","link"]
-supports :: forall (supports :: [Symbol]) name. KnownSymbols supports
-         => Attribute name supports
-         -> [Text]
+supports :: forall supports a. KnownSymbols supports
+         => Attribute supports a -> [Text]
 supports _ = supports' @supports
 
 -- | Get the elements an attribute supports.
@@ -171,36 +143,7 @@ supports _ = supports' @supports
 supports' :: forall (supports :: [Symbol]). KnownSymbols supports => [Text]
 supports' = knownSymbols @supports
 
-
 -- * Attribute Values
-
--- | The value type for a given attribute. The type that an attribute
--- takes is uniquely determined by the name and the elements it
--- applies to. Keeping track of the elements lets us manage attributes
--- that have the same name but different values in different contexts.
---
--- __Examples__
---
--- Defining the HTML/SVG @id@ attribute, using 'Id' for the value:
---
--- @
--- id_ :: Attribute "id" ["HTML", "SVG"]
--- id_ = Attribute'
---
--- type instance AttributeValue "id" ["HTML", "SVG"] = Id
--- @
---
--- Defining the @ping@ attribute for @a@ and @area@ elements:
---
--- @
--- ping :: Attribute "ping" ["a", "area"]
--- ping = Attribute'
---
--- type instance AttributeValue "ping" ["a", "area"] = [Url]
--- @
-type family AttributeValue (name :: Symbol) (supports :: [Symbol])
-
--- ** As Attribute Value
 
 -- | Types that can be converted to and from HTML or XML attribute
 -- values.

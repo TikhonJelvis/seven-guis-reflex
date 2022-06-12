@@ -23,14 +23,10 @@ module UI.Attributes.AttributeSet
   )
 where
 
-
-import           GHC.TypeLits                        (KnownSymbol)
-
-import           Reflex                              (Dynamic)
+import           Reflex                              (Dynamic, Reflex)
 
 import           UI.Attributes.Attribute             (AsAttributeValue (..),
-                                                      Attribute (..),
-                                                      AttributeValue)
+                                                      Attribute (..))
 import           UI.Attributes.AttributeSet.Internal
 import           UI.Type.List                        (KnownSymbols)
 
@@ -43,19 +39,19 @@ import           UI.Type.List                        (KnownSymbols)
 -- __Example__
 --
 -- @
--- div [ class_ := ["draggable", "card"] ]
+-- div [ class_ =: ["draggable", "card"] ]
 -- @
-(=:) :: ( KnownSymbol name
+(=:) :: ( Reflex t
         , KnownSymbols supports
-        , AsAttributeValue (AttributeValue name supports)
-        , Compatible element namespace name supports
+        , AsAttributeValue a
+        , Compatible element namespace supports
         )
-     => Attribute name supports
+     => Attribute supports a
      -- ^ attribute
-     -> AttributeValue name supports
+     -> a
      -- ^ static value
      -> SetAttribute t element namespace
-(=:) = Constant
+attribute =: value = SetAttribute attribute (pure value)
 infixr 1 =:
 
 -- | Set an attribute to a dynamic value that /can/ change over time.
@@ -63,17 +59,16 @@ infixr 1 =:
 -- __Example__
 --
 -- @
--- div [ class_ :== classIf "dragged" <$> beingDragged ]
+-- div [ class_ ==: classIf "dragged" <$> beingDragged ]
 -- @
-(==:) :: ( KnownSymbol name
-         , KnownSymbols supports
-         , AsAttributeValue (AttributeValue name supports)
-         , Compatible element namespace name supports
+(==:) :: ( KnownSymbols supports
+         , AsAttributeValue a
+         , Compatible element namespace supports
          )
-      => Attribute name supports
+      => Attribute supports a
       -- ^ attribute
-      -> Dynamic t (AttributeValue name supports)
+      -> Dynamic t a
       -- ^ dynamic value
       -> SetAttribute t element namespace
-(==:) = Dynamic
+(==:) = SetAttribute
 infixr 1 ==:
