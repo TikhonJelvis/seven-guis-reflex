@@ -20,8 +20,10 @@ import           UI.Attributes                (AsAttributeValue (..),
                                                Transform (..), native,
                                                skipHtmlWhitespace)
 import           UI.Color                     (Color)
+import           UI.Id                        (Id (..))
 import           UI.Style                     (Angle, px, toCss)
 import           UI.SVG.Path                  (Path)
+import qualified UI.Url                       as Url
 
 -- * Sizes and Positions
 
@@ -419,7 +421,7 @@ data Paint = None
            -- ^ A solid color
 
              -- TODO: structured URL type?
-           | Url Text (Maybe Color)
+           | Url Url.Url (Maybe Color)
            -- ^ A URL referencing a "paint server": a
            -- @linearGradient@, @pattern@ or @radialGradient@
 
@@ -439,7 +441,7 @@ instance AsAttributeValue Paint where
     Url u (Just fallback) -> url u <> " " <> toAttributeValue fallback
     ContextFill           -> "context-fill"
     ContextStroke         -> "context-stroke"
-    where url u = "url(" <> u <> ")"
+    where url u = "url(" <> Url.toText u <> ")"
 
   fromAttributeValue = error "parsePaint not implemented yet"
 
@@ -469,5 +471,5 @@ instance IsString Paint where
 --   defs [("bg", \ attrs -> pattern_ attrs c)]
 --   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
 -- @
-paintWith :: Text -> Paint
-paintWith id_ = Url ("#" <> id_) Nothing
+paintWith :: Id -> Paint
+paintWith id_ = Url (Url.byId id_) Nothing
