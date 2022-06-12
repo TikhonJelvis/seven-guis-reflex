@@ -379,37 +379,15 @@ data Linecap = Butt
              | Round
              -- ^ The ends of a line are rounded, with the radius
              -- determined by @stroke-width@.
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-
-instance AsAttributeValue Linecap where
-  toAttributeValue = \case
-    Butt   -> "butt"
-    Square -> "square"
-    Round  -> "round"
-
-  fromAttributeValue = \case
-    "butt"   -> Just Butt
-    "square" -> Just Square
-    "round"  -> Just Round
-    _        -> Nothing
+  deriving AsAttributeValue via Lowercase Linecap
 
 -- | How to draw the joints between two line segments.
 data Linejoin = Miter | Round_ | Bevel
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-
-instance AsAttributeValue Linejoin where
-  toAttributeValue = \case
-    Miter  -> "miter"
-    Round_ -> "round"
-    Bevel  -> "bevel"
-
-  fromAttributeValue = \case
-    "miter" -> Just Miter
-    "round" -> Just Round_
-    "bevel" -> Just Bevel
-    _       -> Nothing
+  deriving AsAttributeValue via Lowercase Linejoin
 
 -- ** Paint
 
