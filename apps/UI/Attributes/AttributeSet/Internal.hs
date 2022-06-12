@@ -55,6 +55,7 @@ import qualified Unsafe.Coerce           as Unsafe
 -- myAttributes =
 --   [ class_ =: ["draggable", "card"]
 --   , position =: Relative
+--   , rotate ==: Turn <$> rotateControl
 --   ]
 -- @
 --
@@ -170,8 +171,7 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
 -- * AttributeKey
 
 -- | The type used internally in 'AttributeSet' to track the type of
--- each value corresponding to an attribute in the set
--- (@AttributeValue name supports@).
+-- the value that corresponds to an attribute.
 data AttributeKey element namespace (a :: Type) where
   AttributeKey :: ( KnownSymbols supports
                   , Compatible element namespace supports
@@ -180,7 +180,9 @@ data AttributeKey element namespace (a :: Type) where
                -> AttributeKey element namespace a
 
 instance Show (AttributeKey element namespace a) where
-  show (AttributeKey attribute) = show attribute
+  show (AttributeKey attribute) =
+    "AttributeKey " <> show (name attribute) <>
+    " (" <> show (type_ attribute) <> ")"
 
 instance Display (AttributeKey element namespace a) where
   displayBuilder (AttributeKey attribute) = displayBuilder attribute
@@ -189,17 +191,13 @@ instance GShow (AttributeKey element namespace) where gshowsPrec = showsPrec
 
 instance GEq (AttributeKey element namespace) where
   geq (AttributeKey a) (AttributeKey b)
-    | Attribute.name a == Attribute.name b &&
-      Attribute.supports a == Attribute.supports b =
-      Just $ Unsafe.unsafeCoerce Refl
-      -- this is safe as long as we don't define and use an attribute
-      -- with the same name and supported elements but different types
+    | type_ a == type_ b = Just $ Unsafe.unsafeCoerce Refl
+    | otherwise          = Nothing
+      -- as long as (type_ a) matches the value type of a—which the
+      -- smart constructors for Attribute ensure—this is safe
       --
-      -- I had an earlier design of the code that kept track of
-      -- attribute names at the type level and prevented this
-      -- possibility, but the extra complexity did not seem worth it
-
-    | otherwise = Nothing
+      -- there is presumably a way to do this without unsafeCoerce,
+      -- but I do not know what it is
 
 instance GCompare (AttributeKey element namespace) where
   gcompare ka@(AttributeKey a) kb@(AttributeKey b)

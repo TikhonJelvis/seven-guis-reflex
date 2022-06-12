@@ -35,8 +35,8 @@ import           Text.URI.QQ                (uri)
 
 import           UI.Element                 (Dom, Html, HtmlInput, el', elAttr',
                                              elDynAttr', input)
+import           UI.Element.IsElement       (rawHtmlInput)
 import           UI.Event                   (EventResult, on)
-import           UI.IsElement               (rawHtmlInput)
 import           UI.Main                    (Runnable (..), withCss)
 import qualified UI.PushMap                 as PushMap
 import           UI.PushMap                 (PushMap)

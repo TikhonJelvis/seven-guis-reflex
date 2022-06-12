@@ -32,7 +32,7 @@ import           Reflex.Dom                  (HasDomEvent, Reflex)
 
 import           Text.Printf                 (printf)
 
-import           UI.IsElement                (IsElement (..))
+import           UI.Element.IsElement        (IsElement (..))
 
 -- * Types of Events
 

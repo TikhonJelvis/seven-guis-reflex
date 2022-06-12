@@ -1,37 +1,37 @@
 module UI.Drag where
 
-import           Control.Applicative (liftA2)
-import           Control.Monad       (void)
+import           Control.Applicative  (liftA2)
+import           Control.Monad        (void)
 
-import           Data.Default.Class  (Default (..))
-import           Data.Foldable       (toList)
-import           Data.Functor        ((<&>))
-import           Data.Maybe          (fromMaybe, isJust)
-import           Data.Text           (Text)
+import           Data.Default.Class   (Default (..))
+import           Data.Foldable        (toList)
+import           Data.Functor         ((<&>))
+import           Data.Maybe           (fromMaybe, isJust)
+import           Data.Text            (Text)
 
-import           GHC.Generics        (Generic)
+import           GHC.Generics         (Generic)
 
-import qualified GHCJS.DOM.Document  as Document
-import qualified GHCJS.DOM.Element   as Element
+import qualified GHCJS.DOM.Document   as Document
+import qualified GHCJS.DOM.Element    as Element
 
-import           Linear              (V2 (..), _x, _y, distance, project, unit)
+import           Linear               (V2 (..), _x, _y, distance, project, unit)
 
 import qualified Reflex
-import           Reflex              (Dynamic, Event)
-import qualified Reflex.Dom          as Dom
+import           Reflex               (Dynamic, Event)
+import qualified Reflex.Dom           as Dom
 
-import           UI.Attributes       (Transition (..), rotate, s, scale,
-                                      transition, translate)
-import           UI.Element          (Dom, Html, el', elClass', elDynAttr')
-import           UI.Event            (Modifier (Shift), MouseButton (..),
-                                      MouseEventResult (..), button, client,
-                                      mouseEvent, on, performJs)
-import           UI.IsElement        (rawElement)
-import           UI.Main             (Runnable (..), withCss)
-import           UI.Style            (Angle (..), getComputedProperty,
-                                      setProperty)
-import           UI.Widget           (Enabled (..), checkbox, enabledIf, label,
-                                      labelFor, ul)
+import           UI.Attributes        (Transition (..), rotate, s, scale,
+                                       transition, translate)
+import           UI.Element           (Dom, Html, el', elClass', elDynAttr')
+import           UI.Element.IsElement (rawElement)
+import           UI.Event             (Modifier (Shift), MouseButton (..),
+                                       MouseEventResult (..), button, client,
+                                       mouseEvent, on, performJs)
+import           UI.Main              (Runnable (..), withCss)
+import           UI.Style             (Angle (..), getComputedProperty,
+                                       setProperty)
+import           UI.Widget            (Enabled (..), checkbox, enabledIf, label,
+                                       labelFor, ul)
 
 import qualified Witherable
 

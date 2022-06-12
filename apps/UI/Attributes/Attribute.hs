@@ -16,8 +16,8 @@
 --
 -- @
 -- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
---                            ↑            ↑
---                         supports    type of values
+--                            ↑               ↑
+--                         supports     type of values
 -- @
 --
 -- Note: when a name overlaps with a reserved word or Prelude function
@@ -31,19 +31,26 @@
 -- placeholder :: Attribute ["input"] Text
 -- @
 --
--- Note: this module is designed to be imported qualified. Common
--- pattern:
+-- 'Attribute' values don't have to map 1:1 to actual attributes on
+-- the element. We can also define __logical__ attributes that map to
+-- any number of physical attributes. For example, we could define a
+-- @p@ attribute that expands to @x@ and @y@:
 --
 -- @
--- import           UI.Attributes.Attribute (Attribute)
--- import qualified UI.Attributes.Attribute as Attribute
+-- p :: Attribute ["p"] Color
+-- p = logical "p" \ V2 x y ->
+--   ["x" =. x, "y" =. y]
 -- @
 module UI.Attributes.Attribute
-  ( Attribute (Attribute)
+  ( Attribute
   , name
-
+  , type_
   , supports
-  , supports'
+  , toAttributes
+
+  , native
+  , logical
+  , (=.)
 
   , AsAttributeValue (..)
   , ShowRead (..)
@@ -51,34 +58,47 @@ module UI.Attributes.Attribute
 
   , htmlWhitespace
   , isHtmlWhitespace
+  , skipHtmlWhitespace
   )
 where
 
-import qualified Data.Char              as Char
-import           Data.Hashable          (Hashable)
-import           Data.Set               (Set)
-import           Data.Text              (Text)
-import qualified Data.Text              as Text
-import           Data.Text.Display      (Display (..))
-import qualified Data.Text.Lazy.Builder as Builder
+import qualified Data.Char                    as Char
+import           Data.Map                     (Map)
+import           Data.Proxy                   (Proxy (..))
+import           Data.Set                     (Set)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as Text
+import           Data.Text.Display            (Display (..))
+import qualified Data.Text.Lazy.Builder       as Builder
+import           Data.Typeable                (TypeRep, Typeable, typeRep)
 
-import           GHC.Generics           (Generic)
-import           GHC.TypeLits           (Symbol)
+import           GHC.Generics                 (Generic)
+import           GHC.TypeLits                 (Symbol)
 
-import           Numeric.Natural        (Natural)
+import           Numeric.Natural              (Natural)
 
-import           Text.Read              (readMaybe)
+import           Text.ParserCombinators.ReadP (ReadP, skipMany, satisfy)
+import           Text.Read                    (readMaybe)
 
-import           UI.Type.List           (KnownSymbols, knownSymbols)
+import           UI.Type.List                 (KnownSymbols, knownSymbols)
 
 -- * Attributes
 
 -- $setup
 -- >>> import Data.Text.Display (display)
--- >>> let class_ = Attribute @"class" @["HTML", "SVG"]
--- >>> let href = Attribute @"href" @["a", "area", "base", "link"]
+-- >>> let class_ = native "class" @["HTML", "SVG"] @ClassName
+-- >>> let href = native "href" @["a", "area", "base", "link"] @Url
 
 -- | An attribute that can be set on HTML or XML elements.
+--
+-- This type supports two kinds of attributes:
+--
+--  * __native__ attributes that correspond 1:1 to element attributes
+--    (example: @class@, @id@, @width@)
+--
+--  * __logical__ attributes that map to /different/ attributes on the
+--    element (example: @c@ that expands to @cx@, @cy@ and @r@ for
+--    circles)
 --
 -- The type of an attribute tracks the type of elements it can
 -- support, either based on namespace (@"HTML"@, @"SVG"@) or based on
@@ -90,7 +110,7 @@ import           UI.Type.List           (KnownSymbols, knownSymbols)
 --
 -- @
 -- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
--- class_ = Attribute "class"
+-- class_ = native
 -- @
 --
 -- Note: when a name overlaps with a reserved word or Prelude function
@@ -101,19 +121,33 @@ import           UI.Type.List           (KnownSymbols, knownSymbols)
 --
 -- @
 -- placeholder :: Attribute ["input"] Text
--- placeholder = Attribute "placeholder"
+-- placeholder = native
 -- @
-newtype Attribute (supports :: [Symbol]) a = Attribute { name :: Text }
-  deriving stock (Eq, Ord, Generic)
-  deriving anyclass (Hashable)
-
--- | A Haskell literal with an explicit type annotation:
 --
--- >>> show class_
--- "(Attribute \"class\" :: Attribute \"class\" '[\"HTML\",\"SVG\"])"
-instance KnownSymbols supports => Show (Attribute supports a) where
-  show attribute@Attribute { name } =
-    "(Attribute " <> show name <> " :: Attribute '" <> show (supports attribute) <> ")"
+-- A logical attribute that maps to several concrete attributes:
+--
+-- @
+-- c :: Attribute ["circle"] Circle
+-- c = logical \ Circle { center = V2 x y, radius } ->
+--   ["cx" =. x, "cy" =. y, "r" =. radius]
+-- @
+data Attribute (supports :: [Symbol]) a = Attribute
+  { toAttributes :: a -> Map Text Text
+  -- ^ How to convert the attribute value to one or more HTML
+  -- attributes.
+
+  , name         :: Text
+  -- ^ A user-readable name for the attribute.
+  --
+  -- For native attributes, this will be the same as the element's
+  -- attribute name. For logical attributes, this can be anything, but
+  -- should be useful for error messages.
+
+  , type_        :: TypeRep
+  -- ^ A runtime representation of the value type in the attribute,
+  -- used to keep attribute set operations safe.
+  }
+  deriving stock (Generic)
 
 -- | Just the attribute name
 --
@@ -131,17 +165,61 @@ instance Display (Attribute supports a) where
 -- ["a","area","base","link"]
 supports :: forall supports a. KnownSymbols supports
          => Attribute supports a -> [Text]
-supports _ = supports' @supports
+supports _ = knownSymbols @supports
 
--- | Get the elements an attribute supports.
+-- | Define a __native__ attribute: an 'Attribute' that corresponds 1:1
+-- with an attribute on the element.
+native :: forall supports a. (Typeable a, AsAttributeValue a)
+       => Text
+       -- ^ attribute name
+       -> Attribute supports a
+native name = Attribute
+  { toAttributes = \ a -> [(name, toAttributeValue a)]
+  , type_ = typeRep (Proxy @a)
+  , name
+  }
+
+-- | Define a __logical__ attribute by providing a mapping from the
+-- attribute value to a set of HTML/XML attribute-value pairs.
 --
--- This has an ambiguous type variable, so it need to be used with an
--- explicit type application:
+-- __Example__
 --
--- >>> supports' @["SVG", "HTML"]
--- ["SVG","HTML"]
-supports' :: forall (supports :: [Symbol]). KnownSymbols supports => [Text]
-supports' = knownSymbols @supports
+-- @
+-- c :: Attribute '["circle"] Circle
+-- c = logical "c" \ Circle { center = V2 x y, radius } ->
+--       ["cx" =. x, "cy" =. y, "r" =. radius]
+-- @
+logical :: forall supports a. Typeable a
+        => Text
+        -- ^ attribute name
+        -> (a -> Map Text Text)
+        -- ^ mapping to native attributes
+        -> Attribute supports a
+logical name toAttributes =
+  Attribute { toAttributes, name, type_ = typeRep (Proxy @a) }
+
+-- | Encode a pair of an attribute name and value.
+--
+-- This is a helper function for defining logical attributes:
+--
+-- @
+-- c :: Attribute '["circle"] Circle
+-- c = logical "c" \ Circle { center = V2 x y, radius } ->
+--       ["cx" =. x, "cy" =. y, "r" =. radius]
+-- @
+--
+-- is the same as:
+--
+-- @
+-- c :: Attribute '["circle"] Circle
+-- c = logical "c" \ Circle { center = V2 x y, radius } ->
+--       [ ("cx", toAttributeValue x)
+--       , ("cy", toAttributeValue y)
+--       , ("r", toAttributeValue radius)
+--       ]
+-- @
+(=.) :: AsAttributeValue a => Text -> a -> (Text, Text)
+attribute =. value = (attribute, toAttributeValue value)
 
 -- * Attribute Values
 
@@ -207,7 +285,7 @@ deriving via ShowRead Word instance AsAttributeValue Word
 deriving via ShowRead Natural instance AsAttributeValue Natural
 deriving via ShowRead Double instance AsAttributeValue Double
 
--- *** Deriving Via
+-- ** Deriving Via
 
 -- | A type of deriving 'AsAttributeValue' for types that have 'Show'
 -- and 'Read' instances that work as attribute values directly.
@@ -290,3 +368,8 @@ isHtmlWhitespace c = c `elem` htmlWhitespace
 --
 htmlWhitespace :: Set Char
 htmlWhitespace = [' ', '\t', '\n', '\f', '\r']
+
+                 -- TODO: use a real parser combinator library?
+-- | A parser that skips any number of HTML whitespace characters.
+skipHtmlWhitespace :: ReadP ()
+skipHtmlWhitespace = skipMany $ satisfy isHtmlWhitespace

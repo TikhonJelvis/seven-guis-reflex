@@ -66,7 +66,8 @@ import           Linear                        (V2 (..), V3 (..))
 
 import           Text.Printf                   (printf)
 
-import           UI.IsElement                  (IsElement, rawElement)
+import           UI.Attributes.Attribute       (AsAttributeValue (..))
+import           UI.Element.IsElement          (IsElement, rawElement)
 
 -- * CSS Properties
 
@@ -458,6 +459,13 @@ instance ToCss Transform where
     where commas :: ToCss a => [a] -> Text
           commas = Text.intercalate ", " . map toCss
 
+    -- TODO: implement fromAttributeValue
+instance AsAttributeValue [Transform] where
+  toAttributeValue = Text.intercalate " " . map toCss
+  fromAttributeValue = error "unimplemented"
+
+  combineAttributeValues = (<>)
+
 -- ** Setting CSS Transforms
 
 -- | Add a transform function to a @style@ attribute.
@@ -618,7 +626,7 @@ instance ToCss BackfaceVisibility where
 -- | Set the @backface-visibility@ CSS property.
 backfaceVisibility :: BackfaceVisibility -> Map Text Text -> Map Text Text
 backfaceVisibility = setProperty "backface-visibility" . toCss
-  
+
 -- * Computed Styles
 
 -- $ Functions for working with the /computed/ style of DOM

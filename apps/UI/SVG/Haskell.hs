@@ -4,18 +4,16 @@
 module UI.SVG.Haskell where
 import           Data.Default.Class (Default (..))
 import           Data.Hashable      (Hashable)
-import           Data.Map           (Map)
-import           Data.Text          (Text)
 
 import           GHC.Generics       (Generic)
 
-import           Reflex             (Dynamic)
+import           Linear             (V2 (..))
 
+import           UI.Attributes      (AttributeSet, (=:))
 import           UI.Element         (Dom)
 import           UI.Main            (Runnable (..), withCss)
-import           UI.Style           (scale)
-import           UI.SVG             (Command (..), Path, Svg, g_, h, l, path,
-                                     svgAttr', v)
+import           UI.SVG             (Command (..), Path, Svg, ViewBox (..), d,
+                                     fill, g, h, l, path, svg, v, viewBox)
 
 -- * Haskell Logo in SVG
 
@@ -152,17 +150,16 @@ haskellPaths Haskell {..} = HaskellPaths { leftAngle, lambda, topLine, bottomLin
 -- Colors taken from Haskell.org logo
 haskell :: forall m t. Dom t m
         => Haskell
-        -> Dynamic t (Map Text Text)
+        -> AttributeSet t "g" "SVG"
         -> m (Svg t)
-haskell config attributes = g_ attributes
-  [ path (pure leftAngle)  (pure [("fill", "#453a62")])
-  , path (pure lambda)     (pure [("fill", "#5e5086")])
-  , path (pure topLine)    (pure [("fill", "#8f4e8b")])
-  , path (pure bottomLine) (pure [("fill", "#8f4e8b")])
-  ]
+haskell config attributes = fst <$> g attributes do
+  path [ d =: leftAngle, fill =: "#453a62" ]
+  path [ d =: lambda, fill =: "#5e5086" ]
+  path [ d =: topLine, fill =: "#8f4e8b"]
+  path [ d =: bottomLine, fill =: "#8f4e8b"]
   where HaskellPaths {..} = haskellPaths config
 
 main :: IO ()
 main = withCss "css/ui-demo.css" $ Runnable do
-  svgAttr' "svg" [("viewBox", "0 0 340 340")] do
-    haskell def $ pure $ scale 8 []
+  svg [viewBox =: ViewBox (V2 0 0) (V2 340 340)] do
+    haskell def []

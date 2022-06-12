@@ -1,15 +1,14 @@
 module UI.SVG
   ( Svg
 
-  , svg
-  , svg'
+  , svgElement
+  , svgElement'
 
+  , svg
   , g
-  , g_
 
   , defs
-  , Def
-  , def
+  , Def (..)
 
   , use
   , pattern_
@@ -31,32 +30,31 @@ module UI.SVG
   )
 where
 
-import           Control.Monad     (forM)
+import           Control.Monad        (forM)
 
-import           Data.Foldable     (sequenceA_)
-import           Data.Functor      ((<&>))
-import           Data.Hashable     (Hashable (..))
-import           Data.Map          (Map)
-import qualified Data.Map          as Map
-import           Data.Proxy        (Proxy (..))
-import           Data.Text         (Text)
-import qualified Data.Text         as Text
+import           Data.Functor         ((<&>))
+import           Data.Hashable        (Hashable (..))
+import           Data.Map             (Map)
+import qualified Data.Map             as Map
+import           Data.Proxy           (Proxy (..))
+import           Data.Text            (Text)
+import qualified Data.Text            as Text
 
-import           GHC.Generics      (Generic)
-import           GHC.TypeLits      (KnownSymbol, symbolVal)
+import           GHC.Generics         (Generic)
+import           GHC.TypeLits         (KnownSymbol, symbolVal)
 
-import           Reflex            (Dynamic, Reflex)
-import qualified Reflex.Dom        as Dom
+import           Reflex               (Dynamic, Reflex)
+import qualified Reflex.Dom           as Dom
 
-import           UI.Attributes     (AttributeSet, href, id_, toDom, (=:))
-import           UI.Color          (Color)
-import           UI.Element        (Dom, createElement)
-import qualified UI.Event          as Event
-import           UI.Id             (Id (..))
-import           UI.IsElement      (FromElement (..), IsElement (..))
+import           UI.Attributes        (AttributeSet, href, id_, toDom, (=:))
+import           UI.Color             (Color)
+import           UI.Element           (Dom, createElement)
+import           UI.Element.IsElement (FromElement (..), IsElement (..))
+import qualified UI.Event             as Event
+import           UI.Id                (Id (..))
 import           UI.SVG.Attributes
 import           UI.SVG.Path
-import qualified UI.Url            as Url
+import qualified UI.Url               as Url
 
 -- * SVG Elements
 
@@ -73,7 +71,7 @@ instance Reflex t => Dom.HasDomEvent t (Svg t) en where
   type DomEventType (Svg t) en = Event.EventResultType en
   domEvent eventName (Svg e) = Dom.domEvent eventName e
 
--- ** Creating Any Element
+-- * Creating SVG Elements
 
 -- | Create an SVG element.
 --
@@ -85,19 +83,19 @@ instance Reflex t => Dom.HasDomEvent t (Svg t) en where
 -- An @svg@ tag containing two circles:
 --
 -- @
--- svg @"svg" [] do
---   svg @"circle" [class_ =: "ball"] (pure ())
---   svg' @"circle" [class_ =: "ball"]
+-- svgElement @"svg" [] do
+--   svgElement @"circle" [class_ =: "ball"] (pure ())
+--   svgElement' @"circle" [class_ =: "ball"]
 -- @
-svg :: forall element a m t. (KnownSymbol element, Dom t m)
-    => AttributeSet t element "SVG"
-    -- ^ attributes
-    -> m a
-    -- ^ body
-    -> m (Svg t, a)
-svg = createElement Nothing tag . toDom
+svgElement :: forall element a m t. (KnownSymbol element, Dom t m)
+           => AttributeSet t element "SVG"
+           -- ^ attributes
+           -> m a
+           -- ^ body
+           -> m (Svg t, a)
+svgElement = createElement Nothing tag . toDom
   where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
-{-# INLINABLE svg #-}
+{-# INLINABLE svgElement #-}
 
 -- | Create an SVG element with no body.
 --
@@ -109,32 +107,36 @@ svg = createElement Nothing tag . toDom
 -- @
 -- svg' @"circle" [class_ =: "ball"]
 -- @
-svg' :: forall element m t. (KnownSymbol element, Dom t m)
-     => AttributeSet t element "SVG"
-     -> m (Svg t)
-svg' attributes = fst <$> svg attributes (pure ())
-{-# INLINABLE svg' #-}
+svgElement' :: forall element m t. (KnownSymbol element, Dom t m)
+            => AttributeSet t element "SVG"
+            -> m (Svg t)
+svgElement' attributes = fst <$> svgElement attributes (pure ())
+{-# INLINABLE svgElement' #-}
 
 -- ** Grouping
+
+-- | A container for SVG elements that defines a new coordinate system
+-- and viewport.
+--
+-- Can be used both inside other SVG elements and to embed SVG
+-- elements into HTML.
+svg :: forall a m t. Dom t m
+    => AttributeSet t "svg" "SVG"
+    -- ^ attributes
+    -> m a
+    -- ^ contents
+    -> m (Svg t, a)
+svg = svgElement
 
 -- | A group of SVG elements.
 g :: forall a m t. Dom t m
   => AttributeSet t "g" "SVG"
   -- ^ Attributes
-  -> [m a]
+  -> m a
   -- ^ SVG elements to group
-  -> m (Svg t, [a])
-g attributes = svg attributes . sequenceA
-
--- | A group of SVG elements, discarding the value returned from
--- creating each element.
-g_ :: forall a m t. Dom t m
-   => AttributeSet t "g" "SVG"
-   -- ^ Attributes
-   -> [m a]
-   -- ^ SVG elements to group
-   -> m (Svg t)
-g_ attributes = fmap fst . svg attributes . sequenceA_
+  -> m (Svg t, a)
+g = svgElement
+{-# INLINE g #-}
 
 -- | Define elements that are not rendered immediately, but can be
 -- used in other parts of the SVG (ie with 'use').
@@ -161,7 +163,7 @@ defs :: forall a m t. Dom t m
      -- ^ A list of definitions.
      -> m (Map Id a)
 defs definitions =
-  snd <$> svg @"defs" [] do
+  snd <$> svgElement @"defs" [] do
     Map.fromList <$> forM definitions \ (Def name create base) -> do
       result <- create $ base <> [id_ =: name]
       pure (name, result)
@@ -171,32 +173,20 @@ defs definitions =
 --
 -- When this is used, the @id@ attribute ('id_') in the base
 -- attributes will be overridden if set.
+--
+-- __Example__
+--
+-- @
+-- defs
+--   [ Def "example-circle" (circle (pure c)) [stroke =: "#000"]
+--   , Def "example-gradient" linearGradient gradientAttrs
+--   ]
+-- @
 data Def t m a where
   Def :: Id
       -> (AttributeSet t element "SVG" -> m a)
       -> AttributeSet t element "SVG"
       -> Def t m a
-
--- | Define an element with the given id and attributes.
---
--- If the @id@ attribute is set in the base attributes, it will be
--- overridden.
---
--- @
--- defs
---   [ def "example-circle" (circle (pure c)) [stroke =: "#000"]
---   , def "example-gradient" linearGradient gradientAttrs
---   ]
--- @
-def :: forall element a m t. Dom t m
-    => Id
-    -- ^ id to define
-    -> (AttributeSet t element "SVG" -> m a)
-    -- ^ function to create element given an attribute set
-    -> AttributeSet t element "SVG"
-    -- ^ base attribute set to pass into function
-    -> Def t m a
-def = Def
 
 -- | Use an element defined elsewhere in the current document,
 -- referenced by id.
@@ -224,7 +214,7 @@ use :: forall m t. Dom t m
     -- See MDN:
     -- [use](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use)
     -> m (Svg t)
-use elementId attributes = svg' $ attributes <> [ href =: Url.byId elementId ]
+use elementId attributes = svgElement' $ attributes <> [ href =: Url.byId elementId ]
 
 -- | A @pattern@ element defines an object that can be tiled along x-
 -- and y-coordinate intervals.
@@ -245,7 +235,7 @@ pattern_ :: forall a m t. Dom t m
          -> m a
          -- ^ Pattern contents
          -> m (Svg t, a)
-pattern_ = svg
+pattern_ = svgElement
 
 -- ** Shapes
 
@@ -267,7 +257,7 @@ circle :: forall m t. Dom t m
        => AttributeSet t "circle" "SVG"
        -- ^ attributes
        -> m (Svg t)
-circle = svg'
+circle = svgElement'
 
 -- | Create a retangle (@rect@ element).
 --
@@ -286,7 +276,7 @@ rect :: forall m t. Dom t m
      => AttributeSet t "rect" "SVG"
      -- ^ attributes
      -> m (Svg t)
-rect = svg'
+rect = svgElement'
 
 -- | A @path@ element.
 --
@@ -295,7 +285,7 @@ path :: forall m t. Dom t m
      => AttributeSet t "path" "SVG"
      -- ^ attributes
      -> m (Svg t)
-path = svg'
+path = svgElement'
 
 -- ** Gradients
 
@@ -343,7 +333,7 @@ linear :: forall m t. Dom t m
        -> AttributeSet t "linearGradient" "SVG"
        -- ^ Attributes
        -> m (Svg t)
-linear stops attributes = fst <$> svg attributes (dynStops stops)
+linear stops attributes = fst <$> svgElement attributes (dynStops stops)
 
 -- | A radial gradient which transitions colors from a center point
 -- (@offset = 0@) out in a circle up to some radius (@offset = 1@).
@@ -353,7 +343,7 @@ radial :: forall m t. Dom t m
        -> AttributeSet t "radialGradient" "SVG"
        -- ^ Attributes
        -> m (Svg t)
-radial stops attributes = fst <$> svg attributes (dynStops stops)
+radial stops attributes = fst <$> svgElement attributes (dynStops stops)
 
 -- | A gradient stop. Defines a color and a position that the gradient
 -- will transition through.
@@ -361,7 +351,7 @@ stop :: forall m t. Dom t m
      => AttributeSet t "stop" "SVG"
      -- ^ attributes
      -> m (Svg t)
-stop = svg'
+stop = svgElement'
 
 -- | A dynamic set of @stop@ elements.
 dynStops :: forall m t. Dom t m

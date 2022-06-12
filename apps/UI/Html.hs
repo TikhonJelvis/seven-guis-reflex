@@ -1,22 +1,22 @@
 -- | HTML elements.
 module UI.Html where
 
-import           Data.Proxy        (Proxy (..))
-import qualified Data.Text         as Text
+import           Data.Proxy           (Proxy (..))
+import qualified Data.Text            as Text
 
-import           GHC.TypeLits      (KnownSymbol, symbolVal)
+import           GHC.TypeLits         (KnownSymbol, symbolVal)
 
-import qualified GHCJS.DOM.Element as Element
-import qualified GHCJS.DOM.Types   as GHCJS
+import qualified GHCJS.DOM.Element    as Element
+import qualified GHCJS.DOM.Types      as GHCJS
 
-import           Reflex            (Reflex)
-import qualified Reflex.Dom        as Dom
+import           Reflex               (Reflex)
+import qualified Reflex.Dom           as Dom
 
-import           UI.Attributes     (AttributeSet, toDom)
-import           UI.Element        (Dom, createElement)
-import qualified UI.Event          as Event
-import           UI.IsElement      (FromElement (..), IsElement (..),
-                                    IsHtml (..), IsHtmlInput (..))
+import           UI.Attributes        (AttributeSet, toDom)
+import           UI.Element           (Dom, createElement)
+import           UI.Element.IsElement (FromElement (..), IsElement (..),
+                                       IsHtml (..), IsHtmlInput (..))
+import qualified UI.Event             as Event
 
 
 -- * HTML Elements

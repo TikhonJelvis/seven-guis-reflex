@@ -17,8 +17,8 @@ import           Reflex                      (Dynamic, Event)
 import qualified Reflex.Dom                  as Dom
 
 import           UI.Element
+import           UI.Element.IsElement        (IsElement (..))
 import           UI.Event                    (on)
-import           UI.IsElement                (IsElement (..))
 import           UI.Main                     (Runnable (..), withCss)
 import           UI.Widget
 

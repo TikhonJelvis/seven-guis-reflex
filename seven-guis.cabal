@@ -69,11 +69,11 @@ executable guis
     UI.Drag
     UI.Drop
     UI.Element
+    UI.Element.IsElement
     UI.Event
     UI.History
     UI.Html
     UI.Id
-    UI.IsElement
     UI.Main
     UI.PushMap
     UI.Style

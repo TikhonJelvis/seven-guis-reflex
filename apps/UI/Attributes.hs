@@ -66,7 +66,7 @@ import           UI.Url                     (Url)
 -- }
 -- @
 id_ :: Attribute ["HTML", "SVG"] Id
-id_ = Attribute "id"
+id_ = native "id"
 
 -- ** CSS Classes
 
@@ -97,7 +97,7 @@ id_ = Attribute "id"
 --     ]
 -- @
 class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
-class_ = Attribute "class"
+class_ = native "class"
 
 -- * Element Attributes
 
@@ -109,4 +109,4 @@ class_ = Attribute "class"
 -- a [href := "https://example.com"] "link to example.com"
 -- @
 href :: Attribute ["a", "area", "base", "link", "use"] Url
-href = Attribute "href"
+href = native "href"

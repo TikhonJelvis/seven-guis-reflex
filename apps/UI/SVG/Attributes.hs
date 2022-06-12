@@ -1,30 +1,41 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module UI.SVG.Attributes where
 
-import           Data.Hashable (Hashable)
-import           Data.Map      (Map)
-import           Data.String   (IsString (..))
-import           Data.Text     (Text)
+import           Data.Hashable                (Hashable)
+import           Data.Map                     (Map)
+import           Data.Maybe                   (listToMaybe)
+import           Data.String                  (IsString (..))
+import           Data.Text                    (Text)
+import qualified Data.Text                    as Text
 
-import           GHC.Generics  (Generic)
+import           GHC.Generics                 (Generic)
 
-import           UI.Attributes (AsAttributeValue (..), Attribute (..),
-                                Lowercase (..))
-import           UI.Color      (Color)
-import           UI.SVG.Path   (Path)
+import           Linear                       (V2 (..))
+
+import           Text.ParserCombinators.ReadP (readP_to_S, readS_to_P)
+import qualified Text.Printf                  as Text
+
+import           UI.Attributes                (AsAttributeValue (..),
+                                               Attribute (..), Lowercase (..),
+                                               Transform (..), native,
+                                               skipHtmlWhitespace)
+import           UI.Color                     (Color)
+import           UI.Style                     (Angle, px, toCss)
+import           UI.SVG.Path                  (Path)
 
 -- * Sizes and Positions
 
 -- | The x coordinate of an element in the user coordinate system.
 x :: Attribute '["image", "rect", "svg", "use"] Double
-x = Attribute "x"
+x = native "x"
 
 -- | The y coordinate of an element in the user coordinate system.
 y :: Attribute '["image", "rect", "svg", "use"] Double
-y = Attribute "y"
+y = native "y"
 
 -- | The x coordinate of the start point in a line.
 x1 :: Attribute '["line", "linearGradient"] Double
-x1 = Attribute "x1"
+x1 = native "x1"
 
 -- | 'x1' but cool
 x₁ :: Attribute '["line", "linearGradient"] Double
@@ -32,7 +43,7 @@ x₁ = x1
 
 -- | The x coordinate of the end point in a line.
 x2 :: Attribute '["line", "linearGradient"] Double
-x2 = Attribute "x2"
+x2 = native "x2"
 
 -- | 'x2' but cool
 x₂ :: Attribute '["line", "linearGradient"] Double
@@ -40,7 +51,7 @@ x₂ = x2
 
 -- | The x coordinate of the start point in a line.
 y1 :: Attribute '["line", "linearGradient"] Double
-y1 = Attribute "y1"
+y1 = native "y1"
 
 -- | 'y1' but cool
 y₁ :: Attribute '["line", "linearGradient"] Double
@@ -48,7 +59,7 @@ y₁ = y1
 
 -- | The x coordinate of the start point in a line.
 y2 :: Attribute '["line", "linearGradient"] Double
-y2 = Attribute "y2"
+y2 = native "y2"
 
 -- | 'y2' but cool
 y₂ :: Attribute '["line", "linearGradient"] Double
@@ -56,36 +67,166 @@ y₂ = y2
 
 -- | The horizontal length of an element in the user coordinate system.
 width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Double
-width = Attribute "width"
+width = native "width"
 
 -- | The vertical length of an element in the user coordiante system.
 height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Double
-height = Attribute "height"
+height = native "height"
 
 -- | The x coordinate of the shape's center.
 cx :: Attribute '["circle", "ellipse", "radialGradient"] Double
-cx = Attribute "cx"
+cx = native "cx"
 
 -- | The y coordinate of the shape's center.
 cy :: Attribute '["circle", "ellipse", "radialGradient"] Double
-cy = Attribute "cy"
+cy = native "cy"
 
 -- | The radius of the shape.
 r :: Attribute '["circle", "radialGradient"] Double
-r = Attribute "r"
+r = native "r"
+
+-- ** Transforms
+
+    -- TODO: better way to share between SVG attributes and CSS
+    -- properties?
+-- | A list of CSS transform functions (see 'Transform') to apply to
+-- the element and its children.
+--
+-- When the @transform@ attribute is set multiple times, it will be
+-- combined with functions added later appearing later in the list of
+-- transforms.
+--
+-- __Example__
+--
+-- Rotate a rectangle by 45°:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [Rotate (Deg 45)]
+--      ]
+-- @
+--
+-- Order matters. Translate /then/ rotate a rectangle:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [translate (V2 10 10), rotate (Deg 45)]
+--      ]
+-- @
+--
+-- Compare with rotating /then/ translating:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [rotate (Deg 45), translate (V2 10 10)]
+--      ]
+-- @
+--
+-- Multiple transforms are combined with later transform functions
+-- added after earlier ones. The same as the previous example:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [rotate (Deg 45)]
+--      , transform =: [translate (V2 10 10)]
+--      ]
+-- @
+transform :: Attribute '["SVG"] [Transform]
+transform = native "transform"
+
+-- | Translate an element along the given X and Y distances in @px@.
+--
+-- __Example__
+--
+-- Move a rectangle down and to the left (or right in RTL mode):
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: #36f
+--      , transform =: [translate (V2 10 20)]
+--      ]
+-- @
+translate :: V2 Double -> Transform
+translate (V2 x y) = Translate (px x) (px y) "0"
+
+-- | Uniformly scale the element.
+--
+-- __Example__
+--
+-- Scale a group of elements:
+--
+-- @
+-- g [ transform =: [scale 10] ] do
+--   circle [ cx =: 10, cy =: 10, r =: 2, fill =: "#36f" ]
+--   circle [ cx =: 15, cy =: 5, r =: 2, fill =: "#f63" ]
+-- @
+scale :: Double -> Transform
+scale n = Scale (toCss n) (toCss n)
+
+-- | Rotate an element in 2D around its @transform-origin@.
+--
+-- See MDN:
+--  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
+--  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
+rotate :: Angle -> Transform
+rotate = Rotate
+
+-- ** viewBox
+
+    -- TODO: better documentation—but I need to understand the details
+    -- myself first!
+-- | The @viewBox@ attribute defines how the coordinate space of an
+-- SVG element maps to the element's viewport.
+data ViewBox = ViewBox
+  { view_min  :: V2 Double
+  , view_size :: V2 Double
+  }
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+
+-- | >>> toAttributeValue $ ViewBox (V2 0 1) (V2 10 20)
+-- "0.0 1.0 10.0 20.0"
+--
+-- >>> fromAttributeValue @ViewBox "\t0.0 1.0 10.0 20.0"
+-- Just (ViewBox {view_min = V2 0.0 1.0, view_size = V2 10.0 20.0})
+instance AsAttributeValue ViewBox where
+  toAttributeValue ViewBox { view_min = V2 min_x min_y, view_size = V2 w h } =
+    Text.pack $ Text.printf "%f %f %f %f" min_x min_y w h
+
+  fromAttributeValue = run do
+    skipHtmlWhitespace
+    view_min  <- V2 <$> double <*> double
+    view_size <- V2 <$> double <*> double
+    pure ViewBox { view_min, view_size }
+    where double = readS_to_P reads
+          run p (Text.unpack -> s) = fst <$> listToMaybe (readP_to_S p s)
+
+-- | The @viewBox@ attribute defines how the coordinate space of an
+-- SVG element maps to the element's viewport.
+viewBox :: Attribute ["marker", "pattern", "svg", "symbol", "view"] ViewBox
+viewBox = native "viewBox"
 
 -- * Paths
 
 -- | The @d@ attribute that specifies the shape of a path.
 --
 -- See 'Path' for details and examples.
-d :: Attribute '["path", "glyph", "missing-glyph"] Path 
-d = Attribute "d"
+d :: Attribute '["path", "glyph", "missing-glyph"] Path
+d = native "d"
 
 -- | The total length of a path in user units. Setting this scales the
 -- distance for drawing an element by @pathLength/computedLength)@.
 pathLength :: Attribute '["circle", "ellipse", "pathLength", "line", "path", "polygon", "polyline", "rect"] Double
-pathLength = Attribute "pathLength"
+pathLength = native "pathLength"
 
 -- * Gradients
 
@@ -117,7 +258,7 @@ data SpreadMethod = Pad
 --
 -- See 'SpreadMethod'.
 spreadMethod :: Attribute Gradients SpreadMethod
-spreadMethod = Attribute "spreadMethod"
+spreadMethod = native "spreadMethod"
 
 -- | The coordinate system for a gradient.
 --
@@ -157,7 +298,7 @@ instance AsAttributeValue GradientUnits where
 --
 -- See 'GradientUnits'
 gradientUnits :: Attribute Gradients GradientUnits
-gradientUnits = Attribute "gradientUnits"
+gradientUnits = native "gradientUnits"
 
 -- ** Gradient Stops
 
@@ -165,19 +306,36 @@ gradientUnits = Attribute "gradientUnits"
 --
 -- See 'linear' and 'radial' for details.
 stop_color :: Attribute '["stop"] Color
-stop_color = Attribute "stop-color"
+stop_color = native "stop-color"
 
 -- | How far along the gradient to place this stop.
 offset :: Attribute '["stop"] Double
-offset = Attribute "offset"
+offset = native "offset"
 
 -- * Presentation
 
 -- ** Fill
 
--- | Set the @fill@ property of an element.
-fill :: Paint -> Map Text Text
-fill paint = [("fill", toAttributeValue paint)]
+-- | Determines how to paint the interior element.
+--
+-- __Examples__
+--
+-- Solid color:
+--
+-- @
+-- [ fill =: "#36f"]
+-- @
+--
+-- Paint with a pre-defined gradient:
+--
+-- @
+-- [ fill =: paintWith "my-gradient" ]
+-- @
+fill :: Attribute
+  ["altGlyph", "circle", "ellipse", "path", "polygon", "polyline", "rect",
+   "text", "textPath", "tref", "tspan"]
+  Paint
+fill = native "fill"
 
              -- TODO: illustrated examples
 -- | The algorithm for filling complex shapes.

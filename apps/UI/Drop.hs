@@ -22,7 +22,7 @@ import           UI.Drag                     (DragConfig (..), Drags (..))
 import qualified UI.Element                  as Element
 import           UI.Element                  (Dom, Html, area, el', elClass',
                                               elDynAttr', overlap)
-import           UI.IsElement                (IsElement, rawElement)
+import           UI.Element.IsElement        (IsElement, rawElement)
 import           UI.Main                     (Runnable (..), withCss)
 import           UI.Style                    (duration, property, s,
                                               setProperty, transition,
@@ -49,7 +49,7 @@ demo = void do
               let validDropped =
                     Reflex.attachWithMaybe validOverlap (Reflex.current atLeast) dropped
                   validOverlap threshold m = (>= threshold) <$> Map.lookup () m
-              
+
               count <- Reflex.count $ Witherable.filter id validDropped
               output @Int count
 

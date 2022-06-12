@@ -45,8 +45,8 @@ import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
                                               ElementConfig (..), HasDocument,
                                               RawElement)
 
+import           UI.Element.IsElement        (FromElement (..), IsElement (..))
 import qualified UI.Event                    as Event
-import           UI.IsElement                (FromElement (..), IsElement (..))
 
 type PerformJS d m = ( MonadFix m
                      , MonadJSM m
