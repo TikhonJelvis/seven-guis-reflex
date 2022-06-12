@@ -2,16 +2,14 @@ module UI.SVG
   ( Svg
 
   , svg
-  , svgAttr
-  , svgDynAttr
-
-  , svg'
-  , svgAttr'
-  , svgDynAttr'
 
   , g
   , g_
+
   , defs
+  , Def
+  , def
+
   , use
   , pattern_
 
@@ -47,26 +45,31 @@ import           Data.Functor        ((<&>))
 import           Data.Hashable       (Hashable (..))
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
+import           Data.Proxy          (Proxy (..))
 import           Data.Text           (Text)
-import           Data.Text.Display   (Display (..))
+import qualified Data.Text           as Text
 
 import           GHC.Generics        (Generic)
+import           GHC.TypeLits        (KnownSymbol, symbolVal)
 
-import           Linear              (V2)
-import           Linear.V2           (V2 (..))
+import           Linear              (V2(..), _x, _y)
 
 import           Reflex              (Dynamic, Reflex)
 import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes       (AsAttribute (..), RelativeLength,
-                                      ShowLowercase (..), ToAttributeValue (..),
-                                      ToAttributes (..), href, id_, with)
+import           UI.Attributes       (AsAttributeValue (..), Attribute (..),
+                                      AttributeSet, AttributeValue,
+                                      Lowercase (..), href, id_, toDom, (=:),
+                                      (==:))
 import           UI.Color            (Color)
-import           UI.Element          (Dom, elDynAttrNs')
+import           UI.Element          (Dom, createElement)
 import qualified UI.Event            as Event
+import           UI.Id               (Id (..))
 import           UI.IsElement        (FromElement (..), IsElement (..))
 import           UI.SVG.Attributes
 import           UI.SVG.Path
+import qualified UI.Url              as Url
+import Control.Lens (view)
 
 -- * SVG Elements
 
@@ -86,96 +89,45 @@ instance Reflex t => Dom.HasDomEvent t (Svg t) en where
 -- ** Creating Any Element
 
 -- | Create an SVG element.
-svg :: forall a m t. Dom t m
-    => Text
-    -- ^ Tag
+--
+-- If the @element@ type variable is ambiguous, you can specify it
+-- with a type application.
+--
+-- __Example__
+--
+-- @
+-- html @"circle" [class_ =: "ball"] (pure ())
+-- @
+svg :: forall element a m t. (KnownSymbol element, Dom t m)
+    => AttributeSet t element "SVG"
+    -- ^ attributes
     -> m a
-    -- ^ Body
-    -> m a
-svg tag body = snd <$> svg' tag body
+    -- ^ body
+    -> m (Svg t, a)
+svg = createElement Nothing tag . toDom
+  where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
 {-# INLINABLE svg #-}
-
--- | Create an SVG element with static attributes.
-svgAttr :: forall a m t. Dom t m
-        => Text
-        -- ^ Tag name
-        -> Map Text Text
-        -- ^ Static attributes
-        -> m a
-        -- ^ Body
-        -> m a
-svgAttr tag attr body = snd <$> svgAttr' tag attr body
-{-# INLINABLE svgAttr #-}
-
--- | Create an SVG element with a dynamic set of attributes.
-svgDynAttr :: forall a m t. Dom t m
-           => Text
-           -- ^ Tag name
-           -> Dynamic t (Map Text Text)
-           -- ^ Attributes
-           -> m a
-           -- ^ Body
-           -> m a
-svgDynAttr tag attr body = snd <$> svgDynAttr' tag attr body
-{-# INLINABLE svgDynAttr #-}
-
--- *** With Element Results
-
--- | Create and return an SVG element.
-svg' :: forall a m t. Dom t m
-     => Text
-     -- ^ Tag name
-     -> m a
-     -- ^ Body
-     -> m (Svg t, a)
-svg' tag = svgAttr' tag []
-{-# INLINABLE svg' #-}
-
--- | Create and return an SVG element with a static set of attributes.
-svgAttr' :: forall a m t. Dom t m
-         => Text
-         -- ^ Tag name
-         -> Map Text Text
-         -- ^ Static attributes
-         -> m a
-         -- ^ Body
-         -> m (Svg t, a)
-svgAttr' tag = svgDynAttr' tag . pure
-{-# INLINABLE svgAttr' #-}
-
--- | Create and return an SVG element with a dynamic set of attributes.
-svgDynAttr' :: forall a m t. Dom t m
-            => Text
-            -- ^ Tag name
-            -> Dynamic t (Map Text Text)
-            -- ^ Attributes
-            -> m a
-            -- ^ Body
-            -> m (Svg t, a)
-svgDynAttr' tag attributes body = do
-  elDynAttrNs' (Just svgNamespace) tag attributes body
-{-# INLINABLE svgDynAttr' #-}
 
 -- ** Grouping
 
 -- | A group of SVG elements.
 g :: forall a m t. Dom t m
-  => Dynamic t (Map Text Text)
+  => AttributeSet t "g" "SVG"
   -- ^ Attributes
   -> [m a]
   -- ^ SVG elements to group
   -> m (Svg t, [a])
-g attributes = svgDynAttr' "g" attributes . sequenceA
+g attributes = svg attributes . sequenceA
 
 -- | A group of SVG elements, discarding the value returned from
 -- creating each element.
 g_ :: forall a m t. Dom t m
-   => Dynamic t (Map Text Text)
-  -- ^ Attributes
-  -> [m a]
-  -- ^ SVG elements to group
-  -> m (Svg t)
-g_ attributes = fmap fst . svgDynAttr' "g" attributes . sequenceA_
+   => AttributeSet t "g" "SVG"
+   -- ^ Attributes
+   -> [m a]
+   -- ^ SVG elements to group
+   -> m (Svg t)
+g_ attributes = fmap fst . svg attributes . sequenceA_
 
 -- | Define elements that are not rendered immediately, but can be
 -- used in other parts of the SVG (ie with 'use').
@@ -185,31 +137,59 @@ g_ attributes = fmap fst . svgDynAttr' "g" attributes . sequenceA_
 -- Define and use an element:
 --
 -- @
--- do
---   defs [("myElement",
---          circle (pure Circle { center = V2 0 0, radius = 5 }))
---        ]
---   use "myElement" (pure [("x", "10"), ("y", "4")])
+-- do let c = Circle { center = V2 0 0, radius = 5 }
+--    defs [ def "myElement" (circle (pure c)) [stroke =: "none"] ]
+--    use "myElement" (pure [("x", "10"), ("y", "4")])
 -- @
 --
 -- Define a pattern and use it to fill an element:
 --
 -- @
--- do
---   let c = circle (pure (Circle 0 10)) (pure $ fill "#fff")
---   defs [("bg", \ attrs -> pattern_ attrs c)]
---   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
+-- do let c = Circle { center = V2 0 0, radius = 10 }
+--    defs [ def "bg" (circle $ pure c) [fill =: "#fff"] ]
+--    rect (pure (Rectangle 100 100 0 0)) [fill =: paintWith "bg"]
 -- @
 defs :: forall a m t. Dom t m
-     => Map Text (Dynamic t (Map Text Text) -> m a)
-     -- ^ A map from ids to functions that take attributes and create
-     -- elements.
-     -> m (Map Text a)
-defs (Map.toList -> definitions) =
-  snd <$> svg' "defs" do
-    Map.fromList <$> forM definitions \ (name, f) -> do
-      result <- f (pure $ with (id_ name) [])
+     => [Def t m a]
+     -- ^ A list of definitions.
+     -> m (Map Id a)
+defs definitions =
+  snd <$> svg [] do
+    Map.fromList <$> forM definitions \ (Def name create base) -> do
+      result <- create $ base <> [id_ =: name]
       pure (name, result)
+
+-- | A definition combining an 'Id', a way to create elements and a
+-- base set of attributes.
+--
+-- When this is used, the @id@ attribute ('id_') in the base
+-- attributes will be overridden if set.
+data Def t m a where
+  Def :: Id
+      -> (AttributeSet t element "SVG" -> m a)
+      -> AttributeSet t element "SVG"
+      -> Def t m a
+
+-- | Define an element with the given id and attributes.
+--
+-- If the @id@ attribute is set in the base attributes, it will be
+-- overridden.
+--
+-- @
+-- defs
+--   [ def "example-circle" (circle (pure c)) [stroke =: "#000"]
+--   , def "example-gradient" linearGradient gradientAttrs
+--   ]
+-- @
+def :: forall element a m t. Dom t m
+    => Id
+    -- ^ id to define
+    -> (AttributeSet t element "SVG" -> m a)
+    -- ^ function to create element given an attribute set
+    -> AttributeSet t element "SVG"
+    -- ^ base attribute set to pass into function
+    -> Def t m a
+def = Def
 
 -- | Use an element defined elsewhere in the current document,
 -- referenced by id.
@@ -219,29 +199,26 @@ defs (Map.toList -> definitions) =
 -- Define and use an element:
 --
 -- @
--- do
---   defs [("myElement",
---          circle (pure Circle { center = V2 0 0, radius = 5 }) (pure []))
---        ]
---   use "myElement" (pure [("x", "10"), ("y", "4")])
+-- do let c = Circle { center = V2 0 0, radius = 5 }
+--    defs [ def "myElement" (circle (pure c)) [] ]
+--    use "myElement" [ x =: 10, y =: 4 ]
 -- @
 use :: forall m t. Dom t m
-    => Text
+    => Id
     -- ^ The id of the element to use
-    -> Dynamic t (Map Text Text)
+    -> AttributeSet t "use" "SVG"
     -- ^ Other attributes of the @use@ tag. An @href@ set here will be
     -- overridden.
     --
     -- Note that /most/ attributes will be the same as the element
     -- being used—only @x@, @y@, @width@ and @height@ will have any
-    -- effect.
+    -- effect, but other attributes are still allowed.
     --
     -- See MDN:
     -- [use](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use)
     -> m (Svg t)
-use element attributes = fst <$> svgDynAttr' "use"
-  (with (href $ "#" <> element) <$> attributes)
-  (pure ())
+use elementId attributes =
+  fst <$> svg (attributes <> [ href =: Url.byId elementId ]) (pure ())
 
 -- | A @pattern@ element defines an object that can be tiled along x-
 -- and y-coordinate intervals.
@@ -257,16 +234,16 @@ use element attributes = fst <$> svgDynAttr' "use"
 --   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
 -- @
 pattern_ :: forall a m t. Dom t m
-         => Dynamic t (Map Text Text)
+         => AttributeSet t "pattern" "SVG"
          -- ^ Attributes
          -> m a
          -- ^ Pattern contents
          -> m (Svg t, a)
-pattern_ = svgDynAttr' "pattern"
+pattern_ = svg
 
 -- ** Shapes
 
--- | A circle.
+-- | A circle with a given center and radius.
 data Circle = Circle
   { center :: !(V2 Double)
   -- ^ The (x, y) coordinates for the circle's center.
@@ -276,52 +253,58 @@ data Circle = Circle
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
-instance ToAttributes Circle where
-  toAttributes Circle { center = V2 cx cy, radius = r } =
-    [ ("cx", toAttributeValue cx)
-    , ("cy", toAttributeValue cy)
-    , ("r", toAttributeValue r)
-    ]
-
-instance Display Circle where
-  displayBuilder Circle { center = V2 x y, radius } =
-    "Circle at (" <> displayBuilder x <> ", " <> displayBuilder y <> ")" <>
-    " with radius = " <> displayBuilder radius
-
 -- | Create a circle element with the given settings.
+--
+-- __Example__
+--
+-- A circle with a static center and radius:
 --
 -- @
 -- let c = Circle { center = (50, 50), radius = 50}
 -- in
--- circle c (toAttributes def { width = 4, color = "#36f" })
+-- circle (pure c) [stroke_width =: 4, stroke =: "#3366ff"]
 -- @
 circle :: forall m t. Dom t m
        => Dynamic t Circle
-       -- ^ Core circle settings.
-       -> Dynamic t (Map Text Text)
+       -- ^ The circle shape itself
+       -> AttributeSet t "circle" "SVG"
        -- ^ Additional attributes. The 'Circle' argument will override
-       -- @cx@, @cy@ and @r@ in this map.
+       -- @cx@, @cy@ and @r@.
        -> m (Svg t)
-circle circle_ attributes =
-  fst <$> svgDynAttr' "circle" (liftA2 with circle_ attributes) (pure ())
+circle shape attributes = fst <$> svg (attributes <> override) (pure ())
+  where override = [ cx ==: view _x . center <$> shape
+                   , cy ==: view _y . center <$> shape
+                   ,  r ==: radius <$> shape
+                   ]
+
+-- | The x coordinate of the shape's center.
+cx :: Attribute "cx" '["circle", "ellipse", "radialGradient"]
+cx = Attribute
+
+type instance AttributeValue "cx" '["circle", "ellipse", "radialGradient"] = Double
+
+-- | The y coordinate of the shape's center.
+cy :: Attribute "cy" '["circle", "ellipse", "radialGradient"]
+cy = Attribute
+
+
+type instance AttributeValue "cy" '["circle", "ellipse", "radialGradient"] = Double
+
+-- | The radius of the shape.
+r :: Attribute "r" '["circle", "radialGradient"]
+r = Attribute
+
+type instance AttributeValue "r" '["circle", "radialGradient"] = Double
+
 
 -- | A rectangle specified as a point along with a width and a height.
 data Rectangle = Rectangle
-  { width  :: RelativeLength
-  , height :: RelativeLength
-  , x      :: RelativeLength
-  , y      :: RelativeLength
+  { position :: !(V2 Double)
+  , width    :: !Double
+  , height   :: !Double
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
-
-instance ToAttributes Rectangle where
-  toAttributes Rectangle { x, y, width, height } =
-    [ ("width", toAttributeValue width)
-    , ("height", toAttributeValue height)
-    , ("x", toAttributeValue x)
-    , ("y", toAttributeValue y)
-    ]
 
 -- | Create a retangle (@rect@ element).
 rect :: forall m t. Dom t m
@@ -385,13 +368,6 @@ data Stop = Stop
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
-
--- TODO: special handling for stop-opacity?
-instance ToAttributes Stop where
-  toAttributes Stop { offset, color } =
-    [ ("offset", toAttributeValue offset)
-    , ("stop-color", toAttributeValue color)
-    ]
 
 -- | A linear gradient, transitioning between stops along a straight
 -- line.
@@ -466,10 +442,9 @@ data Spread = Pad
 
             | Repeat
               -- ^ Repeat the gradient, resetting @offset@ to @0..1@.
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving ToAttributeValue via ShowLowercase Spread
-  deriving ToAttributes via AsAttribute "spreadMethod" Spread
+  deriving AsAttributeValue via Lowercase Spread
 
 -- | The coordinate system for a gradient.
 --
@@ -494,12 +469,16 @@ data GradientUnits = UserSpaceOnUse
                      -- bounding box.
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving ToAttributes via AsAttribute "gradientUnits" GradientUnits
 
-instance ToAttributeValue GradientUnits where
+instance AsAttributeValue GradientUnits where
   toAttributeValue = \case
     UserSpaceOnUse    -> "userSpaceOnUse"
     ObjectBoundingBox -> "objectBoundingBox"
+
+  fromAttributeValue = \case
+    "userSpaceOnUse"    -> Just UserSpaceOnUse
+    "objectBoundingBox" -> Just ObjectBoundingBox
+    _                   -> Nothing
 
 -- * SVG Namespace
 

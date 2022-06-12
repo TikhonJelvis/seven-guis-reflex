@@ -33,7 +33,6 @@ import qualified Text.URI                   as URI
 import           Text.URI                   (URI)
 import           Text.URI.QQ                (uri)
 
-import           UI.Attributes              (addClass)
 import           UI.Element                 (Dom, Html, HtmlInput, el', elAttr',
                                              elDynAttr', input)
 import           UI.Event                   (EventResult, on)

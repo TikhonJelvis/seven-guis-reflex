@@ -12,7 +12,7 @@ import           GHC.Generics  (Generic)
 
 import           Text.Printf   (printf)
 
-import           UI.Attributes (ToAttributeValue (..), ToAttributes (..))
+import           UI.Attributes (AsAttributeValue (..))
 
 -- | A sequence of commands specifying a path.
 newtype Path = Path { toCommands :: [Command] }
@@ -25,13 +25,11 @@ instance IsList Path where
   fromList = Path
   toList = toCommands
 
-instance ToAttributeValue Path where
+instance AsAttributeValue Path where
   toAttributeValue (Path commands) =
     Text.intercalate " " $ toAttributeValue <$> commands
 
--- | sets the @d@ attribute
-instance ToAttributes Path where
-  toAttributes p = [("d", toAttributeValue p)]
+  fromAttributeValue = undefined
 
 -- | Apply a function to each point in a 'Path' (+ @rx@ and @ry@ for
 -- elliptic curves).
@@ -235,7 +233,7 @@ data Command = M !Double !Double
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
 
-instance ToAttributeValue Command where
+instance AsAttributeValue Command where
   toAttributeValue = Text.pack . \case
     M x y                      -> printf "M %f,%f" x y
     M' x y                     -> printf "m %f,%f" x y
@@ -258,6 +256,8 @@ instance ToAttributeValue Command where
     A' rx ry θ large sweep x y ->
       printf "a %f %f %f %d %d %f %f" rx ry θ (fromEnum large) (fromEnum sweep) x y
     Z                          -> "Z"
+
+  fromAttributeValue = undefined
 
 -- | Apply a function to every point in the command (+ @rx@ and @ry@
 -- for elliptic curves).

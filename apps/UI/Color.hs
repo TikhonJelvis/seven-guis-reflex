@@ -18,7 +18,7 @@ import qualified Numeric
 
 import           Text.Printf            (printf)
 
-import           UI.Attributes          (ToAttributeValue (..))
+import           UI.Attributes          (AsAttributeValue (..))
 
 -- *** Color
 
@@ -27,18 +27,9 @@ newtype Color = Color (AlphaColour Double)
   deriving stock (Eq, Show, Generic)
 
 instance IsString Color where
-  fromString ['#', r, g, b] =
-    fromString ['#', r, r, g, g, b, b]
-  fromString ['#', r, g, b, a] =
-    fromString ['#', r, r, g, g, b, b, a, a]
-  fromString s@['#', _r1, _r2, _g1, _g2, _b1, _b2] =
-    fromColour $ Colour.sRGB24read s
-  fromString s@['#', _r1, _r2, _g1, _g2, _b1, _b2, a1, a2] =
-    let base = Colour.sRGB24read (take 7 s) in
-    Color $ Colour.withOpacity base (toDouble $ readHex [a1, a2])
-    where readHex = fst . head . Numeric.readHex
-          toDouble x = fromInteger x / 255
-  fromString invalid = error $ "Invalid color: " <> invalid
+  fromString css = case parseCSSColor $ Text.pack css of
+    Just color -> color
+    Nothing    -> error $ "Invalid color literal: " <> css
 
 -- | hash based on sRGB + α-channel
 instance Hashable Color where
@@ -67,8 +58,32 @@ toCss c = case toRgba c of
   (r, g, b, 0xff) -> Text.pack $ printf "#%.2x%.2x%.2x" r g b
   (r, g, b, a)    -> Text.pack $ printf "#%.2x%.2x%.2x%.2x" r g b a
 
-instance ToAttributeValue Color where
+instance AsAttributeValue Color where
   toAttributeValue = toCss
+
+  fromAttributeValue = parseCSSColor
 
 instance Display Color where
   displayBuilder = Builder.fromText . toCss
+
+    -- TODO: support other color formats
+-- | Parse CSS color literals.
+--
+-- Currently only supports @#xxx@, @#xxxx@, @#xxxxxx@ and @#xxxxxxxx@
+-- literals—covers any colors created through this library—but should
+-- support /all/ valid CSS colors in the future.
+parseCSSColor :: Text -> Maybe Color
+parseCSSColor = go . Text.unpack
+  where
+    go = \case
+      ['#', r, g, b] -> go ['#', r, r, g, g, b, b]
+      ['#', r, g, b, a] -> go ['#', r, r, g, g, b, b, a, a]
+      s@['#', _r1, _r2, _g1, _g2, _b1, _b2] ->
+        Just $ fromColour $ Colour.sRGB24read s
+      s@['#', _r1, _r2, _g1, _g2, _b1, _b2, a1, a2] ->
+        Just $ Color $ Colour.withOpacity (base s) (toDouble $ readHex [a1, a2])
+      _ -> Nothing
+
+    base s = Colour.sRGB24read (take 7 s)
+    readHex = fst . head . Numeric.readHex
+    toDouble x = fromInteger x / 255

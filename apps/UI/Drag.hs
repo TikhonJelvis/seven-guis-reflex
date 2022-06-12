@@ -20,8 +20,7 @@ import qualified Reflex
 import           Reflex              (Dynamic, Event)
 import qualified Reflex.Dom          as Dom
 
-import           UI.Attributes       (Transition (..), addClass, classes,
-                                      joinClasses, rotate, s, scale, setClass,
+import           UI.Attributes       (Transition (..), rotate, s, scale,
                                       transition, translate)
 import           UI.Element          (Dom, Html, el', elClass', elDynAttr')
 import           UI.Event            (Modifier (Shift), MouseButton (..),

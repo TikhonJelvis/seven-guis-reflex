@@ -2,16 +2,8 @@ module UI.Element
   ( PerformJS
   , Dom
 
-  , Html
-  , HtmlInput
-
-  , el'
-  , elClass'
-  , elAttr'
-  , elDynAttr'
-  , elDynAttrNs'
-
-  , input
+  , text
+  , createElement
 
   , getAttribute
   , setAttribute
@@ -47,15 +39,14 @@ import           Language.Javascript.JSaddle (MonadJSM)
 import           Linear                      (V2 (..))
 
 import qualified Reflex
-import           Reflex                      (Dynamic, Reflex)
+import           Reflex                      (Dynamic)
 import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
                                               ElementConfig (..), HasDocument,
                                               RawElement)
 
 import qualified UI.Event                    as Event
-import           UI.IsElement                (FromElement (..), IsElement (..),
-                                              IsHtml (..), IsHtmlInput (..))
+import           UI.IsElement                (FromElement (..), IsElement (..))
 
 type PerformJS d m = ( MonadFix m
                      , MonadJSM m
@@ -74,93 +65,25 @@ type Dom t m = ( MonadFix m
                , HasDocument m
                )
 
--- | An HTML DOM element (as opposed to an SVG element or the like).
-newtype Html t = Html (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+-- | Create a text node with no element.
+text :: forall m t. Dom t m => Text -> m ()
+text = Dom.text
 
-instance FromElement Html where
-  type EventResult Html = Event.EventResult
-  fromElement = Html
-
-instance IsElement (Html t) where
-  rawElement (Html e) = Dom._element_raw e
-
-instance IsHtml (Html t) where
-  rawHtml (Html e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
-
-instance Reflex t => Dom.HasDomEvent t (Html t) en where
-  type DomEventType (Html t) en = Event.EventResultType en
-  domEvent eventName (Html e) = Dom.domEvent eventName e
-
--- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
--- JavaScript).
-newtype HtmlInput t = HtmlInput (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
-
-instance FromElement HtmlInput where
-  type EventResult HtmlInput = Event.EventResult
-  fromElement = HtmlInput
-
-instance IsElement (HtmlInput t) where
-  rawElement (HtmlInput e) = Dom._element_raw e
-
-instance IsHtml (HtmlInput t) where
-  rawHtml (HtmlInput e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
-
-instance IsHtmlInput (HtmlInput t) where
-  rawHtmlInput (HtmlInput e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLInputElement $ Dom._element_raw e
-
-
--- * Creating Elements
-
-el' :: forall a m t. Dom t m
-    => Text
-    -> m a
-    -> m (Html t, a)
-el' tagName = elAttr' tagName []
-{-# INLINABLE el' #-}
-
--- | Create and return an element with the given class.
-elClass' :: forall a m t. Dom t m
-         => Text
-         -> Text
-         -> m a
-         -> m (Html t, a)
-elClass' tagName class_ = elAttr' tagName [("class", class_)]
-{-# INLINABLE elClass' #-}
-
--- | Create and return an element with the given attributes.
-elAttr' :: forall a m t. Dom t m
-        => Text
-        -> Map Text Text
-        -> m a
-        -> m (Html t, a)
-elAttr' tagName attr = elDynAttr' tagName (pure attr)
-{-# INLINABLE elAttr' #-}
-
--- | Create and return an elment with a dynamically changing set of
--- options.
-elDynAttr' :: forall a m t. Dom t m
-           => Text
-           -> Dynamic t (Map Text Text)
-           -> m a
-           -> m (Html t, a)
-elDynAttr' = elDynAttrNs' Nothing
-{-# INLINABLE elDynAttr' #-}
-
--- | Create and return an element in the given (optional) namespace.
-elDynAttrNs' :: forall e a m t. (Dom t m, FromElement e, EventResult e ~ Event.EventResult)
-             => Maybe Text
-             -- ^ Optional namespace
-             -> Text
-             -- ^ Tag
-             -> Dynamic t (Map Text Text)
-             -- ^ Dynamic attributes
-             -> m a
-             -- ^ Body
-             -> m (e t, a)
-elDynAttrNs' namespace tagName attrs body = do
+-- | Create an element with an (optional) namespace.
+--
+-- This is the main interface between this library's structured
+-- element type and the underlying @reflex-dom@ machinery.
+createElement :: forall e a m t. (Dom t m, FromElement e, EventResult e ~ Event.EventResult)
+              => Maybe Text
+              -- ^ Optional namespace
+              -> Text
+              -- ^ Tag
+              -> Dynamic t (Map Text Text)
+              -- ^ Dynamic attributes
+              -> m a
+              -- ^ Body
+              -> m (e t, a)
+createElement namespace tagName attrs body = do
   modifyAttrs <- Dom.dynamicAttributesToModifyAttributes attrs
   let config = ElementConfig
         { _elementConfig_namespace = namespace
@@ -177,19 +100,7 @@ elDynAttrNs' namespace tagName attrs body = do
         filters = mempty
         handler = Dom.GhcjsEventHandler \ (eventName, event) ->
           Event.domHandler eventName $ Dom.unGhcjsDomEvent event
-{-# INLINABLE elDynAttrNs' #-}
-
--- * Input Elements
-
--- | An HTML @<input>@ element.
---
--- Since @input@ is an /empty element/—it cannot have children—this
--- does not take an argument for the body.
-input :: forall m t. Dom t m
-      => Dynamic t (Map Text Text)
-      -- ^ Dynamic attributes for the input element.
-      -> m (HtmlInput t)
-input attributes = fst <$> elDynAttrNs' Nothing "input" attributes (pure ())
+{-# INLINABLE createElement #-}
 
 -- * Element Properties
 

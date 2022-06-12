@@ -287,4 +287,3 @@ haskellBack = mdo
         origin x y =
           setProperty "transform-origin" (Text.pack $ printf "%fpx %fpx" x y) .
           setProperty "transform-box" "fill-box"
-

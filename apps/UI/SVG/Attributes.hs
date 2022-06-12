@@ -9,8 +9,7 @@ import           Data.Text          (Text)
 
 import           GHC.Generics       (Generic)
 
-import           UI.Attributes      (AsAttribute (..), ShowLowercase (..),
-                                     ToAttributeValue (..), ToAttributes (..))
+import           UI.Attributes      (AsAttributeValue (..), Lowercase (..))
 import           UI.Color           (Color, fromColour)
 
 -- * Presentation
@@ -36,15 +35,14 @@ fill paint = [("fill", toAttributeValue paint)]
 --
 -- See MDN:
 -- [fill-rule](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule)
-data FillRule = NonZero
+data FillRule = Nonzero
               -- ^ A point counts as "inside" if @ltr - rtl ≠ 0@.
-              | EvenOdd
+              | Evenodd
               -- ^ A point counts as "inside" if @ltr - rtl@ is odd
               -- and outside if @ltr - rtl@ is even.
-  deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving ToAttributeValue via ShowLowercase FillRule
-  deriving ToAttributes via AsAttribute "fill-rule" FillRule
+  deriving AsAttributeValue via Lowercase FillRule
 
 -- ** Stroke
 
@@ -67,14 +65,6 @@ instance Default Stroke where
     , linejoin = Miter
     }
 
-instance ToAttributes Stroke where
-  toAttributes Stroke { color, width, linecap, linejoin } =
-    [ ("stroke", toAttributeValue color)
-    , ("stroke-width", toAttributeValue width)
-    , ("linecap", toAttributeValue linecap)
-    , ("linejoin", toAttributeValue linejoin)
-    ]
-
 -- | Set just the @stroke@ attribute.
 stroke :: Paint -> Map Text Text
 stroke paint = [("stroke", toAttributeValue paint)]
@@ -92,22 +82,34 @@ data Linecap = Butt
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
 
-instance ToAttributeValue Linecap where
+instance AsAttributeValue Linecap where
   toAttributeValue = \case
     Butt   -> "butt"
     Square -> "square"
     Round  -> "round"
 
+  fromAttributeValue = \case
+    "butt"   -> Just Butt
+    "square" -> Just Square
+    "round"  -> Just Round
+    _        -> Nothing
+
 -- | How to draw the joints between two line segments.
-data Linejoin = Miter | Round' | Bevel
+data Linejoin = Miter | Round_ | Bevel
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
 
-instance ToAttributeValue Linejoin where
+instance AsAttributeValue Linejoin where
   toAttributeValue = \case
     Miter  -> "miter"
-    Round' -> "round"
+    Round_ -> "round"
     Bevel  -> "bevel"
+
+  fromAttributeValue = \case
+    "miter" -> Just Miter
+    "round" -> Just Round_
+    "bevel" -> Just Bevel
+    _       -> Nothing
 
 -- ** Paint
 
@@ -131,7 +133,7 @@ data Paint = None
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
-instance ToAttributeValue Paint where
+instance AsAttributeValue Paint where
   toAttributeValue = \case
     None                  -> "none"
     Color c               -> toAttributeValue c
@@ -140,6 +142,10 @@ instance ToAttributeValue Paint where
     ContextFill           -> "context-fill"
     ContextStroke         -> "context-stroke"
     where url u = "url(" <> u <> ")"
+
+  fromAttributeValue = error "parsePaint not implemented yet"
+
+    -- TODO: implement parsePaint!
 
 -- | @"#fff"@/etc for colors, @"none"@ for 'None', @"context-fill"@ and @"context-stroke"@
 --
