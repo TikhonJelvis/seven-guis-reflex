@@ -25,8 +25,7 @@ where
 
 import           Reflex                              (Dynamic, Reflex)
 
-import           UI.Attributes.Attribute             (AsAttributeValue (..),
-                                                      Attribute (..))
+import           UI.Attributes.Attribute             (Attribute)
 import           UI.Attributes.AttributeSet.Internal
 import           UI.Type.List                        (KnownSymbols)
 
@@ -43,7 +42,6 @@ import           UI.Type.List                        (KnownSymbols)
 -- @
 (=:) :: ( Reflex t
         , KnownSymbols supports
-        , AsAttributeValue a
         , Compatible element namespace supports
         )
      => Attribute supports a
@@ -62,7 +60,6 @@ infixr 1 =:
 -- div [ class_ ==: classIf "dragged" <$> beingDragged ]
 -- @
 (==:) :: ( KnownSymbols supports
-         , AsAttributeValue a
          , Compatible element namespace supports
          )
       => Attribute supports a

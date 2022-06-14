@@ -1,4 +1,42 @@
-module UI.Event where
+module UI.Event
+  ( Dom.domEvent
+  , Dom.EventName (..)
+  , EventResultType
+  , EventResult (..)
+
+  , domHandler
+
+  -- * Modifier Keys
+  , Modifier
+
+  -- * Mouse Events
+  , MouseEventResult (..)
+  , MouseButton (..)
+  , mouseEvent
+
+  -- * Wheel Events
+  , WheelEventResult (..)
+  , DeltaMode (..)
+  , wheelEvent
+
+  -- * Scroll Events
+  , ScrollEventResult (..)
+  , scrollEvent
+
+  -- * Keyboard Events
+  , KeyboardEventResult (..)
+  , Key (..)
+  , KeyLocation (..)
+  , keyboardEvent
+
+  -- * Clipboard Events
+  , pasteText
+
+  -- * Arbitrary JS Events
+  , on
+  , performJs
+  )
+where
 
 import           Control.Lens                ((<&>), (^.))
 import           Control.Monad.IO.Class      (MonadIO (liftIO))

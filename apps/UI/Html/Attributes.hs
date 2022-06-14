@@ -108,7 +108,9 @@ enabledIf :: Bool -> Enabled
 enabledIf = bool Disabled Enabled
 
 -- | Set whether an input is enabled or disabled.
-enabled :: Attribute '["input"] Enabled
+enabled :: Attribute
+  '["button", "input", "fieldset", "optgroup", "option", "select", "textarea"]
+  Enabled
 enabled = logical "enabled" \case
   Enabled  -> []
   Disabled -> [("disabled", "")]

@@ -13,28 +13,36 @@ module UI.Html
   , ul
   , ul_
 
+  , Button (..)
+  , button
+  , button'
   , label
 
   , img
   )
 where
 
+import           Control.Monad        (void)
+
 import           Data.Proxy           (Proxy (..))
+import           Data.Text            (Text)
 import qualified Data.Text            as Text
 
+import           GHC.Generics         (Generic)
 import           GHC.TypeLits         (KnownSymbol, symbolVal)
 
 import qualified GHCJS.DOM.Element    as Element
 import qualified GHCJS.DOM.Types      as GHCJS
 
-import           Reflex               (Reflex)
+import           Reflex               (Event, Reflex)
 import qualified Reflex.Dom           as Dom
 
 import           UI.Attributes        (AttributeSet, toDom)
-import           UI.Element           (Dom, createElement)
+import           UI.Element           (Dom, createElement, text)
 import           UI.Element.IsElement (FromElement (..), IsElement (..),
                                        IsHtml (..), IsHtmlInput (..))
 import qualified UI.Event             as Event
+import           UI.Event             (EventName (..))
 
 
 -- * HTML Elements
@@ -43,6 +51,7 @@ import qualified UI.Event             as Event
 
 -- | An HTML DOM element (as opposed to an SVG element or the like).
 newtype Html t = Html (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+  deriving stock (Generic)
 
 instance FromElement Html where
   type EventResult Html = Event.EventResult
@@ -64,6 +73,7 @@ instance Reflex t => Dom.HasDomEvent t (Html t) en where
 -- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
 -- JavaScript).
 newtype HtmlInput t = HtmlInput (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+  deriving stock (Generic)
 
 instance FromElement HtmlInput where
   type EventResult HtmlInput = Event.EventResult
@@ -79,6 +89,10 @@ instance IsHtml (HtmlInput t) where
 instance IsHtmlInput (HtmlInput t) where
   rawHtmlInput (HtmlInput e) =
     GHCJS.uncheckedCastTo GHCJS.HTMLInputElement $ Dom._element_raw e
+
+instance Reflex t => Dom.HasDomEvent t (HtmlInput t) en where
+  type DomEventType (HtmlInput t) en = Event.EventResultType en
+  domEvent eventName (HtmlInput e) = Dom.domEvent eventName e
 
 -- * Creating HTML Elements
 
@@ -237,6 +251,36 @@ ul_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
 {-# INLINABLE ul_ #-}
 
 -- ** Controls
+
+-- | A button element. Has the underlying HTML element for the button
+-- as well as an event that fires when the button is pressed.
+data Button t = Button
+  { element :: Html t
+  , pressed :: Event t ()
+  }
+  deriving stock (Generic)
+
+-- | A pressable button.
+button :: forall a m t. Dom t m
+       => AttributeSet t "button" "HTML"
+       -- ^ attributes
+       -> m a
+       -- ^ button body (often a text label)
+       -> m (Button t, a)
+button attributes body = do
+  (element, a) <- html attributes body
+  let pressed = void $ Dom.domEvent Click element
+  pure (Button { element, pressed }, a)
+
+-- | A button with a static text label.
+button' :: forall a m t. Dom t m
+        => Text
+        -- ^ button label
+        -> AttributeSet t "button" "HTML"
+        -- ^ attributes
+        -> m (Button t)
+button' label attributes = fst <$> button attributes do
+  text label
 
 -- | A label that can be associated with an input or control. Clicking
 -- on or tabbing to the label will activate the control.

@@ -15,7 +15,6 @@ import           Data.GADT.Compare       (GCompare (..), GEq (..),
 import           Data.GADT.Show          (GShow (..))
 import           Data.Kind               (Constraint, Type)
 import           Data.Map                (Map)
-import qualified Data.Map.Strict         as Map
 import           Data.Some               (Some (..))
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
@@ -30,7 +29,7 @@ import           GHC.TypeLits            (ErrorMessage (..), Symbol, TypeError)
 import           Reflex                  (Dynamic, Reflex, zipDynWith)
 
 import qualified UI.Attributes.Attribute as Attribute
-import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute (..))
+import           UI.Attributes.Attribute (Attribute)
 import           UI.Type.List            (Elem, KnownSymbols, ShowList)
 
 import qualified Unsafe.Coerce           as Unsafe
@@ -116,8 +115,8 @@ combine (AttributeSet old) (AttributeSet new) = AttributeSet $
                          -> Dynamic t v
                          -> Dynamic t v
                          -> Dynamic t v
-        combineAttribute (AttributeKey _) =
-          Reflex.zipDynWith combineAttributeValues
+        combineAttribute (AttributeKey attribute) =
+          Reflex.zipDynWith (Attribute.combine attribute)
 
 -- | '<>' is 'combine'
 instance Reflex t => Semigroup (AttributeSet t element namespace) where
@@ -156,9 +155,9 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
              -> DMap (AttributeKey element namespace) (Dynamic t)
              -> DMap (AttributeKey element namespace) (Dynamic t)
           go (SetAttribute attribute v)=
-            DMap.insertWithKey' combineDyn (AttributeKey attribute) v
+            DMap.insertWithKey' (combineDyn attribute) (AttributeKey attribute) v
 
-          combineDyn _ = Reflex.zipDynWith combineAttributeValues
+          combineDyn attribute _ = Reflex.zipDynWith (Attribute.combine attribute)
 
   toList :: AttributeSet t element namespace -> [SetAttribute t element namespace]
   toList (AttributeSet dmap) = DMap.foldrWithKey go [] dmap
@@ -173,16 +172,14 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
 -- | The type used internally in 'AttributeSet' to track the type of
 -- the value that corresponds to an attribute.
 data AttributeKey element namespace (a :: Type) where
-  AttributeKey :: ( KnownSymbols supports
-                  , Compatible element namespace supports
-                  , AsAttributeValue a)
+  AttributeKey :: (KnownSymbols supports, Compatible element namespace supports)
                => Attribute supports a
                -> AttributeKey element namespace a
 
 instance Show (AttributeKey element namespace a) where
   show (AttributeKey attribute) =
-    "AttributeKey " <> show (name attribute) <>
-    " (" <> show (type_ attribute) <> ")"
+    "AttributeKey " <> show (Attribute.name attribute) <>
+    " (" <> show (Attribute.type_ attribute) <> ")"
 
 instance Display (AttributeKey element namespace a) where
   displayBuilder (AttributeKey attribute) = displayBuilder attribute
@@ -191,8 +188,8 @@ instance GShow (AttributeKey element namespace) where gshowsPrec = showsPrec
 
 instance GEq (AttributeKey element namespace) where
   geq (AttributeKey a) (AttributeKey b)
-    | type_ a == type_ b = Just $ Unsafe.unsafeCoerce Refl
-    | otherwise          = Nothing
+    | Attribute.type_ a == Attribute.type_ b = Just $ Unsafe.unsafeCoerce Refl
+    | otherwise                              = Nothing
       -- as long as (type_ a) matches the value type of a—which the
       -- smart constructors for Attribute ensure—this is safe
       --
@@ -250,10 +247,7 @@ type family Incompatible element namespace supports :: Constraint where
 
 -- | Set an attribute to a value of a compatible type.
 data SetAttribute t element namespace where
-  SetAttribute :: ( KnownSymbols supports
-                  , AsAttributeValue a
-                  , Compatible element namespace supports
-                  )
+  SetAttribute :: (KnownSymbols supports, Compatible element namespace supports)
                => Attribute supports a
                -> Dynamic t a
                -> SetAttribute t element namespace
@@ -278,8 +272,5 @@ toDom (AttributeSet dmap) = DMap.foldrWithKey go (pure []) dmap
            -> Dynamic t v
            -> Dynamic t (Map Text Text)
            -> Dynamic t (Map Text Text)
-        go (AttributeKey (Attribute.name -> name)) value =
-          Reflex.zipDynWith (<>) $ convert name <$> value
-
-        convert :: forall a. AsAttributeValue a => Text -> a -> Map Text Text
-        convert name = Map.singleton name . toAttributeValue
+        go (AttributeKey attribute) value =
+          Reflex.zipDynWith (<>) $ Attribute.toAttributes attribute <$> value

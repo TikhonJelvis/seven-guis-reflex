@@ -47,6 +47,7 @@ module UI.Attributes.Attribute
   , type_
   , supports
   , toAttributes
+  , combine
 
   , native
   , logical
@@ -143,6 +144,11 @@ data Attribute (supports :: [Symbol]) a = Attribute
   -- ^ How to convert the attribute value to one or more HTML
   -- attributes.
 
+  , combine      :: a -> a -> a
+  -- ^ How to combine two instances of this attribute.
+  --
+  -- Default is that the second value overrides the first value.
+
   , name         :: Text
   -- ^ A user-readable name for the attribute.
   --
@@ -182,17 +188,21 @@ native :: forall supports a. (Typeable a, AsAttributeValue a)
        -> Attribute supports a
 native name = Attribute
   { toAttributes = \ a -> [(name, toAttributeValue a)]
-  , type_ = typeRep (Proxy @a)
+  , combine      = combineAttributeValues
+  , type_        = typeRep (Proxy @a)
   , name
   }
 
 -- | Define a __logical__ attribute by providing a mapping from the
 -- attribute value to a set of HTML/XML attribute-value pairs.
 --
+-- Values will be combined by taking the newer value, overriding the
+-- older value.
+--
 -- __Example__
 --
 -- @
--- c :: Attribute '["circle"] Circle
+-- c :: Attribute '["circle"] (Last Circle)
 -- c = logical "c" \ Circle { center = V2 x y, radius } ->
 --       ["cx" =. x, "cy" =. y, "r" =. radius]
 -- @
@@ -202,8 +212,12 @@ logical :: forall supports a. Typeable a
         -> (a -> Map Text Text)
         -- ^ mapping to native attributes
         -> Attribute supports a
-logical name toAttributes =
-  Attribute { toAttributes, name, type_ = typeRep (Proxy @a) }
+logical name toAttributes = Attribute
+  { toAttributes
+  , combine = const
+  , name
+  , type_ = typeRep (Proxy @a)
+  }
 
 -- | Encode a pair of an attribute name and value.
 --

@@ -1,19 +1,21 @@
 -- | Utilities for maintaining undo/redo history.
 module UI.History where
 
-import           Control.Lens  ((&))
+import           Control.Lens       ((&))
 
-import           Data.Hashable (Hashable)
-import qualified Data.List     as List
-import           Data.Maybe    (listToMaybe)
+import           Data.Hashable      (Hashable)
+import qualified Data.List          as List
+import           Data.Maybe         (listToMaybe)
 
-import           GHC.Generics  (Generic)
+import           GHC.Generics       (Generic)
 
 import qualified Reflex
-import           Reflex        (Dynamic, Event)
+import           Reflex             (Dynamic, Event)
 
+import           UI.Attributes      ((==:))
 import           UI.Element
-import           UI.Widget
+import           UI.Html            (Button (..), button')
+import           UI.Html.Attributes (enabled, enabledIf)
 
 -- * History
 
@@ -91,7 +93,7 @@ undoButton :: forall a m t. Dom t m
            -> m (Event t a)
            -- ^ Event with the action to undo
 undoButton history = do
-  pressed <- button' (pure "↶") (enabledIf . hasUndo <$> history)
+  Button { pressed } <- button' "↶" [ enabled ==: enabledIf . hasUndo <$> history ]
   pure $ Reflex.attachWithMaybe (&) (Reflex.current history) (toUndo <$ pressed)
 
 -- | A button with the label @"↷"@ that fires an event with the action
@@ -102,7 +104,7 @@ redoButton :: forall a m t. Dom t m
            -> m (Event t a)
            -- ^ Event with the action to undo
 redoButton history = do
-  pressed <- button' (pure "↷") (enabledIf . hasRedo <$> history)
+  Button { pressed } <- button' "↷" [ enabled ==: enabledIf . hasRedo <$> history ]
   pure $ Reflex.attachWithMaybe (&) (Reflex.current history) (toRedo <$ pressed)
 
 -- | A control pane with an undo button and a redo button that manage

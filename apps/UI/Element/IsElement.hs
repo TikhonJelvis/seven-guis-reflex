@@ -8,6 +8,8 @@ import qualified GHCJS.DOM.Types as GHCJS
 
 import qualified Reflex.Dom      as Dom
 
+-- * Native JS
+
 -- | A value that can be viewed as a raw JavaScript @Element@ object.
 class IsElement e where
   rawElement :: e -> GHCJS.Element
@@ -22,14 +24,16 @@ class IsHtml e where
 instance {-# OVERLAPPABLE #-} GHCJS.IsHTMLElement e => IsHtml e where
   rawHtml = GHCJS.toHTMLElement
 
--- | Values that can be created from an underlying 'Dom.Element'
-class FromElement e where
-  type EventResult e :: Dom.EventTag -> Type
-  fromElement :: Dom.Element (EventResult e) Dom.GhcjsDomSpace t -> e t
-
 -- | A value that can be viewed as a raw JavaScript @HTMLInputElement@ object.
 class IsHtmlInput e where
   rawHtmlInput :: e -> GHCJS.HTMLInputElement
 
 instance IsHtmlInput GHCJS.HTMLInputElement where
   rawHtmlInput = id
+
+-- * Reflex DOM
+
+-- | Values that can be created from an underlying 'Dom.Element'
+class FromElement e where
+  type EventResult e :: Dom.EventTag -> Type
+  fromElement :: Dom.Element (EventResult e) Dom.GhcjsDomSpace t -> e t
