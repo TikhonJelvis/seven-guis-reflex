@@ -3,6 +3,7 @@ module UI.Element
   , Dom
 
   , text
+  , dynText
   , createElement
 
   , getAttribute
@@ -68,6 +69,10 @@ type Dom t m = ( MonadFix m
 -- | Create a text node with no element.
 text :: forall m t. Dom t m => Text -> m ()
 text = Dom.text
+
+-- | A text node with content that can change over time.
+dynText :: forall m t. Dom t m => Dynamic t Text -> m ()
+dynText = Dom.dynText
 
 -- | Create an element with an (optional) namespace.
 --

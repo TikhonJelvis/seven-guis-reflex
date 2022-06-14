@@ -11,9 +11,10 @@ import           Data.Bool               (bool)
 import           Data.Coerce             (coerce)
 import qualified Data.Foldable           as Foldable
 import           Data.Hashable           (Hashable (..))
+import           Data.Maybe              (fromJust)
 import           Data.Set                (Set)
 import qualified Data.Set                as Set
-import           Data.String             (IsString)
+import           Data.String             (IsString (..))
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Display       (Display (..))
@@ -52,6 +53,10 @@ instance AsAttributeValue (Set ClassName) where
 
   fromAttributeValue =
     Just . Set.delete "" . Set.fromList . coerce . Text.split isHtmlWhitespace
+
+instance IsString (Set ClassName) where
+  fromString = fromJust . fromAttributeValue . Text.pack
+
 
 -- | The given class if a condition is 'True', or an empty set
 -- otherwise.

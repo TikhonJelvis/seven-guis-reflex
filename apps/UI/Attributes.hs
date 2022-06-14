@@ -1,12 +1,12 @@
-{-# LANGUAGE AllowAmbiguousTypes    #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+-- | Global attributes that apply to both HTML and SVG elements.
 module UI.Attributes
   ( module UI.Attributes.Attribute
   , module UI.Attributes.AttributeSet
 
   , class_
   , id_
+  , style
+
   , href
 
   , ToCss
@@ -41,6 +41,7 @@ import           Data.Set                   (Set)
 import           UI.Attributes.Attribute
 import           UI.Attributes.AttributeSet
 import           UI.Class                   (ClassName)
+import           UI.Css                     (CssRules)
 import           UI.Id                      (Id)
 import           UI.Style
 import           UI.Url                     (Url)
@@ -55,7 +56,7 @@ import           UI.Url                     (Url)
 -- __Example__
 --
 -- @
--- div [ id_ := "special-div" ]
+-- div_ [ id_ =: "special-div" ]
 -- @
 --
 -- would be matched by the CSS rule:
@@ -78,7 +79,7 @@ id_ = native "id"
 -- __Examples__
 --
 -- @
--- div [class_ := ["draggable"]]
+-- div_ [class_ =: ["draggable"]]
 -- @
 --
 -- would be matched by the CSS rule:
@@ -92,12 +93,17 @@ id_ = native "id"
 -- Setting two classes statically and another class dynamically:
 --
 -- @
--- div [ class_ := ["draggable", "card"]
---     , class_ :== classIf "dragged" <$> beingDragged
---     ]
+-- div_ [ class_ =: ["draggable", "card"]
+--      , class_ ==: classIf "dragged" <$> beingDragged
+--      ]
 -- @
 class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
 class_ = native "class"
+
+         -- TODO: structured version of CSS style attribute
+-- | Set the CSS styles for an element.
+style :: Attribute ["HTML", "SVG"] CssRules
+style = native "style"
 
 -- * Element Attributes
 
@@ -106,7 +112,8 @@ class_ = native "class"
 -- __Example__
 --
 -- @
--- a [href := "https://example.com"] "link to example.com"
+-- a [href =: "https://example.com"] "link to example.com"
 -- @
 href :: Attribute ["a", "area", "base", "link", "use"] Url
 href = native "href"
+

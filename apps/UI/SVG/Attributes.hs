@@ -1,18 +1,22 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module UI.SVG.Attributes where
 
+import           Control.Applicative          (optional)
+
+import           Data.Foldable                (toList)
 import           Data.Hashable                (Hashable)
-import           Data.Map                     (Map)
 import           Data.Maybe                   (listToMaybe)
 import           Data.String                  (IsString (..))
-import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
+import           Data.Vector                  (Vector)
+import qualified Data.Vector                  as Vector
 
 import           GHC.Generics                 (Generic)
 
 import           Linear                       (V2 (..))
 
-import           Text.ParserCombinators.ReadP (readP_to_S, readS_to_P)
+import           Text.ParserCombinators.ReadP (char, choice, readP_to_S,
+                                               readS_to_P, sepBy, string)
 import qualified Text.Printf                  as Text
 
 import           UI.Attributes                (AsAttributeValue (..),
@@ -23,68 +27,69 @@ import           UI.Color                     (Color)
 import           UI.Id                        (Id (..))
 import           UI.Style                     (Angle, px, toCss)
 import           UI.SVG.Path                  (Path)
+import           UI.Units                     (Length)
 import qualified UI.Url                       as Url
 
 -- * Sizes and Positions
 
 -- | The x coordinate of an element in the user coordinate system.
-x :: Attribute '["image", "rect", "svg", "use"] Double
+x :: Attribute '["image", "rect", "svg", "use"] Length
 x = native "x"
 
 -- | The y coordinate of an element in the user coordinate system.
-y :: Attribute '["image", "rect", "svg", "use"] Double
+y :: Attribute '["image", "rect", "svg", "use"] Length
 y = native "y"
 
 -- | The x coordinate of the start point in a line.
-x1 :: Attribute '["line", "linearGradient"] Double
+x1 :: Attribute '["line", "linearGradient"] Length
 x1 = native "x1"
 
 -- | 'x1' but cool
-x₁ :: Attribute '["line", "linearGradient"] Double
+x₁ :: Attribute '["line", "linearGradient"] Length
 x₁ = x1
 
 -- | The x coordinate of the end point in a line.
-x2 :: Attribute '["line", "linearGradient"] Double
+x2 :: Attribute '["line", "linearGradient"] Length
 x2 = native "x2"
 
 -- | 'x2' but cool
-x₂ :: Attribute '["line", "linearGradient"] Double
+x₂ :: Attribute '["line", "linearGradient"] Length
 x₂ = x2
 
 -- | The x coordinate of the start point in a line.
-y1 :: Attribute '["line", "linearGradient"] Double
+y1 :: Attribute '["line", "linearGradient"] Length
 y1 = native "y1"
 
 -- | 'y1' but cool
-y₁ :: Attribute '["line", "linearGradient"] Double
+y₁ :: Attribute '["line", "linearGradient"] Length
 y₁ = y1
 
 -- | The x coordinate of the start point in a line.
-y2 :: Attribute '["line", "linearGradient"] Double
+y2 :: Attribute '["line", "linearGradient"] Length
 y2 = native "y2"
 
 -- | 'y2' but cool
-y₂ :: Attribute '["line", "linearGradient"] Double
+y₂ :: Attribute '["line", "linearGradient"] Length
 y₂ = y2
 
 -- | The horizontal length of an element in the user coordinate system.
-width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Double
+width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Length
 width = native "width"
 
 -- | The vertical length of an element in the user coordiante system.
-height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Double
+height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Length
 height = native "height"
 
 -- | The x coordinate of the shape's center.
-cx :: Attribute '["circle", "ellipse", "radialGradient"] Double
+cx :: Attribute '["circle", "ellipse", "radialGradient"] Length
 cx = native "cx"
 
 -- | The y coordinate of the shape's center.
-cy :: Attribute '["circle", "ellipse", "radialGradient"] Double
+cy :: Attribute '["circle", "ellipse", "radialGradient"] Length
 cy = native "cy"
 
 -- | The radius of the shape.
-r :: Attribute '["circle", "radialGradient"] Double
+r :: Attribute '["circle", "radialGradient"] Length
 r = native "r"
 
 -- ** Transforms
@@ -171,16 +176,75 @@ translate (V2 x y) = Translate (px x) (px y) "0"
 --   circle [ cx =: 10, cy =: 10, r =: 2, fill =: "#36f" ]
 --   circle [ cx =: 15, cy =: 5, r =: 2, fill =: "#f63" ]
 -- @
-scale :: Double -> Transform
-scale n = Scale (toCss n) (toCss n)
+scale :: Double -> [Transform]
+scale n = [Scale (toCss n) (toCss n)]
 
 -- | Rotate an element in 2D around its @transform-origin@.
 --
 -- See MDN:
 --  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
 --  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
-rotate :: Angle -> Transform
-rotate = Rotate
+rotate :: Angle -> [Transform]
+rotate θ = [Rotate θ]
+
+-- | Flip an element around an axis running through the element's
+-- /center of rotation/ at an angle of θ to the y-axis.
+--
+-- __Examples__
+--
+-- Flip horizontally:
+--
+-- @
+-- flipAround (Deg 0)
+-- @
+--
+-- Flip vertically:
+--
+-- @
+-- flipAround (Turn 0.25)
+-- @
+--
+-- Flip along diagonal:
+--
+-- @
+-- flipAround (Deg 45)
+-- @
+flipAround :: Angle -> [Transform]
+flipAround θ = [Rotate θ, Scale "-1" "1", Rotate (-θ)]
+
+-- | Add a 2D matrix transform.
+--
+-- The matrix can take one of two forms:
+--
+-- @[a, b, c, d]@, mapping to:
+--
+-- @
+-- matrix(a, b, c, d, 0, 0)
+-- @
+--
+-- (no translation)
+--
+-- and
+--
+-- @[a, b, c, d, tx, ty]@
+--
+-- mapping to:
+--
+-- @
+-- matrix(a, b, c, d, tx, ty)
+-- @
+--
+-- (with translation by @(tx, ty)@)
+--
+-- Any other number of entries will result in a runtime error.
+matrix :: Vector Double -> [Transform]
+matrix [a, b, c, d] =
+  [Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]]
+matrix [a, b, c, d, tx, ty] =
+  [Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, ty, tx, 0, 1]]
+matrix invalid =
+  error $ Text.printf "Invalid matrix: %s" (show invalid)
+  -- TODO: is this function even a good idea?
 
 -- ** viewBox
 
@@ -227,7 +291,9 @@ d = native "d"
 
 -- | The total length of a path in user units. Setting this scales the
 -- distance for drawing an element by @pathLength/computedLength)@.
-pathLength :: Attribute '["circle", "ellipse", "pathLength", "line", "path", "polygon", "polyline", "rect"] Double
+pathLength :: Attribute
+  '["circle", "ellipse", "pathLength", "line", "path", "polygon", "polyline", "rect"]
+  Length
 pathLength = native "pathLength"
 
 -- * Gradients
@@ -334,13 +400,13 @@ offset = native "offset"
 -- [ fill =: paintWith "my-gradient" ]
 -- @
 fill :: Attribute
-  ["altGlyph", "circle", "ellipse", "path", "polygon", "polyline", "rect",
-   "text", "textPath", "tref", "tspan"]
+  ["circle", "ellipse", "path", "polygon", "polyline", "rect",
+   "text", "textPath", "tspan"]
   Paint
 fill = native "fill"
 
              -- TODO: illustrated examples
--- | The algorithm for filling complex shapes.
+-- | The algorithm to use for filling complex shapes.
 --
 -- To determine whether a point is "inside" a complex path, we draw a
 -- ray from that point and look at how often it crosses the path
@@ -363,11 +429,119 @@ data FillRule = Nonzero
   deriving anyclass (Hashable)
   deriving AsAttributeValue via Lowercase FillRule
 
+-- TODO: examples
+-- | Set the algorithm to use for filling complex shapes.
+--
+-- See 'FillRule' for details.
+fill_rule :: Attribute
+  ["path", "polygon", "polyline", "text", "textPath", "tspan"]
+  FillRule
+fill_rule = native "fill-rule"
+
 -- ** Stroke
 
--- | Set just the @stroke@ attribute.
-stroke :: Paint -> Map Text Text
-stroke paint = [("stroke", toAttributeValue paint)]
+-- | Elements that support stroke-related attributes:
+--
+--  * 'stroke'
+--  * 'stroke_dasharray'
+--  * 'stroke_dashoffset'
+--  * 'stroke_linecap'
+--  * 'stroke_linejoin'
+--  * 'stroke_miterlimit'
+--  * 'stroke_opacity'
+--  * 'stroke_width'
+type Stroked =
+  [ "circle"
+  , "ellipse"
+  , "line"
+  , "path"
+  , "polygon"
+  , "polyline"
+  , "rect"
+  , "text"
+  , "textPath"
+  , "tspan"
+  ]
+
+-- | How the element's outline is painted.
+--
+-- __Examples__
+--
+-- Solid color:
+--
+-- @
+-- [ stroke =: "#36f", stroke_width =: 1 ]
+-- @
+--
+-- Paint with a pre-defined gradient:
+--
+-- @
+-- [ stroke =: paintWith "my-gradient", stroke_width =: 1 ]
+-- @
+stroke :: Attribute Stroked Paint
+stroke = native "stroke"
+
+-- | The width of the stroke.
+stroke_width :: Attribute Stroked Length
+stroke_width = native "stroke-width"
+
+-- | Explicitly set the opacity of the stroke.
+--
+-- Should be a number between 0 and 1.
+stroke_opacity :: Attribute Stroked Double
+stroke_opacity = native "stroke-opacity"
+
+-- | A pattern of lengths specifying the alternating length of dashes
+-- and gaps between dashes.
+newtype Dasharray = Dasharray (Vector Length)
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+
+instance AsAttributeValue Dasharray where
+  toAttributeValue (Dasharray a) = case toList a of
+    [] -> "none"
+    xs -> Text.intercalate " " $ toAttributeValue <$> xs
+
+  fromAttributeValue = run do
+    skipHtmlWhitespace
+    xs <- choice
+      [ sepBy double (optional (char ',') *> skipHtmlWhitespace)
+      , [] <$ string "none"
+      ]
+    skipHtmlWhitespace
+    pure $ Dasharray $ Vector.fromList xs
+    where run p (Text.unpack -> s) = fst <$> listToMaybe (readP_to_S p s)
+          double = readS_to_P reads
+
+-- | A list of lengths specifying the alternating length of dashes and
+-- gaps for a dashed stroke.
+--
+-- __Examples__
+--
+-- Solid stroke, no dashes:
+--
+-- @
+-- [ stroke_dasharray =: [] ]
+-- @
+--
+-- Regularly-spaced 1px dashes:
+--
+-- @
+-- [ stroke_dasharray =: [1, 1]
+-- @
+--
+-- Longer then shorter dashes with small spaces:
+--
+-- @
+-- [ stroke_dasharray =: [2, 2, 3, 2] ]
+-- @
+stroke_dasharray :: Attribute Stroked Dasharray
+stroke_dasharray = native "stroke-dasharray"
+
+                   -- TODO: examples
+-- | An offset on rendering the stroke's dasharray.
+stroke_dashoffset :: Attribute Stroked Length
+stroke_dashoffset = native "stroke-dashoffset"
 
 -- | The shape at the end of lines.
 data Linecap = Butt
@@ -383,11 +557,63 @@ data Linecap = Butt
   deriving anyclass (Hashable)
   deriving AsAttributeValue via Lowercase Linecap
 
+-- | The shape to draw at the end of lines.
+--
+-- __Examples__
+--
+-- @
+-- [ stroke_linecap =: Butt ]
+-- @
+--
+-- @
+-- [ stroke_linecap =: Square ]
+-- @
+--
+-- @
+-- [ stroke_linecap =: Round ]
+-- @
+stroke_linecap :: Attribute
+  '["path", "polyline", "line", "text", "textPath", "tspan"]
+  Linecap
+stroke_linecap = native "stroke-linecap"
+
 -- | How to draw the joints between two line segments.
-data Linejoin = Miter | Round_ | Bevel
+data Linejoin = Arcs | Bevel | Miter | MiterClip | Round_
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving AsAttributeValue via Lowercase Linejoin
+
+instance AsAttributeValue Linejoin where
+  toAttributeValue = \case
+    Arcs      -> "arcs"
+    Bevel     -> "bevel"
+    Miter     -> "miter"
+    MiterClip -> "miter-clip"
+    Round_    -> "round"
+
+  fromAttributeValue = \case
+    "arcs"       -> Just Arcs
+    "bevel"      -> Just Bevel
+    "miter"      -> Just Miter
+    "miter-clip" -> Just MiterClip
+    "round"      -> Just Round_
+    _            -> Nothing
+
+
+    -- TODO: examples
+-- | How to draw the joints between line segments in a stroke.
+stroke_linejoin :: Attribute
+  '["path", "polygon", "polyline", "rect", "text", "textPath", "tspan"]
+  Linejoin
+stroke_linejoin = native "stroke-linejoin"
+
+-- | Limit the ratio of the miter length to 'stroke_width'. When the
+-- limit is exceeded, the miter becomes a bevel.
+--
+-- Must be ≥ 1.
+stroke_miterlimit :: Attribute
+  '["path", "polygon", "polyline", "rect", "text", "textPath", "tspan"]
+  Double
+stroke_miterlimit = native "stroke-miterlimit"
 
 -- ** Paint
 

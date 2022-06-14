@@ -59,6 +59,7 @@ module UI.Attributes.Attribute
   , htmlWhitespace
   , isHtmlWhitespace
   , skipHtmlWhitespace
+  , htmlSpaceList
   )
 where
 
@@ -71,13 +72,16 @@ import qualified Data.Text                    as Text
 import           Data.Text.Display            (Display (..))
 import qualified Data.Text.Lazy.Builder       as Builder
 import           Data.Typeable                (TypeRep, Typeable, typeRep)
+import           Data.Vector                  (Vector)
+import qualified Data.Vector                  as Vector
 
 import           GHC.Generics                 (Generic)
 import           GHC.TypeLits                 (Symbol)
 
 import           Numeric.Natural              (Natural)
 
-import           Text.ParserCombinators.ReadP (ReadP, skipMany, satisfy)
+import           Text.ParserCombinators.ReadP (ReadP, many1, satisfy, sepBy,
+                                               skipMany)
 import           Text.Read                    (readMaybe)
 
 import           UI.Type.List                 (KnownSymbols, knownSymbols)
@@ -85,9 +89,12 @@ import           UI.Type.List                 (KnownSymbols, knownSymbols)
 -- * Attributes
 
 -- $setup
+-- >>> import Data.Maybe
+-- >>> import Text.ParserCombinators.ReadP
 -- >>> import Data.Text.Display (display)
 -- >>> let class_ = native "class" @["HTML", "SVG"] @ClassName
 -- >>> let href = native "href" @["a", "area", "base", "link"] @Url
+-- Not in scope: type constructor or class ‘ClassName’
 
 -- | An attribute that can be set on HTML or XML elements.
 --
@@ -373,3 +380,8 @@ htmlWhitespace = [' ', '\t', '\n', '\f', '\r']
 -- | A parser that skips any number of HTML whitespace characters.
 skipHtmlWhitespace :: ReadP ()
 skipHtmlWhitespace = skipMany $ satisfy isHtmlWhitespace
+
+-- | A parser that parses zero or more whitespace-separate values.
+htmlSpaceList :: ReadP a -> ReadP (Vector a)
+htmlSpaceList value =
+  Vector.fromList <$> sepBy value (many1 $ satisfy isHtmlWhitespace)

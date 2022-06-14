@@ -1,5 +1,23 @@
 -- | HTML elements.
-module UI.Html where
+module UI.Html
+  ( Html
+  , HtmlInput
+
+  , html
+  , html'
+
+  , div_
+  , article
+  , ol
+  , ol_
+  , ul
+  , ul_
+
+  , label
+
+  , img
+  )
+where
 
 import           Data.Proxy           (Proxy (..))
 import qualified Data.Text            as Text
@@ -21,6 +39,8 @@ import qualified UI.Event             as Event
 
 -- * HTML Elements
 
+-- ** Normal HTML Elements
+
 -- | An HTML DOM element (as opposed to an SVG element or the like).
 newtype Html t = Html (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
 
@@ -39,7 +59,28 @@ instance Reflex t => Dom.HasDomEvent t (Html t) en where
   type DomEventType (Html t) en = Event.EventResultType en
   domEvent eventName (Html e) = Dom.domEvent eventName e
 
--- ** Creating HTML Elements
+-- ** Input Elements
+
+-- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
+-- JavaScript).
+newtype HtmlInput t = HtmlInput (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+
+instance FromElement HtmlInput where
+  type EventResult HtmlInput = Event.EventResult
+  fromElement = HtmlInput
+
+instance IsElement (HtmlInput t) where
+  rawElement (HtmlInput e) = Dom._element_raw e
+
+instance IsHtml (HtmlInput t) where
+  rawHtml (HtmlInput e) =
+    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
+
+instance IsHtmlInput (HtmlInput t) where
+  rawHtmlInput (HtmlInput e) =
+    GHCJS.uncheckedCastTo GHCJS.HTMLInputElement $ Dom._element_raw e
+
+-- * Creating HTML Elements
 
 -- | Create an HTML element.
 --
@@ -49,7 +90,8 @@ instance Reflex t => Dom.HasDomEvent t (Html t) en where
 -- __Example__
 --
 -- @
--- html @"div" [class_ =: "draggable"] (pure ())
+-- html @"div" [ class_ =: "draggable" ] do
+--   text "Drag me!"
 -- @
 html :: forall element a m t. (KnownSymbol element, Dom t m)
      => AttributeSet t element "HTML"
@@ -61,7 +103,23 @@ html = createElement Nothing tag . toDom
   where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
 {-# INLINABLE html #-}
 
--- *** Structure
+-- | Create an HTML element with no body.
+--
+-- If the @element@ type variable is ambiguous, you can specify it
+-- with a type application.
+--
+-- __Example__
+--
+-- @
+-- html' @"img" [ src =: "img/example.png", alt =: "An example image." ]
+-- @
+html' :: forall element m t. (KnownSymbol element, Dom t m)
+      => AttributeSet t element "HTML"
+      -> m (Html t)
+html' attributes = fst <$> html attributes (pure ())
+{-# INLINABLE html' #-}
+
+-- ** Structure
 
 -- $ Elements for page structure: @divs@, @article@, @nav@... etc.
 
@@ -70,17 +128,17 @@ html = createElement Nothing tag . toDom
 -- __Example__
 --
 -- @
--- div [class_ =: "note"] do
+-- div_ [class_ =: "note"] do
 --   text "When applicable, semantic elements like article are preferred over div."
 -- @
-div :: forall a m t. Dom t m
-    => AttributeSet t "div" "HTML"
-    -- ^ attributes
-    -> m a
-    -- ^ body
-    -> m (Html t, a)
-div = html
-{-# INLINE div #-}
+div_ :: forall a m t. Dom t m
+     => AttributeSet t "div" "HTML"
+     -- ^ attributes
+     -> m a
+     -- ^ body
+     -> m (Html t, a)
+div_ = html
+{-# INLINE div_ #-}
 
 -- | Create an @article@ element which structures self-contained
 -- compositions in a document.
@@ -101,23 +159,133 @@ article :: forall a m t. Dom t m
 article = html
 {-# INLINE article #-}
 
--- * Input Elements
+-- *** Lists
 
--- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
--- JavaScript).
-newtype HtmlInput t = HtmlInput (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
+-- | An ordered list with items automatically wrapped in @li@
+-- elements.
+--
+-- __Example__
+--
+-- A list with plain text entries:
+--
+-- @
+-- ol [] ["one", "two", "three"]
+-- @
+ol :: forall a m t. Dom t m
+   => AttributeSet t "ol" "HTML"
+   -> [m a]
+   -> m (Html t, [a])
+ol attributes = html attributes . mapM (fmap snd . html @"li" [])
+{-# INLINABLE ol #-}
 
-instance FromElement HtmlInput where
-  type EventResult HtmlInput = Event.EventResult
-  fromElement = HtmlInput
+-- | An ordered list with items automatically wrapped in @li@
+-- elements. Ignores the return value from creating each item.
+--
+-- __Example__
+--
+-- A list with a mix of elements as items:
+--
+-- @
+-- ol_ []
+--   [ "a plain text item"
+--   , img [href =: "img/example.png"]
+--   ]
+-- @
+ol_ :: forall a m t. Dom t m
+    => AttributeSet t "ol" "HTML"
+    -> [m a]
+    -> m (Html t)
+ol_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
 
-instance IsElement (HtmlInput t) where
-  rawElement (HtmlInput e) = Dom._element_raw e
+{-# INLINABLE ol_ #-}
 
-instance IsHtml (HtmlInput t) where
-  rawHtml (HtmlInput e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
+-- | An unordered list with items automatically wrapped in @li@
+-- elements.
+--
+-- __Example__
+--
+-- A list with plain text entries:
+--
+-- @
+-- ul [] ["one", "two", "three"]
+-- @
+ul :: forall a m t. Dom t m
+   => AttributeSet t "ul" "HTML"
+   -> [m a]
+   -> m (Html t, [a])
+ul attributes = html attributes . mapM (fmap snd . html @"li" [])
+{-# INLINABLE ul #-}
 
-instance IsHtmlInput (HtmlInput t) where
-  rawHtmlInput (HtmlInput e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLInputElement $ Dom._element_raw e
+-- | An unordered list with items automatically wrapped in @li@
+-- elements. Ignores the return value from creating each item.
+--
+-- __Example__
+--
+-- A list with a mix of elements as items:
+--
+-- @
+-- ul_ []
+--   [ "a plain text item"
+--   , img [href =: "img/example.png"]
+--   ]
+-- @
+ul_ :: forall a m t. Dom t m
+    => AttributeSet t "ul" "HTML"
+    -> [m a]
+    -> m (Html t)
+ul_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
+{-# INLINABLE ul_ #-}
+
+-- ** Controls
+
+-- | A label that can be associated with an input or control. Clicking
+-- on or tabbing to the label will activate the control.
+--
+-- Labels can be associated with:
+--
+--  * 'button'
+--  * 'input'
+--  * 'meter'
+--  * 'output'
+--  * 'progress'
+--  * 'select'
+--  * 'textarea'
+--
+-- __Examples__
+--
+-- Associate with an 'input' by id:
+--
+-- @
+-- example = do
+--   labelFor "username" [] (text "Username:")
+--   input [ type_ =: Text, id_ =: "username" ]
+-- @
+--
+-- Associate with an 'input' by putting the input element /in/ the
+-- label element:
+--
+-- @
+-- example = label [] (text "Username:") do
+--   input [ type_ =: Text ]
+-- @
+label :: forall a m t. Dom t m
+      => AttributeSet t "label" "HTML"
+      -- ^ Attributes
+      -> m a
+      -- ^ Body
+      -> m (Html t, a)
+label = html
+
+-- ** Media
+
+-- | Embed an image in the page.
+--
+-- __Example__
+--
+-- @
+-- img [ src =: "img/example.png", alt =: "An example image." ]
+-- @
+img :: forall m t. Dom t m
+    => AttributeSet t "img" "HTML"
+    -> m (Html t)
+img = html'
