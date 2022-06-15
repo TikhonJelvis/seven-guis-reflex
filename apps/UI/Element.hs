@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module UI.Element
   ( PerformJS
   , Dom
@@ -5,6 +6,9 @@ module UI.Element
   , text
   , dynText
   , createElement
+
+  , InputConfig (..)
+  , createInputElement
 
   , getAttribute
   , setAttribute
@@ -22,6 +26,7 @@ where
 
 import           Control.Monad.Fix           (MonadFix)
 
+import           Data.Default.Class          (Default)
 import           Data.Hashable               (Hashable)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
@@ -40,13 +45,13 @@ import           Language.Javascript.JSaddle (MonadJSM)
 import           Linear                      (V2 (..))
 
 import qualified Reflex
-import           Reflex                      (Dynamic)
+import           Reflex                      (Dynamic, Event, Reflex)
 import qualified Reflex.Dom                  as Dom
 import           Reflex.Dom                  (DomBuilder (DomBuilderSpace),
                                               ElementConfig (..), HasDocument,
                                               RawElement)
 
-import           UI.Element.IsElement        (FromElement (..), IsElement (..))
+import           UI.Element.IsElement        (IsElement (..))
 import qualified UI.Event                    as Event
 
 type PerformJS d m = ( MonadFix m
@@ -66,6 +71,10 @@ type Dom t m = ( MonadFix m
                , HasDocument m
                )
 
+-- * Creating reflex-dom elements
+
+-- ** Text Nodes
+
 -- | Create a text node with no element.
 text :: forall m t. Dom t m => Text -> m ()
 text = Dom.text
@@ -74,11 +83,33 @@ text = Dom.text
 dynText :: forall m t. Dom t m => Dynamic t Text -> m ()
 dynText = Dom.dynText
 
+-- ** Elements
+
+-- | Create a 'Dom.ElementConfig' record. This is used for creating
+-- reflex-dom elements with 'Dom.element', 'Dom.inputElement'... etc.
+elementConfig :: forall m t. (Dom t m)
+              => Maybe Text
+              -- ^ Optional namespace
+              -> Dynamic t (Map Text Text)
+              -- ^ Dynamic attributes
+              -> m (Dom.ElementConfig Event.EventResult t Dom.GhcjsDomSpace)
+elementConfig namespace attrs = do
+  modifyAttrs <- Dom.dynamicAttributesToModifyAttributes attrs
+  pure ElementConfig
+    { _elementConfig_namespace = namespace
+    , _elementConfig_initialAttributes = Map.empty
+    , _elementConfig_modifyAttributes =
+      Just $ Reflex.fmapCheap Dom.mapKeysToAttributeName modifyAttrs
+    , _elementConfig_eventSpec = eventSpec
+    }
+  where eventSpec = Dom.GhcjsEventSpec filters handler
+        filters = mempty
+        handler = Dom.GhcjsEventHandler \ (eventName, event) ->
+          Event.domHandler eventName $ Dom.unGhcjsDomEvent event
+{-# INLINABLE elementConfig #-}
+
 -- | Create an element with an (optional) namespace.
---
--- This is the main interface between this library's structured
--- element type and the underlying @reflex-dom@ machinery.
-createElement :: forall e a m t. (Dom t m, FromElement e, EventResult e ~ Event.EventResult)
+createElement :: forall a m t. Dom t m
               => Maybe Text
               -- ^ Optional namespace
               -> Text
@@ -87,25 +118,56 @@ createElement :: forall e a m t. (Dom t m, FromElement e, EventResult e ~ Event.
               -- ^ Dynamic attributes
               -> m a
               -- ^ Body
-              -> m (e t, a)
+              -> m (Dom.Element Event.EventResult Dom.GhcjsDomSpace t, a)
 createElement namespace tagName attrs body = do
-  modifyAttrs <- Dom.dynamicAttributesToModifyAttributes attrs
-  let config = ElementConfig
-        { _elementConfig_namespace = namespace
-        , _elementConfig_initialAttributes = Map.empty
-        , _elementConfig_modifyAttributes =
-          Just $ Reflex.fmapCheap Dom.mapKeysToAttributeName modifyAttrs
-        , _elementConfig_eventSpec = eventSpec
-        }
+  config <- elementConfig namespace attrs
   (element, result) <- Dom.element tagName config body
   postBuild <- Reflex.getPostBuild
   Reflex.notReadyUntil postBuild
-  pure (fromElement element, result)
-  where eventSpec = Dom.GhcjsEventSpec filters handler
-        filters = mempty
-        handler = Dom.GhcjsEventHandler \ (eventName, event) ->
-          Event.domHandler eventName $ Dom.unGhcjsDomEvent event
+  pure (element, result)
 {-# INLINABLE createElement #-}
+
+-- | Controlling the value and checked status of an @input@, as
+-- appropriate.
+--
+-- See: 'Dom.InputElementConfig'
+data InputConfig t = InputConfig
+  { initialValue   :: Text
+  , setValue       :: Maybe (Event t Text)
+  , initialChecked :: Bool
+  , setChecked     :: Maybe (Event t Bool)
+  }
+  deriving stock (Generic)
+
+instance Reflex t => Default (InputConfig t) where
+  def = InputConfig
+    { initialValue   = ""
+    , setValue       = Nothing
+    , initialChecked = False
+    , setChecked     = Nothing
+    }
+
+-- | Create an input element.
+createInputElement :: forall m t. Dom t m
+                   => Maybe Text
+                   -- ^ Optional namespace
+                   -> Dynamic t (Map Text Text)
+                   -- ^ Dynamic attributes (should include @"type"@)
+                   -> InputConfig t
+                   -- ^ Parameters to control the value of the widget
+                   -> m (Dom.InputElement Event.EventResult Dom.GhcjsDomSpace t)
+createInputElement namespace attrs InputConfig {..} = do
+  config <- elementConfig namespace attrs
+  Dom.inputElement $ Dom.InputElementConfig
+    { Dom._inputElementConfig_elementConfig = config
+
+    , Dom._inputElementConfig_initialValue = initialValue
+    , Dom._inputElementConfig_setValue     = setValue
+
+    , Dom._inputElementConfig_initialChecked = initialChecked
+    , Dom._inputElementConfig_setChecked     = setChecked
+    }
+{-# INLINABLE createInputElement #-}
 
 -- * Element Properties
 

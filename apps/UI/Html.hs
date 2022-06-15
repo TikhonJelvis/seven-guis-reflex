@@ -1,7 +1,6 @@
 -- | HTML elements.
 module UI.Html
   ( Html
-  , HtmlInput
 
   , html
   , html'
@@ -40,7 +39,7 @@ import qualified Reflex.Dom           as Dom
 import           UI.Attributes        (AttributeSet, toDom)
 import           UI.Element           (Dom, createElement, text)
 import           UI.Element.IsElement (FromElement (..), IsElement (..),
-                                       IsHtml (..), IsHtmlInput (..))
+                                       IsHtml (..))
 import qualified UI.Event             as Event
 import           UI.Event             (EventName (..))
 
@@ -68,32 +67,6 @@ instance Reflex t => Dom.HasDomEvent t (Html t) en where
   type DomEventType (Html t) en = Event.EventResultType en
   domEvent eventName (Html e) = Dom.domEvent eventName e
 
--- ** Input Elements
-
--- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
--- JavaScript).
-newtype HtmlInput t = HtmlInput (Dom.Element Event.EventResult Dom.GhcjsDomSpace t)
-  deriving stock (Generic)
-
-instance FromElement HtmlInput where
-  type EventResult HtmlInput = Event.EventResult
-  fromElement = HtmlInput
-
-instance IsElement (HtmlInput t) where
-  rawElement (HtmlInput e) = Dom._element_raw e
-
-instance IsHtml (HtmlInput t) where
-  rawHtml (HtmlInput e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLElement $ Dom._element_raw e
-
-instance IsHtmlInput (HtmlInput t) where
-  rawHtmlInput (HtmlInput e) =
-    GHCJS.uncheckedCastTo GHCJS.HTMLInputElement $ Dom._element_raw e
-
-instance Reflex t => Dom.HasDomEvent t (HtmlInput t) en where
-  type DomEventType (HtmlInput t) en = Event.EventResultType en
-  domEvent eventName (HtmlInput e) = Dom.domEvent eventName e
-
 -- * Creating HTML Elements
 
 -- | Create an HTML element.
@@ -113,8 +86,10 @@ html :: forall element a m t. (KnownSymbol element, Dom t m)
      -> m a
      -- ^ body
      -> m (Html t, a)
-html = createElement Nothing tag . toDom
-  where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
+html attributes body = do
+  let tag = Text.pack $ symbolVal (Proxy @element)
+  (element, result) <- createElement Nothing tag (toDom attributes) body
+  pure (Html element, result)
 {-# INLINABLE html #-}
 
 -- | Create an HTML element with no body.
@@ -273,14 +248,13 @@ button attributes body = do
   pure (Button { element, pressed }, a)
 
 -- | A button with a static text label.
-button' :: forall a m t. Dom t m
+button' :: forall m t. Dom t m
         => Text
         -- ^ button label
         -> AttributeSet t "button" "HTML"
         -- ^ attributes
         -> m (Button t)
-button' label attributes = fst <$> button attributes do
-  text label
+button' t attributes = fst <$> button attributes (text t)
 
 -- | A label that can be associated with an input or control. Clicking
 -- on or tabbing to the label will activate the control.

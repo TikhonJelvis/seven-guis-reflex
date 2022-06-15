@@ -232,8 +232,8 @@ instance GCompare (AttributeKey element namespace) where
 -- Each attribute tracks which elements or namespaces it supports:
 --
 -- @
--- class_ :: Attribute "class" ["HTML", "SVG"] (Set ClassName)
--- href :: Attribute "href" ["a", "area", "base", "link"] URL
+-- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
+-- href :: Attribute ["a", "area", "base", "link"] URL
 -- @
 --
 -- An attribute can be included in an attribute set as long as /any/

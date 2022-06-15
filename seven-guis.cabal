@@ -75,6 +75,7 @@ executable guis
     UI.History
     UI.Html
     UI.Html.Attributes
+    UI.Html.Input
     UI.Id
     UI.Main
     UI.PushMap
