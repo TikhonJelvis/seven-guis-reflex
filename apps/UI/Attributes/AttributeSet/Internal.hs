@@ -196,11 +196,26 @@ instance GEq (AttributeKey element namespace) where
       -- there is presumably a way to do this without unsafeCoerce,
       -- but I do not know what it is
 
+-- | When attributes have the same name, the /lower/ attribute
+-- according to this ordering will take priority
+--
+-- In particular, this means that if the same name has a key with
+-- @type_ = Nothing@ and a key with @type_ = Just ...@, the version
+-- with @Nothing@ will take precedence.
+--
+-- When the same name has /multiple/ @type_ = Just typeRep@ keys the
+-- ordering is unspecified—currently depends on the 'Ord' instance for
+-- 'SomeTypeRep'.
 instance GCompare (AttributeKey element namespace) where
   gcompare ka@(AttributeKey a) kb@(AttributeKey b)
-    | Just Refl <- geq ka kb            = GEQ
-    | Attribute.name a < Attribute.name b = GLT
-    | otherwise                         = GGT
+    | Just Refl <- geq ka kb = GEQ
+    | isLessThan             = GLT
+    | otherwise              = GGT
+    where isLessThan
+            | name_a == name_b = Attribute.type_ a < Attribute.type_ b
+            | otherwise        = name_a < name_b
+          name_a = Attribute.name a
+          name_b = Attribute.name b
 
 -- * Element compatibility
 
@@ -264,13 +279,23 @@ data SetAttribute t element namespace where
 --              | (attribute, value) <- toList attributeSet
 --              ]
 -- @
+--
+-- Note: if there are multiple attributes with different types setting
+-- the same name, only one value will be set:
+--
+--  * if one was set with 'override', it takes precdence over others
+--
+--  * if multiple attributes were set /without/ 'override', which one
+--    takes precdence is unspecified
 toDom :: forall t element namespace. Reflex t
       => AttributeSet t element namespace
       -> Dynamic t (Map Text Text)
-toDom (AttributeSet dmap) = DMap.foldrWithKey go (pure []) dmap
-  where go :: forall v. AttributeKey element namespace v
+toDom (AttributeSet dmap) = DMap.foldlWithKey go (pure []) dmap
+  where go :: forall v.
+              Dynamic t (Map Text Text)
+           -> AttributeKey element namespace v
            -> Dynamic t v
            -> Dynamic t (Map Text Text)
-           -> Dynamic t (Map Text Text)
-        go (AttributeKey attribute) value =
-          Reflex.zipDynWith (<>) $ Attribute.toAttributes attribute <$> value
+        go existing (AttributeKey attribute) value =
+          Reflex.zipDynWith (<>) converted existing
+          where converted = Attribute.toAttributes attribute <$> value

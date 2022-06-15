@@ -10,6 +10,15 @@
 --  2. What elements they apply to (either globally for HTML/SVG/etc,
 --  or specific elements like @a@ and @area@)
 --
+-- If you need to set an attribute with a non-standard or dynamically
+-- generated name, you can use 'textAttribute' or 'Attribute''s
+-- 'IsString' instance:
+--
+-- @
+-- [ textAttribute "data-foo" =: "some text" ]
+-- [ "data-foo" =: "some-text" ]
+-- @
+--
 -- __Examples__
 --
 -- The @class@ attribute, global across all HTML and SVG elements:
@@ -52,6 +61,7 @@ module UI.Attributes.Attribute
   , native
   , logical
   , (=.)
+  , override
 
   , AsAttributeValue (..)
   , ShowRead (..)
@@ -156,9 +166,16 @@ data Attribute (supports :: [Symbol]) a = Attribute
   -- attribute name. For logical attributes, this can be anything, but
   -- should be useful for error messages.
 
-  , type_        :: TypeRep
+  , type_        :: Maybe TypeRep
   -- ^ A runtime representation of the value type in the attribute,
   -- used to keep attribute set operations safe.
+  --
+  -- Attributes set with 'textAttribute' will have the 'typeRep_'
+  -- 'Nothing'—conceptually, those are set to the "native" value
+  -- directly rather than going through a Haskell type. In practice,
+  -- this lets us treat 'textAttribute' specially vs "normal"
+  -- attributes with type 'Text' so that the overriding behavior of
+  -- 'textAttribute' is consistent.
   }
   deriving stock (Generic)
 
@@ -189,7 +206,7 @@ native :: forall supports a. (Typeable a, AsAttributeValue a)
 native name = Attribute
   { toAttributes = \ a -> [(name, toAttributeValue a)]
   , combine      = combineAttributeValues
-  , type_        = typeRep (Proxy @a)
+  , type_        = Just $ typeRep (Proxy @a)
   , name
   }
 
@@ -216,7 +233,7 @@ logical name toAttributes = Attribute
   { toAttributes
   , combine = const
   , name
-  , type_ = typeRep (Proxy @a)
+  , type_ = Just $ typeRep (Proxy @a)
   }
 
 -- | Encode a pair of an attribute name and value.
@@ -241,6 +258,56 @@ logical name toAttributes = Attribute
 -- @
 (=.) :: AsAttributeValue a => Text -> a -> (Text, Text)
 attribute =. value = (attribute, toAttributeValue value)
+
+-- | Override any value set for the given name, using the provided
+-- 'Text' value directly on the element.
+--
+-- This lets us:
+--
+--  * override attributes like @class_@ that collect multiple values
+--
+--  * set attributes to invalid/non-standard/unsupported values
+--
+--  * set attributes not supported by the library or on elements the
+--    library does not support
+--
+--  * set attributes where the attribute name is dynamic
+--
+-- A value set with 'override' will always take precdence over other
+-- native/logical attributes with the same name. If 'override' is used
+-- multiple times, only the /last/ value will be set.
+--
+-- __Example__
+--
+-- Setting a @data-<foo>@ attribute with a dynamic name:
+--
+-- @
+-- data_ :: Text -> Attribute ["HTML", "SVG"] Text
+-- data_ name = override ("data-" <> name)
+--
+-- myElement dataValue = div [ data_ "my-data" =: dataValue ] (pure ())
+-- @
+--
+-- Overriding the @type@ of an @input@ element, normally set through
+-- the type parameter:
+--
+-- @
+-- -- will be a password field, not a text field
+-- myInput = input @"text" [ override "type" =: "password" ]
+-- @
+--
+-- Set a non-standard (Safari-only) attribute:
+--
+-- @
+-- input @"text" [ override "autocorrect" =: "off" ]
+-- @
+override :: forall supports. Text -> Attribute supports Text
+override name = Attribute
+  { name
+  , type_        = Nothing -- different than "normal" Text attribute
+  , toAttributes = \ value -> [(name, value)]
+  , combine      = const
+  }
 
 -- * Attribute Values
 
