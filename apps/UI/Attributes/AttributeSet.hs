@@ -9,6 +9,7 @@ module UI.Attributes.AttributeSet
     AttributeSet
 
     -- ** Setting attributes
+  , Compatible
   , SetAttribute (..)
   , (=:)
   , (==:)

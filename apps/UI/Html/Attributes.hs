@@ -11,7 +11,8 @@ import           Data.Vector              (Vector)
 
 import           GHC.Generics             (Generic)
 
-import           UI.Attributes            (Attribute, boolean, logical, native)
+import           UI.Attributes            (Attribute, boolean, logical, native,
+                                           (=.))
 import           UI.Color                 (Opaque)
 import           UI.Email                 (Email)
 import           UI.Id                    (Id, Ids)
@@ -162,27 +163,35 @@ maxlength = native "maxlength"
 -- types.
 
 -- | The default value element for inputs—unstructured text.
-value :: Attribute '["input", "text", "search"] Text
+value :: Attribute '["input", "text", "search", "tel"] Text
 value = native "value"
 
 -- | A value for numeric input fields.
-number_value :: Attribute '["input", "number"] Double
+number_value :: Attribute '["input", "number", "range"] Double
 number_value = native "value"
 
 -- | The minimum number a numeric input should accept.
-number_min :: Attribute '["input", "number"] Double
+number_min :: Attribute '["input", "number", "range"] Double
 number_min = native "min"
 
 -- | The maximum number a numeric input should accept.
-number_max :: Attribute '["input", "number"] Double
+number_max :: Attribute '["input", "number", "range"] Double
 number_max = native "max"
 
 -- | The step by which a numeric input can change.
 --
+-- 'Nothing' gets translated to a value of @any@.
+--
 -- If the user enters a value that does not conform to the step, the
 -- browser will round it to the nearest valid value.
-number_step :: Attribute '["input", "number"] Double
-number_step = native "step"
+number_step :: Attribute '["input", "number", "range"] (Maybe Double)
+number_step = logical "step" \case
+  Just n  -> ["step" =. n]
+  Nothing -> ["step" =. ("any" :: Text)]
+
+-- | The value for numeric inputs restricted to integers.
+integer_value :: Attribute '["input", "integer", "integer-range"] Integer
+integer_value = native "value"
 
 -- | A value for URL entries.
 url_value :: Attribute '["input", "url"] Url
@@ -208,6 +217,17 @@ color_value = native "value"
 month_value :: Attribute '["month"] (Integer, Int)
 month_value = logical "value" (\ month -> [("value", toText month)])
   where toText = Text.pack . Time.formatShow Time.yearMonthFormat
+
+-- | A value for week inputs: (year, week) pairs.
+--
+-- __Example__
+--
+-- @
+-- week [ week_value =: (2022, 37) ] never
+-- @
+week_value :: Attribute '["week"] (Integer, Int)
+week_value = logical "value" (\ month -> [("value", toText month)])
+  where toText = Text.pack . Time.formatShow (Time.yearWeekFormat Time.ExtendedFormat)
 
 -- | A value for date pickers.
 --

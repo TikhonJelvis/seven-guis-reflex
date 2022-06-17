@@ -17,12 +17,39 @@
 -- range :: AttributeSet t "range" "HTML"
 -- ...
 -- @
-module UI.Html.Input where
+module UI.Html.Input
+  ( HtmlInput (..)
+  , input
+  , input'
+
+  , text
+  , tel
+  , search
+  , url
+  , password
+  , email
+  , emails
+
+  , checkbox
+
+  , number
+  , integer
+  , range
+  , integerRange
+
+  , month
+  , week
+  , date
+  , time
+  , datetime
+
+  , color
+  )
+where
 
 import qualified Data.Colour                       as Colour
 import           Data.Default.Class                (def)
 import           Data.Maybe                        (fromMaybe)
-import           Data.Proxy                        (Proxy (..))
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Time                         (Day, LocalTime, TimeOfDay)
@@ -31,7 +58,7 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 
 import           GHC.Generics                      (Generic)
-import           GHC.TypeLits                      (KnownSymbol, symbolVal)
+import           GHC.TypeLits                      (KnownSymbol)
 
 import qualified GHCJS.DOM.Types                   as GHCJS
 
@@ -39,9 +66,10 @@ import qualified Reflex
 import           Reflex                            (Dynamic, Event, Reflex)
 import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes                     (boolean, fromAttributeValue,
+import           UI.Attributes                     (AsAttributeValue, Attribute,
+                                                    boolean, fromAttributeValue,
                                                     isHtmlWhitespace, native,
-                                                    override, toAttributeValue)
+                                                    toAttributeValue)
 import qualified UI.Attributes.AttributeSet.Reflex as AttributeSet
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
 import           UI.Color                          (Opaque (..))
@@ -51,8 +79,9 @@ import           UI.Element.IsElement              (IsElement (..), IsHtml (..),
                                                     IsHtmlInput (..))
 import           UI.Email                          (Email, validate)
 import qualified UI.Event                          as Event
-import           UI.Html.Attributes                (number_value)
+import           UI.Html.Attributes                (integer_value, number_value)
 import           UI.Password                       (Password (..))
+import           UI.Type.List                      (KnownSymbols)
 import           UI.Url                            (Url (..))
 
 -- * Input Elements
@@ -89,42 +118,74 @@ instance Reflex t => Dom.HasDomEvent t (HtmlInput t) en where
 
 -- | Create an HTML input element.
 --
--- The element /tag/ will always be @input@ and the @type@ attribute
--- will be explicitly set to the tag in the 'AttributeSet''s type.
+-- Input elements never take children.
 --
--- Note: Input elements never take children.
+-- Because different types of inputs behave differently and accept
+-- different attributes, we track the kind of input in the type rather
+-- than the @"input"@ tag directly: for example, the type of 'integer'
+-- has the tag @"integer"@ rather than @"input"@.
+--
+-- @
+-- integer :: AttributeSet t "integer" "HTML" -> {- ... -}
+-- @
+--
+-- This lets us specialize the type of attributes like 'integer_value'
+-- only to types of inputs where they make sense.
+--
+-- However, all input-specific attributes /still/ support the
+-- @"input"@ tag. If you need an input element where the @type@ is set
+-- dynamically, you can tag it with @"input"@ and use /any/ of the
+-- specialized input attributes with it:
+--
+-- @
+-- myInput type_ = input @"input" type_ def [ integer_value =: 10 ]
+-- @
+--
+-- Warning: if you specify multiple versions of the same underlying
+-- attribute (eg @integer_value@ /and/ @url_value@), which value gets
+-- used is implementation-defined.
 --
 -- __Example__
 --
 -- A password field for entering a numeric PIN:
 --
 -- @
--- input @"password" [ inputmode =: Numeric ]
--- @
---
--- If you need to leave the tag attribute out or set it dynamically,
--- specify @"input"@ instead. This will allow using attributes for
--- /any/ type of input with the element.
---
--- @
--- input @"input" [ override "type" =: "foo" ]
+-- input @"password" def [ inputmode =: Numeric ]
 -- @
 input :: forall type_ m t. (KnownSymbol type_, Dom t m)
-      => InputConfig t
-      -- ^ Config for setting the input value externally.
+      => Text
+      -- ^ Setting for the @type@ attribute.
       -> AttributeSet t type_ "HTML"
       -- ^ Attributes
+      -> InputConfig t
+      -- ^ Config for setting the input value externally.
       -> m (HtmlInput t)
-input config attributes = do
+input type_ attributes config = do
   element <- createInputElement Nothing domAttributes config
   pure $ HtmlInput element
   where domAttributes =
           toDom $ attributes <> [native @'["HTML"] "type" =: type_]
         -- NOTE: using native rather than override so that "type" can
         -- always be overriden by the caller
-
-        type_ = Text.pack $ symbolVal (Proxy @type_)
 {-# INLINABLE input #-}
+
+-- | A version of 'input' that automatically handles converting
+-- to/from types with 'AsAttributeValue' instances.
+input' :: forall type_ a m t. (KnownSymbol type_, Dom t m, AsAttributeValue a)
+       => Text
+       -- ^ Setting for the @type@ attribute
+       -> AttributeSet t type_ "HTML"
+       -- ^ Attributes
+       -> Event t a
+       -- ^ Explicitly override the current value. Use 'never' if you
+       -- don't need this.
+       -> m (HtmlInput t, Dynamic t (Maybe a))
+       -- ^ The input element as well as its current value, or
+       -- 'Nothing' if it does not parse.
+input' type_ attributes setValue = do
+  let config = def { setValue = Just $ toAttributeValue <$> setValue }
+  e <- input type_ attributes config
+  pure (e, fromAttributeValue <$> Dom.value e)
 
 -- ** Text-Based Inputs
 
@@ -146,8 +207,28 @@ text :: forall m t. Dom t m
      -> m (HtmlInput t, Dynamic t Text)
      -- ^ The input element and its current text value.
 text attributes setValue = do
-  e <- input def { setValue = Just setValue } attributes
-  pure (e, Dom.value e)
+  (e, v) <- input' "text" attributes setValue
+  pure (e, fromMaybe "" <$> v)
+{-# INLINABLE text #-}
+
+-- | An entry for a telephone number.
+--
+-- This behaves like a text entry with no additional structure or
+-- validation because telephone numbers vary so much around the
+-- world. However, browsers may change the onscreen keyboard or
+-- display the element differently from plain text inputs.
+tel :: forall m t. Dom t m
+    => AttributeSet t "tel" "HTML"
+    -- ^ Attributes
+    -> Event t Text
+    -- ^ Explicitly set the value of the input. Use 'never' if you
+    -- don't need to do this.
+    -> m (HtmlInput t, Dynamic t Text)
+    -- ^ The input element and its current text value.
+tel attributes setValue = do
+  (e, v) <- input' "tel" attributes setValue
+  pure (e, fromMaybe "" <$> v)
+{-# INLINABLE tel #-}
 
 -- | A plain text field used for searching.
 --
@@ -172,8 +253,9 @@ search :: forall m t. Dom t m
        -> m (HtmlInput t, Dynamic t Text)
        -- ^ The input element and its current value.
 search attributes setValue = do
-  e <- input def { setValue = Just setValue } attributes
-  pure (e, Dom.value e)
+  (e, v) <- input' "search" attributes setValue
+  pure (e, fromMaybe "" <$> v)
+{-# INLINABLE search #-}
 
 -- | A plain text field used for URLs.
 --
@@ -197,49 +279,8 @@ url :: forall m t. Dom t m
        -> m (HtmlInput t, Dynamic t (Maybe Url))
        -- ^ The input element and its current value. 'Nothing' if the
        -- URL syntax is invalid.
-url attributes setValue = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setValue } attributes
-  pure (e, fromAttributeValue <$> Dom.value e)
-
-
--- | An input that allows the user to specify any number.
---
--- If you do not specify a default value, it will be initialized to
--- 'min_value' or to 0 if 'min_value' is not set.
---
--- Some browsers allow invalid characters in numeric input fields. If
--- this happens, the value will retain the previous valid number.
---
--- __Examples__
---
--- Numeric input starting at 12.5:
---
--- @
--- number [ number_value =: 12.5 ] never
--- @
---
--- Numeric input that only allows entries rounded to 0.5. The browser
--- should take care of the rounding:
---
--- @
--- number [ step =: 0.5 ] never
--- @
---
--- Restricting the range of the input:
---
--- @
--- number [ number_min =: 2.5, number_max =: 11, number_step =: 0.5 ] never
--- @
-number :: forall m t. Dom t m
-       => AttributeSet t "number" "HTML"
-       -> Event t Double
-       -> m (HtmlInput t, Dynamic t Double)
-number attributes setValue = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setValue } attributes
-  v <- Reflex.improvingMaybe $ fromAttributeValue <$> Dom.value e
-  let startValue = fromMaybe (pure 0) $
-        AttributeSet.lookup number_value attributes
-  pure (e, Reflex.zipDynWith fromMaybe startValue v)
+url = input' "url"
+{-# INLINABLE url #-}
 
 -- | A password input.
 --
@@ -247,11 +288,16 @@ number attributes setValue = do
 -- with each character displayed as @*@ or @•@.
 password :: forall m t. Dom t m
          => AttributeSet t "password" "HTML"
-         -> Event t Double
+         -- ^ Attributes
+         -> Event t Text
+         -- ^ Override the current value. Use 'never' if you don't
+         -- need this.
          -> m (HtmlInput t, Dynamic t Password)
+         -- ^ The input element and the current value of the input.
 password attributes setValue = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setValue } attributes
-  pure (e, Password <$> Dom.value e)
+  (e, v) <- input' "password" attributes setValue
+  pure (e, Password . fromMaybe "" <$> v)
+{-# INLINABLE password #-}
 
 -- | An email address input.
 --
@@ -272,9 +318,8 @@ email :: forall m t. Dom t m
       => AttributeSet t "email" "HTML"
       -> Event t Email
       -> m (HtmlInput t, Dynamic t (Maybe Email))
-email attributes setEmail = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setEmail } attributes
-  pure (e, fromAttributeValue <$> Dom.value e)
+email = input' "email"
+{-# INLINABLE email #-}
 
 -- | An email address input that allows multiple email addresses.
 --
@@ -293,15 +338,15 @@ emails :: forall m t. (Dom t m)
        -> Event t (Vector Email)
        -> m (HtmlInput t, Dynamic t (Vector (Maybe Email)))
 emails attributes setEmails = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setEmails } attributes'
+  let config = def { setValue = Just $ toAttributeValue <$> setEmails }
+  e <- input "email" attributes' config
   pure (e, getEmails <$> Dom.value e)
   where attributes' :: AttributeSet t "emails" "HTML"
         attributes' = attributes <>
-          [ boolean @'["emails"] "multiple" =: True
-          , override @'["emails"] "type" =: "email"
-          ]
+          [ boolean @'["emails"] "multiple" =: True ]
         getEmails = Vector.fromList . map validate .
           filter (Text.all isHtmlWhitespace) . Text.split (== ',')
+{-# INLINABLE emails #-}
 
 -- ** Checkboxes and Radio Buttons
 
@@ -348,10 +393,165 @@ checkbox :: forall m t. Dom t m
          -- ^ The element + current state (True = checked, False =
          -- unchecked)
 checkbox attributes setChecked = do
-  HtmlInput e <- input def { setChecked = Just setChecked  } attributes
+  let config = def { setChecked = Just setChecked  }
+  HtmlInput e <- input "checkbox" attributes config
   pure (HtmlInput e, Dom._inputElement_checked e)
            -- TODO: does this always force the checkbox to start
            -- unchecked?
+{-# INLINABLE checkbox #-}
+
+-- ** Numbers
+
+-- | An input that takes on numeric values: either @type="number"@ or
+-- @type="range"@.
+numeric :: forall type_ n m supports t.
+           ( Num n
+           , AsAttributeValue n
+           , Dom t m
+           , KnownSymbol type_
+           , KnownSymbols supports
+           , AttributeSet.Compatible type_ "HTML" supports
+           )
+        => Text
+        -- ^ Type of input (usually @"number"@ or @"range"@)
+        -> Attribute supports n
+        -- ^ Specialized attribute for values of type @n@ (eg
+        -- 'integer_value' or 'number_value').
+        -> AttributeSet t type_ "HTML"
+        -- ^ Attributes
+        -> Event t n
+        -- ^ Override current value. Use 'never' if you don't need
+        -- this.
+        -> m (HtmlInput t, Dynamic t n)
+        -- ^ The input element and the current value of the input.
+numeric type_ valueAttribute attributes setValue = do
+  (e, v) <- input' type_ attributes setValue
+  v' <- Reflex.improvingMaybe v
+  pure case AttributeSet.lookup valueAttribute attributes of
+    Just start -> (e, Reflex.zipDynWith fromMaybe start v')
+    Nothing    -> (e, Reflex.zipDynWith fromMaybe (pure 0) v')
+{-# INLINABLE numeric #-}
+
+-- | An input that allows the user to specify any number.
+--
+-- Some browsers allow invalid characters in numeric input fields. If
+-- this happens, the value will retain the previous valid number.
+--
+-- __Examples__
+--
+-- Numeric input starting at 12.5:
+--
+-- @
+-- number [ number_value =: 12.5 ] never
+-- @
+--
+-- Numeric input that only allows entries rounded to 0.5. The browser
+-- should take care of the rounding:
+--
+-- @
+-- number [ step =: 0.5 ] never
+-- @
+--
+-- Restricting the range of the input:
+--
+-- @
+-- number [ number_min =: 2.5, number_max =: 11, number_step =: Just 0.5 ] never
+-- @
+--
+-- Restricting to integer values:
+--
+-- @
+-- number [ number_step =: Just 1 ] never
+-- @
+--
+-- This will still return the value as a 'Double'; you can use
+-- 'integer' to get 'Integer' values instead.
+number :: forall m t. Dom t m
+       => AttributeSet t "number" "HTML"
+       -> Event t Double
+       -> m (HtmlInput t, Dynamic t Double)
+number = numeric "number" number_value
+{-# INLINABLE number #-}
+
+-- | A number input restricted to integers.
+--
+-- Some browsers allow invalid characters in numeric input fields. If
+-- this happens, the value will retain the previous valid number.
+--
+-- __Examples__
+--
+-- A numeric input ranging from 500 to 1000 with a step of 25:
+--
+-- @
+-- integer [ integer_min =: 500, integer_max =: 1000, integer_step =: 25 ] never
+-- @
+integer :: forall m t. Dom t m
+        => AttributeSet t "integer" "HTML"
+        -> Event t Integer
+        -> m (HtmlInput t, Dynamic t Integer)
+integer = numeric "number" integer_value
+{-# INLINABLE integer #-}
+
+-- | A numeric input for numbers within a range.
+--
+-- This is typically represented by a slider or a spinner rather than
+-- a text entry box, so it should not be used when the precise value
+-- of the input matters.
+--
+-- __Examples__
+--
+-- The default behavior is ranging from 0 to 1 with no steps:
+--
+-- @
+-- range [] never
+--
+-- -- equivalently:
+-- range [ number_step =: Nothing, number_min =: 0, number_max =: 1 ] never
+-- @
+--
+-- A range going from 0 to 1 with steps of 0.1:
+--
+-- @
+-- range [ number_step =: Just 0.1 ] never
+-- @
+--
+-- A range going from 0 to 100 with steps of 1:
+--
+-- @
+-- range [ number_step =: Just 1, number_min =: 0, number_max =: 100 ] never
+-- @
+--
+-- The result value is still returned as a 'Double'; if you only want
+-- integers, consider 'integerRange' instead.
+range :: forall m t. Dom t m
+      => AttributeSet t "number" "HTML"
+      -- ^ Attributes
+      -> Event t Double
+      -- ^ Set the number. Use 'never' if you don't need this.
+      -> m (HtmlInput t, Dynamic t Double)
+      -- ^ The element and the currently picked number
+range = numeric "range" number_value
+{-# INLINABLE range #-}
+
+-- | A numeric input for integers within a range.
+--
+-- Default behavior is to range from 0 to 100 with a step of 1.
+--
+-- See 'range' for more details.
+--
+-- __Examples__
+--
+-- Range from 500 to 1000 with a step of 25:
+--
+-- @
+-- integerRange [ integer_min =: 500, integer_max =: 1000, integer_step =: 25 ] never
+-- @
+integerRange :: forall m t. Dom t m
+             => AttributeSet t "integer" "HTML"
+             -> Event t Integer
+             -> m (HtmlInput t, Dynamic t Integer)
+integerRange = numeric "range" integer_value
+{-# INLINABLE integerRange #-}
 
 -- ** Date and Time
 
@@ -376,10 +576,39 @@ month :: forall m t. Dom t m
       -> m (HtmlInput t, Dynamic t (Maybe (Integer, Int)))
       -- ^ The element and the current year-month pair if it parses.
 month attributes setMonth = do
-  e <- input def { setValue = Just $ toText <$> setMonth } attributes
-  pure (e, getMonth <$> Dom.value e)
+  (e, v) <- input' "month" attributes (toText <$> setMonth)
+  pure (e, getMonth <$> v)
   where toText = Text.pack . Time.formatShow Time.yearMonthFormat
-        getMonth = Time.formatParseM Time.yearMonthFormat . Text.unpack
+        getMonth v = v >>= Time.formatParseM Time.yearMonthFormat . Text.unpack
+{-# INLINABLE month #-}
+
+-- | A week + year input.
+--
+-- The underlying value should be in the @yyyy-Www@ format
+-- (@2022-W37@).
+--
+--  __Example__
+--
+-- A week input with a default corresponding to @2022-W37@:
+--
+-- @
+-- week [ week_value =: (2022, 37) ] never
+-- @
+week :: forall m t. Dom t m
+     => AttributeSet t "week" "HTML"
+     -- ^ Attributes
+     -> Event t (Integer, Int)
+     -- ^ Explicitly set the year-week value of the input. Use
+     -- 'Reflex.never' if you don't need this.
+     -> m (HtmlInput t, Dynamic t (Maybe (Integer, Int)))
+     -- ^ The element and the current year-week pair if it parses.
+week attributes setWeek = do
+  (e, v) <- input' "week" attributes (toText <$> setWeek)
+  pure (e, getMonth <$> v)
+  where weekFormat = Time.yearWeekFormat Time.ExtendedFormat
+        toText = Text.pack . Time.formatShow weekFormat
+        getMonth v = v >>= Time.formatParseM weekFormat . Text.unpack
+{-# INLINABLE week #-}
 
 -- | A date picker.
 --
@@ -397,11 +626,8 @@ date :: forall m t. Dom t m
      => AttributeSet t "date" "HTML"
      -> Event t Day
      -> m (HtmlInput t, Dynamic t (Maybe Day))
-date attributes setDate = do
-  e <- input def { setValue = Just $ toText <$> setDate } attributes
-  pure (e, getDay <$> Dom.value e)
-  where toText = Text.pack . Time.iso8601Show
-        getDay = Time.iso8601ParseM . Text.unpack
+date = input' "date"
+{-# INLINABLE date #-}
 
 -- | A time picker.
 --
@@ -423,9 +649,8 @@ time :: forall m t. Dom t m
      -> m (HtmlInput t, Dynamic t (Maybe TimeOfDay))
      -- ^ The input element as well as the time of day if it parses
      -- correctly.
-time attributes setTime = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setTime } attributes
-  pure (e, fromAttributeValue <$> Dom.value e)
+time = input' "time"
+{-# INLINABLE time #-}
 
 -- | A date + time picker.
 --
@@ -446,9 +671,8 @@ datetime :: forall m t. Dom t m
          -- ^ Explicitly set the value of the date picker. Use
          -- @never@ if you don't ever want to do this.
          -> m (HtmlInput t, Dynamic t (Maybe LocalTime))
-datetime attributes setDatetime = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setDatetime } attributes
-  pure (e, fromAttributeValue <$> Dom.value e)
+datetime = input' "datetime-local"
+{-# INLINABLE datetime #-}
 
 -- ** Misc
 
@@ -477,6 +701,6 @@ color :: forall m t. Dom t m
       -> m (HtmlInput t, Dynamic t Opaque)
       -- ^ The element and the current picked color
 color attributes setColor = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setColor } attributes
-  pure (e, getColor <$> Dom.value e)
-  where getColor = fromMaybe (Opaque Colour.black) . fromAttributeValue
+  (e, v) <- input' "color" attributes setColor
+  pure (e, fromMaybe (Opaque Colour.black) <$> v)
+{-# INLINABLE color #-}

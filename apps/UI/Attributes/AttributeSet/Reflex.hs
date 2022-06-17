@@ -4,6 +4,8 @@ module UI.Attributes.AttributeSet.Reflex
     AttributeSet
 
     -- ** Setting attributes
+  , Compatible
+  , SetAttribute (..)
   , (=:)
   , (==:)
 
