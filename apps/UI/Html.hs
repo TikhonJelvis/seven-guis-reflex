@@ -117,7 +117,7 @@ html' attributes = fst <$> html attributes (pure ())
 -- __Example__
 --
 -- @
--- div_ [class_ =: "note"] do
+-- div_ [class_ =: ["note"]] do
 --   text "When applicable, semantic elements like article are preferred over div."
 -- @
 div_ :: forall a m t. Dom t m
@@ -135,7 +135,7 @@ div_ = html
 -- __Example__
 --
 -- @
--- blogPost title body = article [class_ =: "post"] do
+-- blogPost title body = article [class_ =: ["post"]] do
 --   h1 title
 --   body
 -- @
@@ -283,8 +283,9 @@ button' t attributes = fst <$> button attributes (text t)
 -- label element:
 --
 -- @
--- example = label [] (text "Username:") do
---   input [ type_ =: Text ]
+-- example = label [] do
+--   text "Username:"
+--   Input.text []
 -- @
 label :: forall a m t. Dom t m
       => AttributeSet t "label" "HTML"

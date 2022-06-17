@@ -66,11 +66,11 @@ executable guis
     UI.Class
     UI.Color
     UI.Css
-    UI.Modal
     UI.Drag
     UI.Drop
     UI.Element
     UI.Element.IsElement
+    UI.Email
     UI.Event
     UI.History
     UI.Html
@@ -78,6 +78,7 @@ executable guis
     UI.Html.Input
     UI.Id
     UI.Main
+    UI.Modal
     UI.PushMap
     UI.Style
     UI.SVG
@@ -97,6 +98,7 @@ executable guis
     , data-default-class
     , dependent-map
     , directory
+    , email-validate
     , file-embed
     , ghcjs-dom
     , hashable

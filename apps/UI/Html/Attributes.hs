@@ -1,15 +1,23 @@
 -- | Attributes that only apply to HTML elements.
 module UI.Html.Attributes where
 
-import           Data.Bool     (bool)
-import           Data.Hashable (Hashable)
-import           Data.Text     (Text)
+import           Data.Bool                (bool)
+import           Data.Hashable            (Hashable)
+import           Data.Text                (Text)
+import qualified Data.Text                as Text
+import           Data.Time                (Day, LocalTime, TimeOfDay)
+import qualified Data.Time.Format.ISO8601 as Time
+import           Data.Vector              (Vector)
 
-import           GHC.Generics  (Generic)
+import           GHC.Generics             (Generic)
 
-import           UI.Attributes (Attribute, logical, native)
-import           UI.Id         (Id, Ids)
-import           UI.Url        (Url)
+import           UI.Attributes            (Attribute, boolean, logical, native)
+import           UI.Color                 (Opaque)
+import           UI.Email                 (Email)
+import           UI.Id                    (Id, Ids)
+import           UI.Url                   (Url)
+
+-- * Images and Media
 
 -- | An alternate text description for the image. The description will
 -- be presented if the image cannot be loaded or if the user is not
@@ -45,6 +53,8 @@ alt = native "alt"
 -- @
 src :: Attribute '["img"] Url
 src = native "src"
+
+-- * Forms and Inputs
 
 -- | Associates a 'label' or 'output' with a control.
 --
@@ -93,7 +103,6 @@ for = native "for"
 for_ :: Attribute '["output"] Ids
 for_ = native "for"
 
-
 -- | Whether an input element is enabled or disabled.
 --
 -- A disabled element should not accept user input and should have
@@ -114,3 +123,105 @@ enabled :: Attribute
 enabled = logical "enabled" \case
   Enabled  -> []
   Disabled -> [("disabled", "")]
+
+-- | Whether a checkbox /starts out checked when the page loads/.
+--
+-- Note: The @checked@ attribute /does not/ reflect or control the
+-- state of the checkbox element after it's been loaded. Setting
+-- @checked@ dynamically will not have a visible effect and querying
+-- the attribute will not necessarily reflect the current state of the
+-- checkbox.
+--
+-- __Examples__
+--
+-- -- @
+-- checkbox [ checked =: True ] never
+-- -- ⇒ <input type="checkbox" checked>
+--
+-- checkbox [ checked =: False ] never
+-- -- ⇒ <input type="checkbox">
+-- @
+checked :: Attribute '["input", "checkbox"] Bool
+checked = boolean "checked"
+
+-- ** Input Value
+
+-- $ Different types of inputs have different types of values. To
+-- support this with reasonable type inference and error messages, we
+-- have versions of the @value@ attribute specialized to different
+-- types.
+
+-- | The default value element for inputs—unstructured text.
+value :: Attribute '["input", "text"] Text
+value = native "value"
+
+-- | A value for colors. Only opaque colors are supported.
+--
+-- __Example__
+--
+-- @
+-- color [ color_value =: Opaque Colour.red ] never
+-- @
+color_value :: Attribute '["color"] Opaque
+color_value = native "value"
+
+-- | A value for month inputs: (year, day) pairs.
+--
+-- __Example__
+--
+-- @
+-- month [ month_value =: (2022, 12) ] never
+-- @
+month_value :: Attribute '["month"] (Integer, Int)
+month_value = logical "value" (\ month -> [("value", toText month)])
+  where toText = Text.pack . Time.formatShow Time.yearMonthFormat
+
+-- | A value for date pickers.
+--
+-- __Example__
+--
+-- @
+-- date [ date_value =: read "2022-12-23" ] never
+-- @
+date_value :: Attribute '["date"] Day
+date_value = native "value"
+
+-- | A value for time pickers.
+--
+-- __Example__
+--
+-- @
+-- time [ time_value =: read "14:25" ] never
+-- @
+time_value :: Attribute '["time"] TimeOfDay
+time_value = native "value"
+
+-- | A value for datetime-local inputs.
+--
+-- __Example__
+--
+-- @
+-- datetime [ datetime_value =: read "2022-12-23 14:23:00" ] never
+-- @
+datetime_value :: Attribute '["datetime-local"] LocalTime
+datetime_value = native "value"
+
+-- | A value for email inputs.
+--
+-- __Example__
+--
+-- @
+-- email [ email_value =: "john.doe@example.com" ]
+-- @
+email_value :: Attribute '["email"] Email
+email_value = native "value"
+
+-- | A value for email inputs allowing multiple emails.
+--
+-- __Example__
+--
+-- @
+-- email [ emails_value =: ["a@example.com", "b@example.com"] ]
+-- @
+emails_value :: Attribute '["emails"] (Vector Email)
+emails_value = native "value"

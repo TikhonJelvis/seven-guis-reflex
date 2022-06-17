@@ -60,6 +60,7 @@ module UI.Attributes.Attribute
 
   , native
   , logical
+  , boolean
   , (=.)
   , override
 
@@ -71,8 +72,11 @@ module UI.Attributes.Attribute
   , isHtmlWhitespace
   , skipHtmlWhitespace
   , htmlSpaceList
+  , htmlCommaList
   )
 where
+
+import           Control.Applicative          ((<|>))
 
 import qualified Data.Char                    as Char
 import           Data.Map                     (Map)
@@ -82,6 +86,8 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Data.Text.Display            (Display (..))
 import qualified Data.Text.Lazy.Builder       as Builder
+import           Data.Time                    (Day, LocalTime, TimeOfDay)
+import qualified Data.Time.Format.ISO8601     as Time
 import           Data.Typeable                (TypeRep, Typeable, typeRep)
 import           Data.Vector                  (Vector)
 import qualified Data.Vector                  as Vector
@@ -92,7 +98,7 @@ import           GHC.TypeLits                 (Symbol)
 import           Numeric.Natural              (Natural)
 
 import           Text.ParserCombinators.ReadP (ReadP, many1, satisfy, sepBy,
-                                               skipMany)
+                                               skipMany, string)
 import           Text.Read                    (readMaybe)
 
 import           UI.Type.List                 (KnownSymbols, knownSymbols)
@@ -236,6 +242,32 @@ logical name toAttributes = Attribute
   , type_ = Just $ typeRep (Proxy @a)
   }
 
+-- | A boolean attribute. 'True' means the attribute is present on the
+-- element, 'False' means it isn't.
+--
+-- __Example__
+--
+-- The @checked@ attribute for checkboxes:
+--
+-- @
+-- checked :: Attribute '["input", "checkbox"] Bool
+-- checked = boolean "checked"
+-- @
+--
+-- With this, we have:
+--
+-- @
+-- checkbox [ checked =: True ] never
+-- -- ⇒ <input type="checkbox" checked>
+--
+-- checkbox [ checked =: False ] never
+-- -- ⇒ <input type="checkbox">
+-- @
+boolean :: forall supports. Text -> Attribute supports Bool
+boolean name = logical name $ \case
+  True  -> [(name, "")]
+  False -> []
+
 -- | Encode a pair of an attribute name and value.
 --
 -- This is a helper function for defining logical attributes:
@@ -372,6 +404,20 @@ deriving via ShowRead Integer instance AsAttributeValue Integer
 deriving via ShowRead Word instance AsAttributeValue Word
 deriving via ShowRead Natural instance AsAttributeValue Natural
 deriving via ShowRead Double instance AsAttributeValue Double
+deriving via ShowRead Day instance AsAttributeValue Day
+
+instance AsAttributeValue TimeOfDay where
+  toAttributeValue = Text.pack . Time.iso8601Show
+  fromAttributeValue (Text.unpack -> str) =
+    Time.iso8601ParseM str <|> Time.iso8601ParseM (str <> ":00")
+    -- seconds are optional in the normalized HTML time format
+
+instance AsAttributeValue LocalTime where
+  toAttributeValue = Text.pack . Time.iso8601Show
+  fromAttributeValue (Text.unpack -> str) =
+    Time.iso8601ParseM str <|> Time.iso8601ParseM (str <> ":00")
+    -- the normalized datetime-local format in HTML leaves out the
+    -- seconds when they are :00
 
 -- ** Deriving Via
 
@@ -458,11 +504,16 @@ htmlWhitespace :: Set Char
 htmlWhitespace = [' ', '\t', '\n', '\f', '\r']
 
                  -- TODO: use a real parser combinator library?
--- | A parser that skips any number of HTML whitespace characters.
+-- | Skips any number of HTML whitespace characters.
 skipHtmlWhitespace :: ReadP ()
 skipHtmlWhitespace = skipMany $ satisfy isHtmlWhitespace
 
--- | A parser that parses zero or more whitespace-separate values.
+-- | Parses zero or more whitespace-separate values.
 htmlSpaceList :: ReadP a -> ReadP (Vector a)
 htmlSpaceList value =
   Vector.fromList <$> sepBy value (many1 $ satisfy isHtmlWhitespace)
+
+-- | Parses zero or more comma-separated values.
+htmlCommaList :: ReadP a -> ReadP (Vector a)
+htmlCommaList value =
+  Vector.fromList <$> sepBy value (skipHtmlWhitespace *> string "," *> skipHtmlWhitespace)
