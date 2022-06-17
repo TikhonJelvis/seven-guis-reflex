@@ -1,30 +1,33 @@
 -- | Piles of cards that we can drag and drop onto.
 module Cards.UI.Pile where
 
-import           Control.Monad      (void)
+import           Control.Monad                     (void)
 
-import           Data.Default.Class (def)
+import           Data.Default.Class                (def)
 
-import           Linear             (V2 (..))
+import           Linear                            (V2 (..))
 
-import           Prelude            hiding (div)
+import           Prelude                           hiding (div)
 
-import           UI.Attributes      (AttributeSet, class_, (=:))
-import           UI.Element         (Dom)
-import           UI.Html            (Html, div)
-import           UI.Main            (Runnable (..), withCss)
-import           UI.SVG             (Def (..), ViewBox (..), defs, path,
-                                     pattern_, rect, svg)
-import           UI.SVG.Attributes  (d, fill, height, paintWith, viewBox, width,
-                                     x, y)
-import           UI.SVG.Haskell     (HaskellPaths (..), haskellPaths)
+import           UI.Attributes                     (class_)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
+import           UI.Element                        (Dom)
+import           UI.Html                           (Html, div_)
+import           UI.Main                           (Runnable (..), withCss)
+import           UI.SVG                            (Def (..), ViewBox (..),
+                                                    defs, path, pattern_, rect,
+                                                    svg)
+import           UI.SVG.Attributes                 (d, fill, height, paintWith,
+                                                    viewBox, width, x, y)
+import           UI.SVG.Haskell                    (HaskellPaths (..),
+                                                    haskellPaths)
 
 demo :: forall m t. Dom t m => m ()
 demo = void pile
 
 -- | A potentially empty pile that we can drop cards onto.
 pile :: forall m t. Dom t m => m (Html t)
-pile = fst <$> div [class_ =: ["pile"]] do
+pile = fst <$> div_ [class_ =: ["pile"]] do
   svg [] do
     defs [Def "background" background
            [ viewBox =: ViewBox (V2 4 0) (V2 8 14)

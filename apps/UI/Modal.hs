@@ -9,27 +9,28 @@ module UI.Modal
   )
 where
 
-import           Control.Lens                ((^.))
-import           Control.Monad               (unless, void, when)
+import           Control.Lens                      ((^.))
+import           Control.Monad                     (unless, void, when)
 
-import           Data.Hashable               (Hashable)
-import           Data.Text                   (Text)
+import           Data.Hashable                     (Hashable)
+import           Data.Text                         (Text)
 
-import           GHC.Generics                (Generic)
+import           GHC.Generics                      (Generic)
 
-import           Language.Javascript.JSaddle (MonadJSM, jsf, liftJSM, valToBool,
-                                              (!))
+import           Language.Javascript.JSaddle       (MonadJSM, jsf, liftJSM,
+                                                    valToBool, (!))
 
 import qualified Reflex
-import           Reflex                      (Event)
-import qualified Reflex.Dom                  as Dom
+import           Reflex                            (Event)
+import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes               (AttributeSet, class_, (=:))
+import           UI.Attributes                     (class_)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
 import           UI.Element
-import           UI.Element.IsElement        (IsElement (..))
-import           UI.Event                    (on)
-import           UI.Html                     (Html, html)
-import           UI.Main                     (Runnable (..), withCss)
+import           UI.Element.IsElement              (IsElement (..))
+import           UI.Event                          (on)
+import           UI.Html                           (Html, html)
+import           UI.Main                           (Runnable (..), withCss)
 import           UI.Widget
 
 -- | HTML modal dialogs can either be hidden or shown in two ways:

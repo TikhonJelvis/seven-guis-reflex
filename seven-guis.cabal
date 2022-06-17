@@ -63,6 +63,7 @@ executable guis
     UI.Attributes.Attribute
     UI.Attributes.AttributeSet
     UI.Attributes.AttributeSet.Internal
+    UI.Attributes.AttributeSet.Reflex
     UI.Class
     UI.Color
     UI.Css

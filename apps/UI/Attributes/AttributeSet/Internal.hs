@@ -7,6 +7,8 @@
 -- The code in this module may change at any time.
 module UI.Attributes.AttributeSet.Internal where
 
+import           Control.Applicative     (liftA2)
+
 import           Data.Dependent.Map      (DMap)
 import qualified Data.Dependent.Map      as DMap
 import           Data.Functor            ((<&>))
@@ -24,9 +26,8 @@ import           Data.Type.Bool
 import           Data.Type.Equality
 
 import           GHC.Exts                (IsList (..))
+import           GHC.Generics            (Generic)
 import           GHC.TypeLits            (ErrorMessage (..), Symbol, TypeError)
-
-import           Reflex                  (Dynamic, Reflex, zipDynWith)
 
 import qualified UI.Attributes.Attribute as Attribute
 import           UI.Attributes.Attribute (Attribute)
@@ -36,8 +37,9 @@ import qualified Unsafe.Coerce           as Unsafe
 
 -- * Attribute Set
 
--- | A set of attributes for some kind of element. Each attribute can
--- potentailly change over time.
+-- | A set of attributes for some kind of element. Each attribute is
+-- wrapped in a functor, supporting things like using 'Dynamic' to let
+-- attributes vary over time.
 --
 -- Attribute sets track what kind of attribute is allowed based on the
 -- element and its namespace (@"HTML"@, @"SVG"@... etc):
@@ -46,8 +48,8 @@ import qualified Unsafe.Coerce           as Unsafe
 -- div :: Dom t m => AttributeSet t "div" "HTML" -> m a -> m (Html t, a)
 -- @
 --
--- Attributes can be defined as a list, using '=:' to provide static
--- values and '==:' to provide dynamic values:
+-- Attributes can be defined as a list, using '=:' to provide pure
+-- values and '==:' to provide values in the functor:
 --
 -- @
 -- myAttributes :: Attributes t ["HTML"]
@@ -73,8 +75,9 @@ import qualified Unsafe.Coerce           as Unsafe
 --     , class_ ==: classIf "dragged" <$> beingDragged
 --     ]
 -- @
-newtype AttributeSet t (element :: Symbol) (namespace :: Symbol) =
-  AttributeSet (DMap (AttributeKey element namespace) (Dynamic t))
+newtype AttributeSet f (element :: Symbol) (namespace :: Symbol) =
+  AttributeSet (DMap (AttributeKey element namespace) f)
+  deriving stock (Generic)
 
 -- | Combine attributes. Attributes set in both sets are combined with
 -- 'combineAttributeValues'.
@@ -96,85 +99,85 @@ newtype AttributeSet t (element :: Symbol) (namespace :: Symbol) =
 --   [class_ =: ["draggable", "card"]]
 -- @
 --
--- We can also combine static and dynamic values:
+-- We can also combine pure and wrapped values:
 --
 -- @
 -- combine [class_ =: ["draggable"]]
 --   [class_ ==: classIf "dragged" <$> beingDragged] ≡
 --   [class_ ==: bool ["draggable"] ["dragged", "draggable"] <$> beingDragged]
 -- @
-combine :: forall (element :: Symbol) (namespace :: Symbol) t. Reflex t
-        => AttributeSet t element namespace
+combine :: forall (element :: Symbol) (namespace :: Symbol) f. Applicative f
+        => AttributeSet f element namespace
         -- ^ Base values. May be overriden.
-        -> AttributeSet t element namespace
+        -> AttributeSet f element namespace
         -- ^ Additional values. May override base values.
-        -> AttributeSet t element namespace
+        -> AttributeSet f element namespace
 combine (AttributeSet old) (AttributeSet new) = AttributeSet $
   DMap.unionWithKey combineAttribute old new
-  where combineAttribute :: AttributeKey element namespace v
-                         -> Dynamic t v
-                         -> Dynamic t v
-                         -> Dynamic t v
+  where combineAttribute :: AttributeKey element namespace v -> f v -> f v -> f v
         combineAttribute (AttributeKey attribute) =
-          Reflex.zipDynWith (Attribute.combine attribute)
+          liftA2 (Attribute.combine attribute)
 
 -- | '<>' is 'combine'
-instance Reflex t => Semigroup (AttributeSet t element namespace) where
+instance Applicative f => Semigroup (AttributeSet f element namespace) where
   (<>) = combine
 
 -- | 'mempty' is 'emtpy'
-instance Reflex t => Monoid (AttributeSet t element namespace) where
+instance Applicative f => Monoid (AttributeSet f element namespace) where
   mempty = empty
 
 -- | An empty set of attributes.
-empty :: AttributeSet t element namespace
+empty :: forall f element namespace. AttributeSet f element namespace
 empty = AttributeSet DMap.empty
 
 -- | A set of attributes with a single attribute set.
 --
--- >>> singleton (class_ =: ["draggable"])
-singleton :: forall (element :: Symbol) (namespace :: Symbol) t. Reflex t
-          => SetAttribute t element namespace
-          -> AttributeSet t element namespace
+-- >>> import UI.Attributes.Attribute (override)
+-- >>> import Data.Functor.Identity (Identity)
+-- >>> display $ singleton @Identity @"HTML" (override @'["HTML"] "foo" =: "bar")
+-- "[foo=\"...\"]"
+singleton :: forall f (element :: Symbol) (namespace :: Symbol). Applicative f
+          => SetAttribute f element namespace
+          -> AttributeSet f element namespace
 singleton = \case
   SetAttribute attribute value ->
     AttributeSet $ DMap.singleton (AttributeKey attribute) value
 
-instance Display (AttributeSet t element namespace) where
+instance Display (AttributeSet f element namespace) where
   displayBuilder (AttributeSet dmap) =
     "[" <> Builder.fromText (Text.intercalate " " displayed) <> "]"
     where displayed = DMap.keys dmap <&> \case
             Some key -> display key <> "=\"...\""
 
-instance Reflex t => IsList (AttributeSet t element namespace) where
-  type Item (AttributeSet t element namespace) = SetAttribute t element namespace
+instance Applicative f => IsList (AttributeSet f element namespace) where
+  type Item (AttributeSet f element namespace) = SetAttribute f element namespace
 
-  fromList :: [SetAttribute t element namespace] -> AttributeSet t element namespace
+  fromList :: [SetAttribute f element namespace] -> AttributeSet f element namespace
   fromList sets = AttributeSet $ foldr go DMap.empty sets
-    where go :: SetAttribute t element namespace
-             -> DMap (AttributeKey element namespace) (Dynamic t)
-             -> DMap (AttributeKey element namespace) (Dynamic t)
+    where go :: SetAttribute f element namespace
+             -> DMap (AttributeKey element namespace) f
+             -> DMap (AttributeKey element namespace) f
           go (SetAttribute attribute v)=
             DMap.insertWithKey' (combineDyn attribute) (AttributeKey attribute) v
 
-          combineDyn attribute _ = Reflex.zipDynWith (Attribute.combine attribute)
+          combineDyn attribute _ = liftA2 (Attribute.combine attribute)
 
-  toList :: AttributeSet t element namespace -> [SetAttribute t element namespace]
+  toList :: AttributeSet f element namespace -> [SetAttribute f element namespace]
   toList (AttributeSet dmap) = DMap.foldrWithKey go [] dmap
     where go :: forall v. AttributeKey element namespace v
-             -> Dynamic t v
-             -> [SetAttribute t element namespace]
-             -> [SetAttribute t element namespace]
+             -> f v
+             -> [SetAttribute f element namespace]
+             -> [SetAttribute f element namespace]
           go (AttributeKey attribute) v sets = SetAttribute attribute v : sets
 
 -- * Accessing Attribute Values
 
 -- | Look up the value set for the given attribute, if any.
-lookup :: forall a supports element namespace t.
+lookup :: forall a supports element namespace f.
           (KnownSymbols supports, Compatible element namespace supports)
        => Attribute supports a
-       -> AttributeSet t element namespace
-       -> Maybe (Dynamic t a)
+       -> AttributeSet f element namespace
+       -> Maybe (f a)
 lookup attribute (AttributeSet dmap) =
   DMap.lookup (AttributeKey attribute) dmap
 
@@ -272,16 +275,53 @@ type family Incompatible element namespace supports :: Constraint where
 -- * SetAttribute
 
 -- | Set an attribute to a value of a compatible type.
-data SetAttribute t element namespace where
+data SetAttribute f element namespace where
   SetAttribute :: (KnownSymbols supports, Compatible element namespace supports)
                => Attribute supports a
-               -> Dynamic t a
-               -> SetAttribute t element namespace
+               -> f a
+               -> SetAttribute f element namespace
 
--- * Rendering to reflex-dom
+-- | Set an attribute to a static value that does /not/ change over
+-- time.
+--
+-- __Example__
+--
+-- @
+-- div [ class_ =: ["draggable", "card"] ]
+-- @
+(=:) :: ( Applicative f
+        , KnownSymbols supports
+        , Compatible element namespace supports
+        )
+     => Attribute supports a
+     -- ^ attribute
+     -> a
+     -- ^ static value
+     -> SetAttribute f element namespace
+attribute =: value = SetAttribute attribute (pure value)
+infixr 1 =:
 
--- | Convert an 'AttributeSet' to an untyped map of elements in the
--- format expected by @reflex-dom@ functions.
+-- | Set an attribute to a dynamic value that /can/ change over time.
+--
+-- __Example__
+--
+-- @
+-- div [ class_ ==: classIf "dragged" <$> beingDragged ]
+-- @
+(==:) :: ( KnownSymbols supports
+         , Compatible element namespace supports
+         )
+      => Attribute supports a
+      -- ^ attribute
+      -> f a
+      -- ^ dynamic value
+      -> SetAttribute f element namespace
+(==:) = SetAttribute
+infixr 1 ==:
+
+-- * Rendering to text
+
+-- | Convert an 'AttributeSet' to text map of attribute-value pairs.
 --
 -- This is morally equivalent to:
 --
@@ -298,15 +338,15 @@ data SetAttribute t element namespace where
 --
 --  * if multiple attributes were set /without/ 'override', which one
 --    takes precdence is unspecified
-toDom :: forall t element namespace. Reflex t
-      => AttributeSet t element namespace
-      -> Dynamic t (Map Text Text)
+toDom :: forall f element namespace. Applicative f
+      => AttributeSet f element namespace
+      -> f (Map Text Text)
 toDom (AttributeSet dmap) = DMap.foldlWithKey go (pure []) dmap
   where go :: forall v.
-              Dynamic t (Map Text Text)
+              f (Map Text Text)
            -> AttributeKey element namespace v
-           -> Dynamic t v
-           -> Dynamic t (Map Text Text)
+           -> f v
+           -> f (Map Text Text)
         go existing (AttributeKey attribute) value =
-          Reflex.zipDynWith (<>) converted existing
+          liftA2 (<>) converted existing
           where converted = Attribute.toAttributes attribute <$> value

@@ -1,21 +1,21 @@
 -- | Utilities for maintaining undo/redo history.
 module UI.History where
 
-import           Control.Lens       ((&))
+import           Control.Lens               ((&))
 
-import           Data.Hashable      (Hashable)
-import qualified Data.List          as List
-import           Data.Maybe         (listToMaybe)
+import           Data.Hashable              (Hashable)
+import qualified Data.List                  as List
+import           Data.Maybe                 (listToMaybe)
 
-import           GHC.Generics       (Generic)
+import           GHC.Generics               (Generic)
 
 import qualified Reflex
-import           Reflex             (Dynamic, Event)
+import           Reflex                     (Dynamic, Event)
 
-import           UI.Attributes      ((==:))
+import           UI.Attributes.AttributeSet ((==:))
 import           UI.Element
-import           UI.Html            (Button (..), button')
-import           UI.Html.Attributes (enabled, enabledIf)
+import           UI.Html                    (Button (..), button')
+import           UI.Html.Attributes         (enabled, enabledIf)
 
 -- * History
 

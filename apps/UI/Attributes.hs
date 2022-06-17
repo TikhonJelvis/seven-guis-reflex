@@ -1,7 +1,6 @@
 -- | Global attributes that apply to both HTML and SVG elements.
 module UI.Attributes
   ( module UI.Attributes.Attribute
-  , module UI.Attributes.AttributeSet
 
   , class_
   , id_
@@ -39,7 +38,6 @@ where
 import           Data.Set                   (Set)
 
 import           UI.Attributes.Attribute
-import           UI.Attributes.AttributeSet
 import           UI.Class                   (ClassName)
 import           UI.Css                     (CssRules)
 import           UI.Id                      (Id)

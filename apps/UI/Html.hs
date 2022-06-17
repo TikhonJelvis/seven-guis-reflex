@@ -21,27 +21,27 @@ module UI.Html
   )
 where
 
-import           Control.Monad        (void)
+import           Control.Monad                     (void)
 
-import           Data.Proxy           (Proxy (..))
-import           Data.Text            (Text)
-import qualified Data.Text            as Text
+import           Data.Proxy                        (Proxy (..))
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
 
-import           GHC.Generics         (Generic)
-import           GHC.TypeLits         (KnownSymbol, symbolVal)
+import           GHC.Generics                      (Generic)
+import           GHC.TypeLits                      (KnownSymbol, symbolVal)
 
-import qualified GHCJS.DOM.Element    as Element
-import qualified GHCJS.DOM.Types      as GHCJS
+import qualified GHCJS.DOM.Element                 as Element
+import qualified GHCJS.DOM.Types                   as GHCJS
 
-import           Reflex               (Event, Reflex)
-import qualified Reflex.Dom           as Dom
+import           Reflex                            (Event, Reflex)
+import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes        (AttributeSet, toDom)
-import           UI.Element           (Dom, createElement, text)
-import           UI.Element.IsElement (FromElement (..), IsElement (..),
-                                       IsHtml (..))
-import qualified UI.Event             as Event
-import           UI.Event             (EventName (..))
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom)
+import           UI.Element                        (Dom, createElement, text)
+import           UI.Element.IsElement              (FromElement (..),
+                                                    IsElement (..), IsHtml (..))
+import qualified UI.Event                          as Event
+import           UI.Event                          (EventName (..))
 
 
 -- * HTML Elements

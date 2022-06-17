@@ -19,41 +19,41 @@
 -- @
 module UI.Html.Input where
 
-import qualified Data.Colour                as Colour
-import           Data.Default.Class         (def)
-import           Data.Maybe                 (fromMaybe)
-import           Data.Proxy                 (Proxy (..))
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import           Data.Time                  (Day, LocalTime, TimeOfDay)
-import qualified Data.Time.Format.ISO8601   as Time
-import           Data.Vector                (Vector)
-import qualified Data.Vector                as Vector
+import qualified Data.Colour                       as Colour
+import           Data.Default.Class                (def)
+import           Data.Maybe                        (fromMaybe)
+import           Data.Proxy                        (Proxy (..))
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
+import           Data.Time                         (Day, LocalTime, TimeOfDay)
+import qualified Data.Time.Format.ISO8601          as Time
+import           Data.Vector                       (Vector)
+import qualified Data.Vector                       as Vector
 
-import           GHC.Generics               (Generic)
-import           GHC.TypeLits               (KnownSymbol, symbolVal)
+import           GHC.Generics                      (Generic)
+import           GHC.TypeLits                      (KnownSymbol, symbolVal)
 
-import qualified GHCJS.DOM.Types            as GHCJS
+import qualified GHCJS.DOM.Types                   as GHCJS
 
 import qualified Reflex
-import           Reflex                     (Dynamic, Event, Reflex)
-import qualified Reflex.Dom                 as Dom
+import           Reflex                            (Dynamic, Event, Reflex)
+import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes              (AttributeSet, boolean,
-                                             fromAttributeValue,
-                                             isHtmlWhitespace, native, override,
-                                             toAttributeValue, toDom, (=:))
-import qualified UI.Attributes.AttributeSet as AttributeSet
-import           UI.Color                   (Opaque (..))
-import           UI.Element                 (Dom, InputConfig (..),
-                                             createInputElement)
-import           UI.Element.IsElement       (IsElement (..), IsHtml (..),
-                                             IsHtmlInput (..))
-import           UI.Email                   (Email, validate)
-import qualified UI.Event                   as Event
-import           UI.Html.Attributes         (number_value)
-import           UI.Password                (Password (..))
-import           UI.Url                     (Url (..))
+import           UI.Attributes                     (boolean, fromAttributeValue,
+                                                    isHtmlWhitespace, native,
+                                                    override, toAttributeValue)
+import qualified UI.Attributes.AttributeSet.Reflex as AttributeSet
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
+import           UI.Color                          (Opaque (..))
+import           UI.Element                        (Dom, InputConfig (..),
+                                                    createInputElement)
+import           UI.Element.IsElement              (IsElement (..), IsHtml (..),
+                                                    IsHtmlInput (..))
+import           UI.Email                          (Email, validate)
+import qualified UI.Event                          as Event
+import           UI.Html.Attributes                (number_value)
+import           UI.Password                       (Password (..))
+import           UI.Url                            (Url (..))
 
 -- * Input Elements
 

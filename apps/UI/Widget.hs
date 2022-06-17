@@ -2,37 +2,38 @@
 -- | Widgets that I use throughout the seven example tasks.
 module UI.Widget where
 
-import           Control.Monad      (void)
-import           Control.Monad.Fix  (MonadFix)
+import           Control.Monad              (void)
+import           Control.Monad.Fix          (MonadFix)
 
-import           Data.Hashable      (Hashable)
-import qualified Data.Map           as Map
-import           Data.String        (IsString)
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
-import           Data.Text.Display  (Display)
-import qualified Data.Text.Display  as Display
+import           Data.Hashable              (Hashable)
+import qualified Data.Map                   as Map
+import           Data.String                (IsString)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Data.Text.Display          (Display)
+import qualified Data.Text.Display          as Display
 
-import           GHC.Generics       (Generic)
+import           GHC.Generics               (Generic)
 
 import qualified Reflex
-import           Reflex             (Dynamic, Event, Reflex)
-import qualified Reflex.Dom         as Dom
-import           Reflex.Dom         (DomBuilderSpace)
+import           Reflex                     (Dynamic, Event, Reflex)
+import qualified Reflex.Dom                 as Dom
+import           Reflex.Dom                 (DomBuilderSpace)
 
-import           Text.Printf        (printf)
-import           Text.URI.QQ        (uri)
+import           Text.Printf                (printf)
+import           Text.URI.QQ                (uri)
 
-import           UI.Attributes      (class_, style, (=:), (==:))
-import           UI.Css             (CssRules (..))
-import           UI.Element         (Dom, dynText, text)
-import           UI.Event           (EventResult)
-import           UI.Html            (div_, img, ul)
-import           UI.Html.Attributes (src)
-import           UI.Main            (Runnable (..), withCss)
-import qualified UI.PushMap         as PushMap
-import           UI.PushMap         (PushMap)
-import           UI.Url             (Url (..))
+import           UI.Attributes              (class_, style)
+import           UI.Attributes.AttributeSet ((=:), (==:))
+import           UI.Css                     (CssRules (..))
+import           UI.Element                 (Dom, dynText, text)
+import           UI.Event                   (EventResult)
+import           UI.Html                    (div_, img, ul)
+import           UI.Html.Attributes         (src)
+import           UI.Main                    (Runnable (..), withCss)
+import qualified UI.PushMap                 as PushMap
+import           UI.PushMap                 (PushMap)
+import           UI.Url                     (Url (..))
 
 -- * Widgets
 

@@ -2,18 +2,19 @@
 -- | An extended example of using the SVG @path@ element to draw
 -- variations on the Haskell logo.
 module UI.SVG.Haskell where
-import           Data.Default.Class (Default (..))
-import           Data.Hashable      (Hashable)
+import           Data.Default.Class                (Default (..))
+import           Data.Hashable                     (Hashable)
 
-import           GHC.Generics       (Generic)
+import           GHC.Generics                      (Generic)
 
-import           Linear             (V2 (..))
+import           Linear                            (V2 (..))
 
-import           UI.Attributes      (AttributeSet, (=:))
-import           UI.Element         (Dom)
-import           UI.Main            (Runnable (..), withCss)
-import           UI.SVG             (Command (..), Path, Svg, ViewBox (..), d,
-                                     fill, g, h, l, path, svg, v, viewBox)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
+import           UI.Element                        (Dom)
+import           UI.Main                           (Runnable (..), withCss)
+import           UI.SVG                            (Command (..), Path, Svg,
+                                                    ViewBox (..), d, fill, g, h,
+                                                    l, path, svg, v, viewBox)
 
 -- * Haskell Logo in SVG
 

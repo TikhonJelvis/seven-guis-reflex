@@ -30,31 +30,33 @@ module UI.SVG
   )
 where
 
-import           Control.Monad        (forM)
+import           Control.Monad                     (forM)
 
-import           Data.Functor         ((<&>))
-import           Data.Hashable        (Hashable (..))
-import           Data.Map             (Map)
-import qualified Data.Map             as Map
-import           Data.Proxy           (Proxy (..))
-import           Data.Text            (Text)
-import qualified Data.Text            as Text
+import           Data.Functor                      ((<&>))
+import           Data.Hashable                     (Hashable (..))
+import           Data.Map                          (Map)
+import qualified Data.Map                          as Map
+import           Data.Proxy                        (Proxy (..))
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
 
-import           GHC.Generics         (Generic)
-import           GHC.TypeLits         (KnownSymbol, symbolVal)
+import           GHC.Generics                      (Generic)
+import           GHC.TypeLits                      (KnownSymbol, symbolVal)
 
-import           Reflex               (Dynamic, Reflex)
-import qualified Reflex.Dom           as Dom
+import           Reflex                            (Dynamic, Reflex)
+import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes        (AttributeSet, href, id_, toDom, (=:))
-import           UI.Color             (Color)
-import           UI.Element           (Dom, createElement)
-import           UI.Element.IsElement (FromElement (..), IsElement (..))
-import qualified UI.Event             as Event
-import           UI.Id                (Id (..))
+import           UI.Attributes                     (href, id_)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
+import           UI.Color                          (Color)
+import           UI.Element                        (Dom, createElement)
+import           UI.Element.IsElement              (FromElement (..),
+                                                    IsElement (..))
+import qualified UI.Event                          as Event
+import           UI.Id                             (Id (..))
 import           UI.SVG.Attributes
 import           UI.SVG.Path
-import qualified UI.Url               as Url
+import qualified UI.Url                            as Url
 
 -- * SVG Elements
 
