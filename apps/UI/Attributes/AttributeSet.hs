@@ -18,10 +18,15 @@ module UI.Attributes.AttributeSet
   , empty
   , combine
 
+    -- ** Inspecting attribute sets
+  , lookup
+
     -- ** Integrating with reflex-dom
   , toDom
   )
 where
+
+import           Prelude                             hiding (lookup)
 
 import           Reflex                              (Dynamic, Reflex)
 

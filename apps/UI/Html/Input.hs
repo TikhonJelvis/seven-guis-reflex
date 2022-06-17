@@ -19,36 +19,41 @@
 -- @
 module UI.Html.Input where
 
-import qualified Data.Colour              as Colour
-import           Data.Default.Class       (def)
-import           Data.Maybe               (fromMaybe)
-import           Data.Proxy               (Proxy (..))
-import qualified Data.Text                as Text
-import           Data.Time                (Day, LocalTime, TimeOfDay)
-import qualified Data.Time.Format.ISO8601 as Time
-import           Data.Vector              (Vector)
-import qualified Data.Vector              as Vector
+import qualified Data.Colour                as Colour
+import           Data.Default.Class         (def)
+import           Data.Maybe                 (fromMaybe)
+import           Data.Proxy                 (Proxy (..))
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Data.Time                  (Day, LocalTime, TimeOfDay)
+import qualified Data.Time.Format.ISO8601   as Time
+import           Data.Vector                (Vector)
+import qualified Data.Vector                as Vector
 
-import           GHC.Generics             (Generic)
-import           GHC.TypeLits             (KnownSymbol, symbolVal)
+import           GHC.Generics               (Generic)
+import           GHC.TypeLits               (KnownSymbol, symbolVal)
 
-import qualified GHCJS.DOM.Types          as GHCJS
+import qualified GHCJS.DOM.Types            as GHCJS
 
-import           Reflex                   (Dynamic, Event, Reflex)
-import qualified Reflex.Dom               as Dom
+import qualified Reflex
+import           Reflex                     (Dynamic, Event, Reflex)
+import qualified Reflex.Dom                 as Dom
 
-import           UI.Attributes            (AttributeSet, boolean,
-                                           fromAttributeValue, isHtmlWhitespace,
-                                           native, override, toAttributeValue,
-                                           toDom, (=:))
-import           UI.Color                 (Opaque (..))
-import           UI.Element               (Dom, InputConfig (..),
-                                           createInputElement)
-import           UI.Element.IsElement     (IsElement (..), IsHtml (..),
-                                           IsHtmlInput (..))
-import           UI.Email                 (Email, validate)
-import qualified UI.Event                 as Event
-import           UI.Html.Attributes       ()
+import           UI.Attributes              (AttributeSet, boolean,
+                                             fromAttributeValue,
+                                             isHtmlWhitespace, native, override,
+                                             toAttributeValue, toDom, (=:))
+import qualified UI.Attributes.AttributeSet as AttributeSet
+import           UI.Color                   (Opaque (..))
+import           UI.Element                 (Dom, InputConfig (..),
+                                             createInputElement)
+import           UI.Element.IsElement       (IsElement (..), IsHtml (..),
+                                             IsHtmlInput (..))
+import           UI.Email                   (Email, validate)
+import qualified UI.Event                   as Event
+import           UI.Html.Attributes         (number_value)
+import           UI.Password                (Password (..))
+import           UI.Url                     (Url (..))
 
 -- * Input Elements
 
@@ -121,7 +126,184 @@ input config attributes = do
         type_ = Text.pack $ symbolVal (Proxy @type_)
 {-# INLINABLE input #-}
 
--- ** Types of Inputs
+-- ** Text-Based Inputs
+
+-- | A plain text input field.
+--
+-- __Examples__
+--
+-- Text input with an initial value:
+--
+-- @
+-- text [ value =: "initial value" ] never
+-- @
+text :: forall m t. Dom t m
+     => AttributeSet t "text" "HTML"
+     -- ^ Attributes
+     -> Event t Text
+     -- ^ Explicitly set the value of the input. Use 'never' if you
+     -- don't need to do this.
+     -> m (HtmlInput t, Dynamic t Text)
+     -- ^ The input element and its current text value.
+text attributes setValue = do
+  e <- input def { setValue = Just setValue } attributes
+  pure (e, Dom.value e)
+
+-- | A plain text field used for searching.
+--
+-- This is functionally equivalent to a text field, but some browsers
+-- present search elements differently (like including a clear button
+-- or changing the enter key on the onscreen keyboard to a search
+-- icon).
+--
+-- __Example__
+--
+-- Search input with a placeholder:
+--
+-- @
+-- search [ placeholder =: "search" ] never
+-- @
+search :: forall m t. Dom t m
+       => AttributeSet t "search" "HTML"
+       -- ^ Attributes
+       -> Event t Text
+       -- ^ Explicitly set the text value of the input. Use 'never' if
+       -- you don't need this.
+       -> m (HtmlInput t, Dynamic t Text)
+       -- ^ The input element and its current value.
+search attributes setValue = do
+  e <- input def { setValue = Just setValue } attributes
+  pure (e, Dom.value e)
+
+-- | A plain text field used for URLs.
+--
+-- This works the same as a plain text input but has different
+-- validation parameters and can be handled differently by browsers
+-- with onscreen keyboards (ie mobile).
+--
+-- __Example__
+--
+-- URL entry with default value:
+--
+-- @
+-- url [ url_value =: "https://example.com" ]
+-- @
+url :: forall m t. Dom t m
+       => AttributeSet t "url" "HTML"
+       -- ^ Attributes
+       -> Event t Url
+       -- ^ Explicitly set the text value of the input. Use 'never' if
+       -- you don't need this.
+       -> m (HtmlInput t, Dynamic t (Maybe Url))
+       -- ^ The input element and its current value. 'Nothing' if the
+       -- URL syntax is invalid.
+url attributes setValue = do
+  e <- input def { setValue = Just $ toAttributeValue <$> setValue } attributes
+  pure (e, fromAttributeValue <$> Dom.value e)
+
+
+-- | An input that allows the user to specify any number.
+--
+-- If you do not specify a default value, it will be initialized to
+-- 'min_value' or to 0 if 'min_value' is not set.
+--
+-- Some browsers allow invalid characters in numeric input fields. If
+-- this happens, the value will retain the previous valid number.
+--
+-- __Examples__
+--
+-- Numeric input starting at 12.5:
+--
+-- @
+-- number [ number_value =: 12.5 ] never
+-- @
+--
+-- Numeric input that only allows entries rounded to 0.5. The browser
+-- should take care of the rounding:
+--
+-- @
+-- number [ step =: 0.5 ] never
+-- @
+--
+-- Restricting the range of the input:
+--
+-- @
+-- number [ number_min =: 2.5, number_max =: 11, number_step =: 0.5 ] never
+-- @
+number :: forall m t. Dom t m
+       => AttributeSet t "number" "HTML"
+       -> Event t Double
+       -> m (HtmlInput t, Dynamic t Double)
+number attributes setValue = do
+  e <- input def { setValue = Just $ toAttributeValue <$> setValue } attributes
+  v <- Reflex.improvingMaybe $ fromAttributeValue <$> Dom.value e
+  let startValue = fromMaybe (pure 0) $
+        AttributeSet.lookup number_value attributes
+  pure (e, Reflex.zipDynWith fromMaybe startValue v)
+
+-- | A password input.
+--
+-- On most browsers, the exact text the user types will be hidden,
+-- with each character displayed as @*@ or @•@.
+password :: forall m t. Dom t m
+         => AttributeSet t "password" "HTML"
+         -> Event t Double
+         -> m (HtmlInput t, Dynamic t Password)
+password attributes setValue = do
+  e <- input def { setValue = Just $ toAttributeValue <$> setValue } attributes
+  pure (e, Password <$> Dom.value e)
+
+-- | An email address input.
+--
+-- If the email address entered is invalid, the value is 'Nothing'.
+--
+-- Note: setting the @"multiple"@ attribute on this element will
+-- result in 'Nothing' for anything except exactly one entry. For
+-- allowing multiple emails, use 'emails'.
+--
+-- __Examples__
+--
+-- Email address with initial value set:
+--
+-- @
+-- email [ email_value =: "john.doe@example.com" ] never
+-- @
+email :: forall m t. Dom t m
+      => AttributeSet t "email" "HTML"
+      -> Event t Email
+      -> m (HtmlInput t, Dynamic t (Maybe Email))
+email attributes setEmail = do
+  e <- input def { setValue = Just $ toAttributeValue <$> setEmail } attributes
+  pure (e, fromAttributeValue <$> Dom.value e)
+
+-- | An email address input that allows multiple email addresses.
+--
+-- Any invalid emails in the result will be 'Nothing'.
+--
+-- __Examples__
+--
+-- A field supporting multiple email addresses with two set as the
+-- initial value:
+--
+-- @
+-- email [ emails_value =: ["a@example.com", "b@example.com"] ] never
+-- @
+emails :: forall m t. (Dom t m)
+       => AttributeSet t "emails" "HTML"
+       -> Event t (Vector Email)
+       -> m (HtmlInput t, Dynamic t (Vector (Maybe Email)))
+emails attributes setEmails = do
+  e <- input def { setValue = Just $ toAttributeValue <$> setEmails } attributes'
+  pure (e, getEmails <$> Dom.value e)
+  where attributes' :: AttributeSet t "emails" "HTML"
+        attributes' = attributes <>
+          [ boolean @'["emails"] "multiple" =: True
+          , override @'["emails"] "type" =: "email"
+          ]
+        getEmails = Vector.fromList . map validate .
+          filter (Text.all isHtmlWhitespace) . Text.split (== ',')
+
+-- ** Checkboxes and Radio Buttons
 
         -- TODO: support "intermediate" state checkboxes
 -- | Create a checkbox.
@@ -171,34 +353,7 @@ checkbox attributes setChecked = do
            -- TODO: does this always force the checkbox to start
            -- unchecked?
 
--- | A button that opens a color-picker and lets the user specify a
--- color.
---
--- Only supports opaque colors and doesn't recognize color names.
---
--- If the @value@ of a color input does not parse as a valid color (in
--- the @#xxxxxx@ format), the value is interpreted as @#000000@
--- (black).
---
--- __Example__
---
--- A color picker that starts out picking red:
---
--- @
--- color [ color_value =: Opaque Colour.red ] never
--- @
-color :: forall m t. Dom t m
-      => AttributeSet t "color" "HTML"
-      -- ^ Attributes
-      -> Event t Opaque
-      -- ^ Set the picked color. Use 'never' if you don't want to
-      -- explicitly override the value.
-      -> m (HtmlInput t, Dynamic t Opaque)
-      -- ^ The element and the current picked color
-color attributes setColor = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setColor } attributes
-  pure (e, getColor <$> Dom.value e)
-  where getColor = fromMaybe (Opaque Colour.black) . fromAttributeValue
+-- ** Date and Time
 
 -- | A month + year input.
 --
@@ -295,52 +450,33 @@ datetime attributes setDatetime = do
   e <- input def { setValue = Just $ toAttributeValue <$> setDatetime } attributes
   pure (e, fromAttributeValue <$> Dom.value e)
 
--- | An email address input.
---
--- If the email address entered is invalid, the value is 'Nothing'.
---
--- Note: setting the @"multiple"@ attribute on this element will
--- result in 'Nothing' for anything except exactly one entry. For
--- allowing multiple emails, use 'emails'.
---
--- __Examples__
---
--- Email address with initial value set:
---
--- @
--- email [ email_value =: "john.doe@example.com" ]
--- @
-email :: forall m t. Dom t m
-      => AttributeSet t "email" "HTML"
-      -> Event t Email
-      -> m (HtmlInput t, Dynamic t (Maybe Email))
-email attributes setEmail = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setEmail } attributes
-  pure (e, fromAttributeValue <$> Dom.value e)
+-- ** Misc
 
--- | An email address input that allows multiple email addresses.
+-- | A button that opens a color-picker and lets the user specify a
+-- color.
 --
--- Any invalid emails in the result will be 'Nothing'.
+-- Only supports opaque colors and doesn't recognize color names.
 --
--- __Examples__
+-- If the @value@ of a color input does not parse as a valid color (in
+-- the @#xxxxxx@ format), the value is interpreted as @#000000@
+-- (black).
 --
--- A field supporting multiple email addresses with two set as the
--- initial value:
+-- __Example__
+--
+-- A color picker that starts out picking red:
 --
 -- @
--- email [ emails_value =: ["a@example.com", "b@example.com"] ]
+-- color [ color_value =: Opaque Colour.red ] never
 -- @
-emails :: forall m t. (Dom t m)
-       => AttributeSet t "emails" "HTML"
-       -> Event t (Vector Email)
-       -> m (HtmlInput t, Dynamic t (Vector (Maybe Email)))
-emails attributes setEmails = do
-  e <- input def { setValue = Just $ toAttributeValue <$> setEmails } attributes'
-  pure (e, getEmails <$> Dom.value e)
-  where attributes' :: AttributeSet t "emails" "HTML"
-        attributes' = attributes <>
-          [ boolean @'["emails"] "multiple" =: True
-          , override @'["emails"] "type" =: "email"
-          ]
-        getEmails = Vector.fromList . map validate .
-          filter (Text.all isHtmlWhitespace) . Text.split (== ',')
+color :: forall m t. Dom t m
+      => AttributeSet t "color" "HTML"
+      -- ^ Attributes
+      -> Event t Opaque
+      -- ^ Set the picked color. Use 'never' if you don't want to
+      -- explicitly override the value.
+      -> m (HtmlInput t, Dynamic t Opaque)
+      -- ^ The element and the current picked color
+color attributes setColor = do
+  e <- input def { setValue = Just $ toAttributeValue <$> setColor } attributes
+  pure (e, getColor <$> Dom.value e)
+  where getColor = fromMaybe (Opaque Colour.black) . fromAttributeValue

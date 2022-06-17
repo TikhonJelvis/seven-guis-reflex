@@ -167,6 +167,17 @@ instance Reflex t => IsList (AttributeSet t element namespace) where
              -> [SetAttribute t element namespace]
           go (AttributeKey attribute) v sets = SetAttribute attribute v : sets
 
+-- * Accessing Attribute Values
+
+-- | Look up the value set for the given attribute, if any.
+lookup :: forall a supports element namespace t.
+          (KnownSymbols supports, Compatible element namespace supports)
+       => Attribute supports a
+       -> AttributeSet t element namespace
+       -> Maybe (Dynamic t a)
+lookup attribute (AttributeSet dmap) =
+  DMap.lookup (AttributeKey attribute) dmap
+
 -- * AttributeKey
 
 -- | The type used internally in 'AttributeSet' to track the type of
@@ -267,7 +278,7 @@ data SetAttribute t element namespace where
                -> Dynamic t a
                -> SetAttribute t element namespace
 
--- ** Rendering to reflex-dom
+-- * Rendering to reflex-dom
 
 -- | Convert an 'AttributeSet' to an untyped map of elements in the
 -- format expected by @reflex-dom@ functions.

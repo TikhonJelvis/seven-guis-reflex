@@ -144,6 +144,16 @@ enabled = logical "enabled" \case
 checked :: Attribute '["input", "checkbox"] Bool
 checked = boolean "checked"
 
+-- | The minimum number of a characters a password input accepts,
+-- measured in UTF-16 code units.
+minlength :: Attribute '["input", "password"] Word
+minlength = native "minlength"
+
+-- | The maximum number of a characters a password input accepts,
+-- measured in UTF-16 code units.
+maxlength :: Attribute '["input", "password"] Word
+maxlength = native "maxlength"
+
 -- ** Input Value
 
 -- $ Different types of inputs have different types of values. To
@@ -152,8 +162,31 @@ checked = boolean "checked"
 -- types.
 
 -- | The default value element for inputs—unstructured text.
-value :: Attribute '["input", "text"] Text
+value :: Attribute '["input", "text", "search"] Text
 value = native "value"
+
+-- | A value for numeric input fields.
+number_value :: Attribute '["input", "number"] Double
+number_value = native "value"
+
+-- | The minimum number a numeric input should accept.
+number_min :: Attribute '["input", "number"] Double
+number_min = native "min"
+
+-- | The maximum number a numeric input should accept.
+number_max :: Attribute '["input", "number"] Double
+number_max = native "max"
+
+-- | The step by which a numeric input can change.
+--
+-- If the user enters a value that does not conform to the step, the
+-- browser will round it to the nearest valid value.
+number_step :: Attribute '["input", "number"] Double
+number_step = native "step"
+
+-- | A value for URL entries.
+url_value :: Attribute '["input", "url"] Url
+url_value = native "value"
 
 -- | A value for colors. Only opaque colors are supported.
 --
@@ -162,7 +195,7 @@ value = native "value"
 -- @
 -- color [ color_value =: Opaque Colour.red ] never
 -- @
-color_value :: Attribute '["color"] Opaque
+color_value :: Attribute '["input", "color"] Opaque
 color_value = native "value"
 
 -- | A value for month inputs: (year, day) pairs.

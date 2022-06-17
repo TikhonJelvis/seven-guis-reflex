@@ -79,6 +79,7 @@ executable guis
     UI.Id
     UI.Main
     UI.Modal
+    UI.Password
     UI.PushMap
     UI.Style
     UI.SVG
