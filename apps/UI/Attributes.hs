@@ -7,42 +7,16 @@ module UI.Attributes
   , style
 
   , href
-
-  , ToCss
-  , Length
-  , px
-  , RelativeLength
-  , Factor
-  , Angle (..)
-  , Duration (..)
-  , ms
-  , s
-  , styles
-  , joinStyles
-  , setProperty
-  , updateProperty
-  , setUserSelect
-
-  , Transform (..)
-  , addTransform
-  , setTransform
-  , translate
-  , rotate
-  , scale
-
-  , Transition (..)
-  , transition
   )
 where
 
-import           Data.Set                   (Set)
+import           Data.Set                (Set)
 
 import           UI.Attributes.Attribute
-import           UI.Class                   (ClassName)
-import           UI.Css                     (CssRules)
-import           UI.Id                      (Id)
-import           UI.Style
-import           UI.Url                     (Url)
+import           UI.Class                (ClassName)
+import           UI.Css                  (CssRules)
+import           UI.Id                   (Id)
+import           UI.Url                  (Url)
 
 -- * Global Attributes
 
@@ -114,4 +88,3 @@ style = native "style"
 -- @
 href :: Attribute ["a", "area", "base", "link", "use"] Url
 href = native "href"
-

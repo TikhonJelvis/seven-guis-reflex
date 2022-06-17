@@ -2,6 +2,9 @@
 module UI.Html
   ( Html
 
+  , text
+  , dynText
+
   , html
   , html'
 
@@ -37,7 +40,8 @@ import           Reflex                            (Event, Reflex)
 import qualified Reflex.Dom                        as Dom
 
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom)
-import           UI.Element                        (Dom, createElement, text)
+import           UI.Element                        (Dom, createElement, dynText,
+                                                    text)
 import           UI.Element.IsElement              (FromElement (..),
                                                     IsElement (..), IsHtml (..))
 import qualified UI.Event                          as Event

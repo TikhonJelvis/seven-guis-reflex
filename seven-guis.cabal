@@ -67,6 +67,9 @@ executable guis
     UI.Class
     UI.Color
     UI.Css
+    UI.Css.Animations
+    UI.Css.Transforms
+    UI.Css.Values
     UI.Drag
     UI.Drop
     UI.Element

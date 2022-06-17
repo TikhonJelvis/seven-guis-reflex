@@ -1,43 +1,46 @@
 module UI.Drag where
 
-import           Control.Applicative  (liftA2)
-import           Control.Monad        (void)
+import           Control.Applicative               (liftA2)
+import           Control.Monad                     (void)
 
-import           Data.Default.Class   (Default (..))
-import           Data.Foldable        (toList)
-import           Data.Functor         ((<&>))
-import           Data.Maybe           (fromMaybe, isJust)
-import           Data.Text            (Text)
+import           Data.Default.Class                (Default (..))
+import           Data.Foldable                     (toList)
+import           Data.Functor                      ((<&>))
+import           Data.Maybe                        (fromMaybe, isJust)
+import           Data.Text                         (Text)
 
-import           GHC.Generics         (Generic)
+import           GHC.Generics                      (Generic)
 
-import qualified GHCJS.DOM.Document   as Document
-import qualified GHCJS.DOM.Element    as Element
+import qualified GHCJS.DOM.Document                as Document
+import qualified GHCJS.DOM.Element                 as Element
 
-import           Linear               (V2 (..), _x, _y, distance, project, unit)
+import           Linear                            (V2 (..), _x, _y, distance,
+                                                    project, unit)
 
 import qualified Reflex
-import           Reflex               (Dynamic, Event)
-import qualified Reflex.Dom           as Dom
+import           Reflex                            (Dynamic, Event)
+import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes        (Transition (..), rotate, s, scale,
-                                       transition, translate)
-import           UI.Element           (Dom, Html, el', elClass', elDynAttr')
-import           UI.Element.IsElement (rawElement)
-import           UI.Event             (Modifier (Shift), MouseButton (..),
-                                       MouseEventResult (..), button, client,
-                                       mouseEvent, on, performJs)
-import           UI.Main              (Runnable (..), withCss)
-import           UI.Style             (Angle (..), getComputedProperty,
-                                       setProperty)
-import           UI.Widget            (Enabled (..), checkbox, enabledIf, label,
-                                       labelFor, ul)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
+import           UI.Element                        (Dom)
+import           UI.Element.IsElement              (rawElement)
+import           UI.Event                          (Modifier (Shift),
+                                                    MouseButton (..),
+                                                    MouseEventResult (..),
+                                                    button, client, mouseEvent,
+                                                    on, performJs)
+import qualified UI.Html                           as Html
+import           UI.Html                           (Html)
+import           UI.Main                           (Runnable (..), withCss)
+import           UI.Style                          (Angle (..),
+                                                    getComputedProperty,
+                                                    setProperty)
 
 import qualified Witherable
 
 demo :: forall m t. Dom t m => m ()
 demo = void do
-  ul (pure [("class", "drag-demo")])
+  Html.ul [ class_ =: ["drag-demo"] ]
     [ example "Follow cursor exactly" def translate
     , example "Follow with transition" def withTransition
     , example "Horizontal only" def xOnly
@@ -76,20 +79,22 @@ demo = void do
           Drags { total } <- drags def element
           pure ()
 
+        example :: Text
+                -> DragConfig d t
+                -> (Dynamic t (V2 Double) -> AttributeSet t "div" "HTML")
+                -> m ()
         example description config doDrag = mdo
           label description
-          (container, _) <- elClass' "div" "draggable drag-example" mdo
-            (element, _) <- elDynAttr' "div" attributes (pure ())
-            let attributes = doDrag <$> total <*> pure []
+          (container, _) <- Html.div_ [ class_ =: ["draggable drag-example"] ] mdo
+            (element, _) <- Html.div_ (doDrag total) (pure ())
             Drags { total } <- drags config { container = Just container } element
             pure ()
           pure ()
 
         snapBack = mdo
           label "Snap back after each drag"
-          (container, _) <- elClass' "div" "draggable drag-example" mdo
-            (element, _) <- elDynAttr' "div" attributes (pure ())
-            let attributes = dragOrSnap <$> current <*> base
+          (container, _) <- Html.div_ [ class_ =: ["draggable drag-example"] ] mdo
+            (element, _) <- Html.div_ (dragOrSnap current) (pure ())
             Drags { current, start, end } <- drags def { container = Just container } element
 
             -- TODO: some design that makes this behavior less
@@ -103,6 +108,7 @@ demo = void do
                   Nothing -> []
             pure ()
           pure ()
+
         dragOrSnap = \case
           Just d  -> translate d
           Nothing -> transition snap
@@ -138,6 +144,9 @@ demo = void do
             Drags { total } <- drags config element
             pure ()
           pure ()
+
+        label :: Text -> m ()
+        label = void . Html.div_ [ class_ =: ["label"] ] . Html.text
 
 -- | Information about how a user interacts with an element by
 -- dragging.
@@ -189,22 +198,22 @@ data DragConfig d t = DragConfig
   -- The default is 'Nothing', which will use events from the entire
   -- document body.
 
-  , enabled          :: Maybe (Dynamic t Enabled)
+  , enabled          :: Maybe (Dynamic t Bool)
   -- ^ Is dragging enabled for the element?
   --
   -- Default is 'Nothing', equivalent to "always enabled" (@pure
   -- Enabled@).
   --
-  -- If 'enabled' becomes 'Disabled' /while a drag is going on/, the
-  -- drag will continue, but the user will not be able to drag the
-  -- element again. (Note: this might change in the future when the
-  -- 'drags' API is extended to make drags dynamically cancellable).
+  -- If 'enabled' becomes 'False' /while a drag is going on/, the drag
+  -- will continue, but the user will not be able to drag the element
+  -- again. (Note: this might change in the future when the 'drags'
+  -- API is extended to make drags dynamically cancellable).
 
-  -- enabled is a 'Maybe' because if we used 'Dynamic t Enabled' and
+  -- enabled is a 'Maybe' because if we used 'Dynamic t Bool' and
   -- wrote the corresponding Default instance:
   --
   -- instance Reflex t => Default (DragConfig d t) where
-  --   def = DragConfig { ..., enabled = pure Enabled }
+  --   def = DragConfig { ..., enabled = pure True }
   --
   -- the type variable t would be ambiguous when overriding 'enabled':
   --
@@ -360,10 +369,9 @@ drags DragConfig { container, enabled, mouseEventFilter } element = do
   where toMaybe dragged delta = if dragged then delta else Nothing
         gate = Reflex.gate . Reflex.current
 
-        canDrag Enabled isDragged = not isDragged
-        canDrag Disabled _        = False
+        canDrag dragEnabled isDragged = dragEnabled && not isDragged
 
-        enabled' = fromMaybe (pure Enabled) enabled
+        enabled' = fromMaybe (pure True) enabled
 
         dragging (rawElement -> e) = do
           existing <- fromMaybe ("" :: Text) <$>

@@ -7,7 +7,7 @@ module UI.Event
   , domHandler
 
   -- * Modifier Keys
-  , Modifier
+  , Modifier (..)
 
   -- * Mouse Events
   , MouseEventResult (..)
