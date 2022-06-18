@@ -11,30 +11,30 @@
 --
 -- This is expressed in Haskell through the 'Css' type and the
 -- 'AsAttributeValue' class.
-module UI.Css.Values where
+module UI.Css.Values
+  ( Css (..)
 
-import           Data.Default.Class            (Default (..))
-import           Data.Functor                  ((<&>))
-import           Data.Hashable                 (Hashable)
-import           Data.Map.Strict               (Map)
-import qualified Data.Map.Strict               as Map
-import           Data.String                   (IsString)
-import           Data.Text                     (Text)
-import qualified Data.Text                     as Text
-import           Data.Text.Display             (Display (..))
-import           Data.Vector.Instances         ()
+  , Length
+  , px
+  , RelativeLength
+  , Factor
 
-import           GHC.Generics                  (Generic)
+  , Angle (Rad, Deg, Turn, Grad)
 
-import qualified GHCJS.DOM                     as GHCJS
-import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
-import           GHCJS.DOM.Types               (MonadDOM)
-import           GHCJS.DOM.Window              as Window
+  , Duration
+  , ms
+  , s
+  )
+where
 
-import           Linear                        (V2 (..), V3 (..))
+import           Data.Hashable         (Hashable)
+import           Data.Text             (Text)
+import           Data.Text.Display     (Display (..))
+import           Data.Vector.Instances ()
 
-import           UI.Attributes                 (AsAttributeValue (..))
-import           UI.Element.IsElement          (IsElement, rawElement)
+import           GHC.Generics          (Generic)
+
+import           UI.Attributes         (AsAttributeValue (..))
 
 -- * CSS Values
 

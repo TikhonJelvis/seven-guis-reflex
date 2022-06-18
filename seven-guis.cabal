@@ -68,6 +68,7 @@ executable guis
     UI.Color
     UI.Css
     UI.Css.Animations
+    UI.Css.Rules
     UI.Css.Transforms
     UI.Css.Values
     UI.Drag
@@ -85,7 +86,6 @@ executable guis
     UI.Modal
     UI.Password
     UI.PushMap
-    UI.Style
     UI.SVG
     UI.SVG.Attributes
     UI.SVG.Haskell

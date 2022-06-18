@@ -1,112 +1,107 @@
 {-# LANGUAGE UndecidableInstances #-}
-module UI.Css where
+module UI.Css
+  ( module UI.Css.Animations
+  , module UI.Css.Rules
+  , module UI.Css.Transforms
+  , module UI.Css.Values
 
-import           Data.Hashable           (Hashable)
-import           Data.Map                (Map)
-import qualified Data.Map                as Map
-import           Data.String             (IsString)
-import           Data.Text               (Text)
-import qualified Data.Text               as Text
-import           Data.Text.Display       (Display)
+  , BackfaceVisibility (..)
+  , backfaceVisibility
 
-import           GHC.Exts                (IsList)
-import           GHC.Generics            (Generic)
+  , getComputedProperty
+  )
+where
 
-import           UI.Attributes.Attribute (AsAttributeValue (..))
+import           Data.Functor                  ((<&>))
+import           Data.Hashable                 (Hashable)
+import           Data.Text                     (Text)
+import           Data.Vector.Instances         ()
 
--- | A CSS property name.
-newtype Property = Property Text
-  deriving stock (Generic)
-  deriving newtype (Show, Eq, Ord, Display, IsString, Hashable)
+import           GHC.Generics                  (Generic)
 
+import qualified GHCJS.DOM                     as GHCJS
+import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
+import           GHCJS.DOM.Types               (MonadDOM)
+import           GHCJS.DOM.Window              as Window
 
--- TODO: structured representation of CSS rules?
--- | A set of CSS rules for a single element.
---
--- When the attribute is set multiple times, the map of rules is
--- combined. If the same /rule/ ends up being set multiple times, the
--- newer definition takes precendence.
-newtype CssRules = CssRules (Map Property Text)
-  deriving stock (Show, Eq, Ord, Generic)
+import           UI.Attributes                 (AsAttributeValue (toAttributeValue),
+                                                Lowercase (..))
+import           UI.Css.Animations
+import           UI.Css.Rules
+import           UI.Css.Transforms
+import           UI.Css.Values
+import           UI.Element.IsElement          (IsElement, rawElement)
+
+-- * CSS Properties
+
+-- ** Misc
+
+data BackfaceVisibility = Visible | Hidden
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving newtype (IsList, Semigroup, Monoid)
+  deriving AsAttributeValue via Lowercase BackfaceVisibility
 
-instance AsAttributeValue CssRules where
-  toAttributeValue (CssRules (Map.toList -> rules)) =
-    Text.intercalate ";" [ property <> " : " <> value
-                         | (Property property, value) <- rules ]
+-- | Set the @backface-visibility@ CSS property.
+backfaceVisibility :: BackfaceVisibility -> CssRules -> CssRules
+backfaceVisibility = setProperty "backface-visibility" . toAttributeValue
 
-    -- TODO: proper CSS parsing?
-  fromAttributeValue text = Just $ CssRules $ Map.fromList
-    [ toKV declaration
-    | declaration <- Text.strip <$> Text.split (== ';') text
-    , declaration /= ""
-    ]
-    where toKV declaration =
-            let (a, b) = Text.break (== ':') declaration
-            in (Property $ Text.strip a, Text.strip $ Text.drop 1 b)
 
-  combineAttributeValues = (<>)
+-- * Computed Styles
 
--- * Manipulating CSS Rules
+-- $ Functions for working with the /computed/ style of DOM
+-- elements. The actual values of a CSS property on a DOM element are
+-- combined from several sources:
+--
+--  * the element's @style@ attribute (@element.style@ in JavaScript)
+--  * rules matching the element from external stylesheets
+--  * intermediate calculations from CSS animations and transitions
+--
+-- This means that inspecting an element's @style@ attribute is not
+-- sufficient to know what the element is /actually/ styled
+-- as. Instead, we can get this information by querying the element's
+-- __computed style__ directly.
+--
+-- Apart from accounting for the different ways an element's property
+-- can be set, computed properties are also evaluated to __resolved
+-- values__:
+--
+--  * relative units like @em@ are converted to absolute units like
+--    @px@
+--  * special properties like @inherit@ are converted to normal values
+--  * variables and computations like animations are evaluated
+--
+-- These additional calculations mean that even if a property is
+-- explicitly set in an element's @style@ attribute—which has a higher
+-- priority than rules from external stylesheets—the computed value
+-- can still differ from the specified value.
+--
+-- See MDN:
+--
+--  * [Window.getComputedStyle](https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle)
+--  * [resolved value](https://developer.mozilla.org/en-US/docs/Web/CSS/resolved_value)
+--  * [computed value](https://developer.mozilla.org/en-US/docs/Web/CSS/computed_value)
+--  * [used value](https://developer.mozilla.org/en-US/docs/Web/CSS/used_value)
 
-    -- TODO: types CSS rules based on Attribute + AttributeSet
--- | Set a property to a given value.
+        -- TODO: error handling!
+-- | Get the __computed value__ of a specific style property.
 --
--- This will overwrite the previous value /of that exact property/,
--- but will not touch related properties. Setting @border: 1px@ will
--- override the previous @border@ value but will not affect properties
--- like @border-width@ or @border-right@.
+-- Returns @Nothing@ if the property name is not valid.
 --
--- >>> setProperty "color" "blue" [("pointer", "auto")]
--- CssRules (fromList [("color","blue"),("pointer","auto")])
---
--- >>> setProperty "color" "blue" [("pointer", "auto"), ("color", "green"), ("background-color", "yellow")]
--- CssRules (fromList [("background-color","yellow"),("color","blue"),("pointer","auto")])
---
--- >>> setProperty "color" "blue" []
--- CssRules (fromList [("color","blue")])
-setProperty :: forall a. AsAttributeValue a
-            => Property
-            -- ^ Property name
-            -> a
-            -- ^ Property value
-            -> CssRules
-            -> CssRules
-setProperty property value (CssRules rules) =
-  CssRules $ Map.insert property (toAttributeValue value) rules
-
--- | Use the given function to combine the old value of a property
--- with the given new value.
---
--- If the property is not set, this will set it to the given value.
---
--- This is handy for properties that can take a sequence of values
--- like @transform@:
---
--- >>> let app b a = a <> " " <> b
--- >>> let translate = "translate(10px, 10px)"
---
--- >>> updateProperty app "transform" translate []
--- CssRules (fromList [("transform","translate(10px, 10px)")])
---
--- >>> updateProperty app "transform" translate [("style", "transform: rotate(10deg)")]
--- CssRules (fromList [("style","transform: rotate(10deg)"),("transform","translate(10px, 10px)")])
-updateProperty :: (Text -> Text -> Text)
-               -- ^ Function to combine values: @f new old@
-               -> Property
-               -- ^ Property name
-               -> Text
-               -- ^ New property value
-               -> CssRules
-               -> CssRules
-updateProperty f property value (CssRules rules) =
-  CssRules $ Map.insertWith f property value rules
-
--- | Set the @user-select@ and @-webkit-user-select@ properties.
---
--- While WebKit /should/ support @user-select@ with no prefix, only
--- the prefixed version worked for me in WebKitGTK.
-setUserSelect :: Text -> CssRules -> CssRules
-setUserSelect value =
-  setProperty "user-select" value . setProperty "-webkit-user-select" value
+-- Note: the underlying @Window.getComputedStyle@ API does not support
+-- shorthand properties. This function will account for that in the
+-- future, but for now asking for a shorthand property will produce
+-- @Nothing@.
+getComputedProperty :: (IsElement e, MonadDOM m)
+                    => e
+                    -- ^ Element to get the computed property for
+                    -> Property
+                    -- ^ The name of the property
+                    -> m (Maybe Text)
+                    -- ^ The computed value of the property as a string
+                    -- or 'Nothing' if the property name is not supported
+getComputedProperty (rawElement -> element) (Property propertyName) = do
+  window <- GHCJS.currentWindow <&> \case
+    Just w  -> w
+    Nothing -> error "Could not get global Window object"
+  styleDeclaration <- Window.getComputedStyle window element (Nothing @Text)
+  Just <$> CSSStyleDeclaration.getPropertyValue styleDeclaration propertyName

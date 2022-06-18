@@ -14,7 +14,7 @@ import           Data.Set                (Set)
 
 import           UI.Attributes.Attribute
 import           UI.Class                (ClassName)
-import           UI.Css                  (CssRules)
+import           UI.Css.Rules            (CssRules)
 import           UI.Id                   (Id)
 import           UI.Url                  (Url)
 

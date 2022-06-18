@@ -9,32 +9,24 @@
 --  * [<transform-function>](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function)
 module UI.Css.Transforms where
 
-import           Data.Default.Class            (Default (..))
-import           Data.Foldable                 (toList)
-import           Data.Functor                  ((<&>))
-import           Data.Hashable                 (Hashable)
-import           Data.Map.Strict               (Map)
-import qualified Data.Map.Strict               as Map
-import           Data.String                   (IsString)
-import           Data.Text                     (Text)
-import qualified Data.Text                     as Text
-import           Data.Text.Display             (Display (..))
-import           Data.Vector                   (Vector)
-import           Data.Vector.Instances         ()
+import           Data.Foldable           (toList)
+import           Data.Hashable           (Hashable)
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import           Data.Vector             (Vector)
+import           Data.Vector.Instances   ()
 
-import           GHC.Generics                  (Generic)
+import           GHC.Generics            (Generic)
 
-import qualified GHCJS.DOM                     as GHCJS
-import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
-import           GHCJS.DOM.Types               (MonadDOM)
-import           GHCJS.DOM.Window              as Window
+import           Linear                  (V2 (..), V3 (..))
 
-import           Linear                        (V2 (..), V3 (..))
+import           Text.Printf             (printf)
 
-import           Text.Printf                   (printf)
-
-import           UI.Attributes.Attribute       (AsAttributeValue (..))
-import           UI.Element.IsElement          (IsElement, rawElement)
+import           UI.Attributes.Attribute (AsAttributeValue (..))
+import qualified UI.Css.Rules            as Rules
+import           UI.Css.Rules            (CssRules)
+import           UI.Css.Values           (Angle, Factor, Length, RelativeLength,
+                                          px)
 
 -- | CSS supports a number of different __transform functions__. Each
 -- of these functions can be expressed as a matrix (with 'Matrix3D'),
@@ -106,42 +98,42 @@ data Transform = Matrix3D !(Vector Double)
 
 -- | To the corresponding @<transform-function>@.
 --
--- >>> toCss (Matrix3D [1..16])
+-- >>> toAttributeValue (Matrix3D [1..16])
 -- "matrix3d(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0)"
 --
--- >>> toCss (Perspective "10cm")
+-- >>> toAttributeValue (Perspective "10cm")
 -- "perspective(10cm)"
 --
--- >>> toCss (Rotate (Rad 10))
+-- >>> toAttributeValue (Rotate (Rad 10))
 -- "rotate(10.0rad)"
 --
--- >>> toCss (Rotate3D (V3 1 2 3) (Deg 10))
+-- >>> toAttributeValue (Rotate3D (V3 1 2 3) (Deg 10))
 -- "rotate3d(1.0, 2.0, 3.0, 0.17453292519943295rad)"
 --
--- >>> toCss (Scale "2" "10%")
+-- >>> toAttributeValue (Scale "2" "10%")
 -- "scale(2, 10%)"
 --
--- >>> toCss (Scale3D (V3 1 2 3))
+-- >>> toAttributeValue (Scale3D (V3 1 2 3))
 -- "scale3d(1.0, 2.0, 3.0)"
 --
--- >>> toCss (Skew (Deg 5) (Deg 7))
+-- >>> toAttributeValue (Skew (Deg 5) (Deg 7))
 -- "skew(8.726646259971647e-2rad, 0.12217304763960307rad)"
 --
--- >>> toCss (Translate "10%" "5px" "10cm")
+-- >>> toAttributeValue (Translate "10%" "5px" "10cm")
 -- "translate3d(10%, 5px, 10cm)"
-instance ToCss Transform where
-  toCss = \case
+instance AsAttributeValue Transform where
+  toAttributeValue = \case
     Matrix3D v
       | length v == 16 ->
         "matrix3d(" <> commas (toList v) <> ")"
       | otherwise      ->
         error $ "Invalid Matrix3D: needs 16 values.\nGot: " <> show v
     Perspective a ->
-      "perspective(" <> toCss a <> ")"
+      "perspective(" <> toAttributeValue a <> ")"
     Rotate a ->
-      "rotate(" <> toCss a <> ")"
+      "rotate(" <> toAttributeValue a <> ")"
     Rotate3D (V3 x y z) a ->
-      "rotate3d(" <> commas [toCss x, toCss y, toCss z, toCss a] <> ")"
+      "rotate3d(" <> commas [toAttributeValue x, toAttributeValue y, toAttributeValue z, toAttributeValue a] <> ")"
     Scale x y ->
       "scale(" <> commas [x, y] <> ")"
     Scale3D (V3 x y z) ->
@@ -150,12 +142,14 @@ instance ToCss Transform where
       "skew(" <> commas [ax, ay] <> ")"
     Translate x y z ->
       "translate3d(" <> commas [x, y, z] <> ")"
-    where commas :: ToCss a => [a] -> Text
-          commas = Text.intercalate ", " . map toCss
+    where commas :: AsAttributeValue a => [a] -> Text
+          commas = Text.intercalate ", " . map toAttributeValue
+
+  fromAttributeValue = error "Parsing CSS not implemented"
 
     -- TODO: implement fromAttributeValue
 instance AsAttributeValue [Transform] where
-  toAttributeValue = Text.intercalate " " . map toCss
+  toAttributeValue = Text.intercalate " " . map toAttributeValue
   fromAttributeValue = error "unimplemented"
 
   combineAttributeValues = (<>)
@@ -167,21 +161,21 @@ instance AsAttributeValue [Transform] where
 -- If a @transform@ property is already set, this will add to the end
 -- of that property (except for @perspective@ which is added to the
 -- front).
-addTransform :: Transform -> Map Text Text -> Map Text Text
+addTransform :: Transform -> CssRules -> CssRules
 addTransform = \case
-  p@Perspective{} -> updateProperty before "transform" (toCss p)
-  transform       -> updateProperty after "transform" (toCss transform)
+  p@Perspective{} -> Rules.updateProperty before "transform" (toAttributeValue p)
+  transform       -> Rules.updateProperty after "transform" (toAttributeValue transform)
   where before new old = new <> " " <> old
         after new old  = old <> " " <> new
 
     -- TODO: handle Perspective correctly?
 -- | Set the @tranform@ property of a value, overriding any previous
 -- setting.
-setTransform :: [Transform] -> Map Text Text -> Map Text Text
-setTransform (toCss -> transforms) = setProperty "transform" transforms
+setTransform :: [Transform] -> CssRules -> CssRules
+setTransform (toAttributeValue -> transforms) = Rules.setProperty "transform" transforms
 
 -- | Translate an element along the given X and Y distances in @px@.
-translate :: V2 Double -> Map Text Text -> Map Text Text
+translate :: V2 Double -> CssRules -> CssRules
 translate (V2 x y) = addTransform $ Translate (px x) (px y) "0"
 
 -- | Rotate an element in 2D around its @transform-origin@.
@@ -189,12 +183,12 @@ translate (V2 x y) = addTransform $ Translate (px x) (px y) "0"
 -- See MDN:
 --  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
 --  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
-rotate :: Angle -> Map Text Text -> Map Text Text
+rotate :: Angle -> CssRules -> CssRules
 rotate = addTransform . Rotate
 
 -- | Uniformly scale an element.
-scale :: Double -> Map Text Text -> Map Text Text
-scale n = addTransform $ Scale (toCss n) (toCss n)
+scale :: Double -> CssRules -> CssRules
+scale n = addTransform $ Scale (toAttributeValue n) (toAttributeValue n)
 
 -- | Flip an element around an axis running through the element's
 -- /center of rotation/ at an angle of θ to the y-axis.
@@ -218,7 +212,7 @@ scale n = addTransform $ Scale (toCss n) (toCss n)
 -- @
 -- flipAround (Deg 45)
 -- @
-flipAround :: Angle -> Map Text Text -> Map Text Text
+flipAround :: Angle -> CssRules -> CssRules
 flipAround θ =
   addTransform (Rotate (-θ)) .
   addTransform (Scale "-1" "1") .
@@ -249,7 +243,7 @@ flipAround θ =
 -- (with translation by @(tx, ty)@)
 --
 -- Any other number of entries will result in a runtime error.
-matrix :: Vector Double -> Map Text Text -> Map Text Text
+matrix :: Vector Double -> CssRules -> CssRules
 matrix [a, b, c, d] = addTransform $
   Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 matrix [a, b, c, d, tx, ty] = addTransform $

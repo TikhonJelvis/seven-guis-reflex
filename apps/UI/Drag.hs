@@ -3,10 +3,12 @@ module UI.Drag where
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (void)
 
+import           Data.Bool                         (bool)
 import           Data.Default.Class                (Default (..))
-import           Data.Foldable                     (toList)
 import           Data.Functor                      ((<&>))
 import           Data.Maybe                        (fromMaybe, isJust)
+import           Data.Set                          (Set)
+import qualified Data.Set                          as Set
 import           Data.Text                         (Text)
 
 import           GHC.Generics                      (Generic)
@@ -21,7 +23,15 @@ import qualified Reflex
 import           Reflex                            (Dynamic, Event)
 import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
+import           UI.Attributes                     (class_, fromAttributeValue,
+                                                    style, toAttributeValue)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
+import           UI.Class                          (ClassName (..))
+import qualified UI.Css                            as Css
+import           UI.Css                            (Angle (..), Transition (..),
+                                                    s)
+import qualified UI.Css.Animations                 as Animations
+import qualified UI.Css.Transforms                 as Transforms
 import           UI.Element                        (Dom)
 import           UI.Element.IsElement              (rawElement)
 import           UI.Event                          (Modifier (Shift),
@@ -31,10 +41,9 @@ import           UI.Event                          (Modifier (Shift),
                                                     on, performJs)
 import qualified UI.Html                           as Html
 import           UI.Html                           (Html)
+import           UI.Html.Attributes                (for)
+import qualified UI.Html.Input                     as Input
 import           UI.Main                           (Runnable (..), withCss)
-import           UI.Style                          (Angle (..),
-                                                    getComputedProperty,
-                                                    setProperty)
 
 import qualified Witherable
 
@@ -55,27 +64,38 @@ demo = void do
     , enableDisable
     ]
   dragAnywhere
-  where withTransition p = addClass "smooth-drag" . translate p
+  where translate :: Dynamic t (V2 Double) -> AttributeSet t "div" "HTML"
+        translate p = [ style ==: Transforms.translate <$> p <*> pure mempty ]
 
-        xOnly = translate . project (unit _x)
-        yOnly = translate . project (unit _y)
+        withTransition p = translate p <> [ class_ =: ["smooth-drag"] ]
 
-        snapTo n p =
-          addClass "smooth-drag" . translate (toGrid n <$> p)
+        xOnly = translate . fmap (project $ unit _x)
+        yOnly = translate . fmap (project $ unit _y)
+
+        snapTo n p = translate (fmap (toGrid n) <$> p) <> [ class_ =: ["smooth-drag"] ]
         toGrid n x = fromInteger $ round x - (round x `mod` n)
 
-        rotateByDistance p = rotate (Turn $ distance p 0 / 100)
+        rotateByDistance :: Dynamic t (V2 Double) -> AttributeSet t "div" "HTML"
+        rotateByDistance dragged = [ style ==: rotated ]
+          where rotated = do
+                  p <- dragged
+                  pure $ Transforms.rotate (Turn $ distance p 0 / 100) mempty
 
-        scaleByDistance p = scale (1 + distance p 0 / 250)
+        scaleByDistance :: Dynamic t (V2 Double) -> AttributeSet t "div" "HTML"
+        scaleByDistance dragged = [ style ==: scaled ]
+          where scaled = do
+                  p <- dragged
+                  pure $ Transforms.scale (1 + distance p 0 / 250) mempty
 
         shiftConfig = def
           { mouseEventFilter = \ e ->
               (button e == Auxiliary) && (Shift `elem` modifiers e ) }
 
         dragAnywhere = mdo
-          (element, _) <- elDynAttr' "div" attributes $
+          (element, _) <- Html.div_ attributes $
             Dom.text "drag me!"
-          let attributes = translate <$> total <*> pure [("class", "drag-me")]
+          let attributes = [ style ==: translated, class_ =: ["drag-me"] ]
+              translated = Transforms.translate <$> total <*> pure mempty
           Drags { total } <- drags def element
           pure ()
 
@@ -94,53 +114,52 @@ demo = void do
         snapBack = mdo
           label "Snap back after each drag"
           (container, _) <- Html.div_ [ class_ =: ["draggable drag-example"] ] mdo
-            (element, _) <- Html.div_ (dragOrSnap current) (pure ())
+            (element, _) <- Html.div_ (dragOrSnap current <> [ style ==: base ]) (pure ())
             Drags { current, start, end } <- drags def { container = Just container } element
 
             -- TODO: some design that makes this behavior less
             -- convoluted?
             computed <- Reflex.performEvent $
-              getComputedProperty element "transform" <$ start
+              Css.getComputedProperty element "transform" <$ start
             transform <- Reflex.holdDyn Nothing $
               Reflex.leftmost [computed, Nothing <$ end]
             let base = transform <&> \case
-                  Just t  -> setProperty "transform" t []
+                  Just t  -> Css.setProperty "transform" t mempty
                   Nothing -> []
             pure ()
           pure ()
 
-        dragOrSnap = \case
-          Just d  -> translate d
-          Nothing -> transition snap
+        dragOrSnap :: Dynamic t (Maybe (V2 Double)) -> AttributeSet t "div" "HTML"
+        dragOrSnap current = [ style ==: rules ]
+          where rules = current <&> \case
+                  Just d  -> Transforms.translate d mempty
+                  Nothing -> Animations.transition snap mempty
         snap = def { property = "transform", duration = s 1}
 
         dragHandle = mdo
           label "Drag entire diff by handle only."
-          (container, _) <- elClass' "div" "drag-example" mdo
-            (_, attributes) <- elDynAttr' "div" attributes mdo
-              (handle, _) <- elDynAttr' "div" (pure [("class", "draggable drag-handle")]) do
+          (container, _) <- Html.div_ [ class_ =: ["drag-example"] ] mdo
+            (_, attributes) <- Html.div_ attributes mdo
+              (handle, _) <- Html.div_ [ class_ =: ["draggable", "drag-handle"] ] do
                 Dom.text "X"
-              Drags { total, current } <- drags def {container = Just container } handle
-              let isDragging = setClass "dragging" . isJust <$> current
-              pure $ isDragging <*> (translate <$> total <*> pure [])
+              Drags { total, current } <-
+                drags def { container = Just container } handle
+              pure $ [ class_ ==: bool [] ["dragging"] . isJust <$> current ]
+                  <> translate total
             pure ()
           pure ()
 
         enableDisable = mdo
           label "Enable or disable dragging interactively."
-          (_, enabled) <- el' "div" do
-            labelFor "toggle-drag" "Enabled dragging"
-            snd <$> checkbox "toggle-drag" True Reflex.never
-          (container, _) <- elClass' "div" "drag-example" mdo
-            (element, _) <- elDynAttr' "div" attributes (pure ())
-            let attributes = do
-                  move   <- translate <$> total
-                  class_ <- setClass "draggable" <$> enabled
-                  pure $ class_ $ move []
-                config = def
-                  { container = Just container
-                  , enabled   = Just $ enabledIf <$> enabled
-                  }
+          (_, enabled) <- Html.div_ [] do
+            snd <$> Html.label [ for =: "toggle-drag" ] do
+              Dom.text "Enabled dragging"
+              snd <$> Input.checkbox [ class_ =: ["toggle-drag"] ] Reflex.never
+          (container, _) <- Html.div_ [ class_ =: ["drag-example"] ] mdo
+            (element, _) <- Html.div_ attributes (pure ())
+            let attributes = [ class_ ==: bool [] ["draggable"] <$> enabled ]
+                          <> translate total
+                config = def { container = Just container, enabled = Just enabled }
             Drags { total } <- drags config element
             pure ()
           pure ()
@@ -379,8 +398,11 @@ drags DragConfig { container, enabled, mouseEventFilter } element = do
           Element.setAttribute e ("class" :: Text) (existing <> " " <> "dragging")
 
         notDragging (rawElement -> e) = do
-          let parseClasses = toList . classes . fromMaybe ""
-              remove c = joinClasses . filter (/= c)
+          let parseClasses :: Maybe Text -> Set ClassName
+              parseClasses classes = fromMaybe [] $ fromAttributeValue =<< classes
+
+              remove :: ClassName -> Set ClassName -> Text
+              remove c = toAttributeValue . Set.filter (/= c)
           existing <- parseClasses <$> Element.getAttribute e ("class" :: Text)
           Element.setAttribute e ("class" :: Text) $ remove "dragging" existing
 
