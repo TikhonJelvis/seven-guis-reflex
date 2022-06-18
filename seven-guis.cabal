@@ -50,7 +50,6 @@ executable guis
   other-modules:
     Cards.Card
     Cards.Place
-    Cards.UI.Back
     Cards.UI.Card
     Cards.UI.Pile
     Seven.CircleDrawer

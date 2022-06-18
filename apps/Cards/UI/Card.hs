@@ -1,54 +1,58 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Cards.UI.Card where
 
-import           Cards.Card         (Card (..), Rank (..), Suit (..), rankName,
-                                     suitName)
-import           Cards.Place        (Face (..))
+import           Cards.Card                        (Card (..), Rank (..),
+                                                    Suit (..), rankName,
+                                                    suitName)
+import           Cards.Place                       (Face (..))
 
-import           Control.Monad      (void)
+import           Control.Monad                     (void)
 
-import           Data.Bool          (bool)
-import           Data.Default.Class (Default, def)
-import           Data.Functor       ((<&>))
-import           Data.Map           (Map)
-import           Data.Maybe         (fromMaybe, isJust)
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
+import           Data.Bool                         (bool)
+import           Data.Default.Class                (Default, def)
+import           Data.Functor                      ((<&>))
+import           Data.Maybe                        (fromMaybe, isJust)
 
-import           GHC.Generics       (Generic)
+import           GHC.Generics                      (Generic)
 
-import           Linear             (V2 (..), V3 (..))
+import           Linear                            (V2 (..), V3 (..))
 
-import           Reflex             (Dynamic, toggle)
-import qualified Reflex.Dom         as Dom
+import           Reflex                            (Dynamic, toggle)
 
-import           Text.Printf        (printf)
-import qualified Text.URI           as URI
-
-import           UI.Attributes      (Transform (..), addClass, addTransform,
-                                     removeClass, setClass, setProperty,
-                                     toAttributes, with)
-import qualified UI.Drag            as Drag
-import           UI.Drag            (DragConfig (..), Drags (..))
-import           UI.Element         (Dom, Html, elClass', elDynAttr')
-import           UI.Main            (Runnable (..), withCss)
-import           UI.Style           (Angle (..), BackfaceVisibility (..),
-                                     backfaceVisibility, flipAround, rotate,
-                                     scale, translate)
-import           UI.SVG             (Command (..), GradientUnits (..),
-                                     Rectangle (..), Stop (..), Svg, a, defs,
-                                     g_, h, m, path, pattern_, radial,
-                                     radialPath, rect, svgAttr', use, v)
-import           UI.SVG.Attributes  (FillRule (..), Stroke (..), fill,
-                                     paintWith, stroke)
-import           UI.SVG.Haskell     (HaskellPaths (..), haskellPaths)
-import           UI.Widget          (Enabled (..), button', image, label)
+import           UI.Attributes                     (class_, style)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
+import           UI.Class                          (ClassName (..), classIf)
+import qualified UI.Css                            as Css
+import           UI.Css                            (Angle (..), Transform (..))
+import qualified UI.Css.Transforms                 as Transforms
+import qualified UI.Drag                           as Drag
+import           UI.Drag                           (DragConfig (..), Drags (..))
+import qualified UI.Element                        as Element
+import           UI.Element                        (Dom)
+import qualified UI.Html                           as Html
+import           UI.Html                           (Button (..), Html)
+import           UI.Html.Attributes                (src)
+import           UI.Main                           (Runnable (..), withCss)
+import qualified UI.SVG                            as Svg
+import           UI.SVG                            (Command (..), Def (..), Svg,
+                                                    a, d, h, m, v, viewBox)
+import           UI.SVG.Attributes                 (GradientUnits (..),
+                                                    ViewBox (..), cx, cy, fill,
+                                                    fill_rule, gradientUnits,
+                                                    height, paintWith, r,
+                                                    stroke, stroke_width,
+                                                    transform, transform_origin,
+                                                    width, x, y)
+import           UI.SVG.Haskell                    (HaskellPaths (..),
+                                                    haskellPaths)
+import qualified UI.Url                            as Url
 
 demo :: forall m t. Dom t m => m ()
-demo = void $ elClass' "div" "card-demo" do
+demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
   label "Cards draggable across body"
 
-  faceUp <- Reflex.toggle True =<< button' (pure "flip cards") (pure Enabled)
+  Button { pressed } <- Html.button' "flip cards" []
+  faceUp <- Reflex.toggle True pressed
   let facing = bool FaceDown FaceUp <$> faceUp
 
   rec CardElement { drags } <-
@@ -60,23 +64,29 @@ demo = void $ elClass' "div" "card-demo" do
           def { attributes = dragAttributes drags }
 
   pure ()
-  where dragAttributes Drags { current } =
-          Just $ whenDragged . isJust <$> current <*> pure []
-        whenDragged True  =
-          setProperty "z-index" "100" . rotate (Deg 5) . addClass "dragging"
-        whenDragged False = removeClass "dragging"
+  where dragAttributes :: Drags t -> Maybe (AttributeSet t "div" "HTML")
+        dragAttributes Drags { current } = Just
+          [ class_ ==: classIf "dragging" . isJust <$> current
+          , style  ==: whenDragged . isJust <$> current
+          ]
+
+        whenDragged True =
+          Css.setProperty "z-index" (100 :: Double) $ Transforms.rotate (Deg 5) mempty
+        whenDragged False = []
+
+        label = Html.div_ [ class_ =: ["label"] ] . Element.text
 
 -- | Various parameters that can be set up for a card element.
 data CardConfig t = CardConfig
-  { container  :: Maybe (Html t)
+  { container       :: Maybe (Html t)
     -- ^ The container within which the card is draggable.
     --
     -- Drag events outside the container will not register.
 
-  , dragging   :: Maybe (Dynamic t Enabled)
+  , draggingEnabled :: Maybe (Dynamic t Bool)
     -- ^ Is dragging enabled for the card?
 
-  , attributes :: Maybe (Dynamic t (Map Text Text))
+  , attributes      :: Maybe (AttributeSet t "div" "HTML")
     -- ^ Any additional dynamic attributes.
     --
     -- Note that various card-specific properties will add to or
@@ -118,30 +128,30 @@ draggable :: forall m t. Dom t m
           -> Dynamic t Face
           -> CardConfig t
           -> m (CardElement t)
-draggable card@Card { rank, suit } face CardConfig { container, dragging, attributes } = mdo
-  let attributes' = do
-        move <- translate <$> total
-        draggingClass <- setClass "dragging" . isJust <$> current
-        move . draggingClass . static <$> fromMaybe (pure []) attributes
+draggable
+  card@Card { rank, suit }
+  face
+  CardConfig { container, draggingEnabled, attributes } = mdo
+  let attributes' = fromMaybe [] attributes <>
+        [ style ==: Transforms.translate <$> total <*> pure mempty
+        , style =: Css.backfaceVisibility Css.Hidden mempty
+        , class_ ==: classIf "dragging" . isJust <$> current
+        , class_ =: ["draggable", "card", ClassName $ suitName suit, ClassName $ rankName rank]
+        ]
 
-  (element, _) <- elDynAttr' "div" attributes' do
+  (element, _) <- Html.div_ attributes' do
     let facing = face <&> \case
-          FaceUp   -> id
-          FaceDown -> addTransform (Rotate3D (V3 0 1 0) (Deg 180))
-    Dom.elDynAttr "div" (facing <*> pure [("class", "center")]) do
-      front card (pure [])
-      back haskellBack (pure [])
+          FaceUp   -> mempty
+          FaceDown ->
+            Transforms.addTransform (Rotate3D (V3 0 1 0) (Deg 180)) mempty
+    Html.div_ [ class_ =: ["center"], style ==: facing ] do
+      front card []
+      back haskellBack []
 
   drags@Drags { current, total } <-
-    Drag.drags def { container, enabled = dragging } element
+    Drag.drags def { container, enabled = draggingEnabled } element
 
   pure CardElement { card, drags }
-  where static =
-          addClass "draggable" .
-          addClass "card" .
-          addClass (suitName suit) .
-          addClass (rankName rank) .
-          backfaceVisibility Hidden
 
 -- * Card Fronts
 
@@ -149,14 +159,15 @@ draggable card@Card { rank, suit } face CardConfig { container, dragging, attrib
 front :: forall m t. Dom t m
       => Card
       -- ^ The card this represents.
-      -> Dynamic t (Map Text Text)
+      -> AttributeSet t "div" "HTML"
       -- ^ Additional attributes for the element.
       -> m (Html t)
 front Card { rank, suit } attributes = do
-  (element, _) <- elDynAttr' "div" (addClass "front" <$> attributes) do
-    void $ image $ fromMaybe (error "Invalid URI!") $ URI.mkURI cardURI
+  (element, _) <- Html.div_ ([ class_ =: ["front"] ] <> attributes) do
+    void $ Html.img [ src =: cardUrl ]
   pure element
-  where cardURI = "img/" <> rankName rank <> "-" <> suitName suit <> ".svg"
+  where cardUrl = fromMaybe (error "Invalid card URL!") $ Url.parseUrl $
+          "img/" <> rankName rank <> "-" <> suitName suit <> ".svg"
 
 main :: IO ()
 main = withCss "css/card-demo.css" (Runnable demo)
@@ -168,46 +179,57 @@ back :: forall a m t. Dom t m
      => m a
      -- ^ Design for the card back. Should be an element that can fill
      -- the space (example: 'haskellBack').
-     -> Dynamic t (Map Text Text)
+     -> AttributeSet t "div" "HTML"
      -- ^ Additional attributes for the element.
      -> m (Html t, a)
-back backDesign attributes = do
-  elDynAttr' "div" (addClass "back" <$> attributes) backDesign
+back backDesign attributes =
+  Html.div_ ([class_ =: ["back"]] <> attributes) backDesign
 
 -- | A card back design based on the Haskell logo.
 haskellBack :: forall m t. Dom t m => m (Svg t)
 haskellBack = mdo
-  fst <$> svgAttr' "svg" [("viewBox", "-100 -300 200 600")] do
-    defs [ ("small-lambda", smallLambda)
-         , ("lambda-tile", lambdaTile)
-         , ("lambda-pattern", lambdaPattern)
-         , ("background", backgroundGradient)
-         ]
-
-    -- background
-    let background = with (fill $ paintWith "background") []
-    rect (pure $ Rectangle "400" "600" "-200" "-300") (pure background)
-
-    aroundLogo 400 600 110 $ pure $
-      translate (V2 (-200) (-300)) $
-      with EvenOdd $
-      stroke "none" <> fill (paintWith "lambda-pattern")
-
-    -- center logo
-    g_ (pure $ scale 6 [])
-      [ pair (translate $ V2 0 (-12))
-      , pair (flipAround (Deg 90) . translate (V2 0 12))
+  fst <$> Svg.svg [ viewBox =: ViewBox (V2 (-100) (-300)) (V2 200 600) ] do
+    Svg.defs
+      [ Def "small-lambda" smallLambda []
+      , Def "lambda-tile" lambdaTile []
+      , Def "lambda-pattern" lambdaPattern []
+      , Def "background" backgroundGradient []
       ]
 
-  where backgroundGradient =
-          radial (pure stops) .
-          fmap (with (radialPath 0 400) . with UserSpaceOnUse)
-          where stops =
-                  [ Stop 0    "#000000"
-                  , Stop 0.25 "#251a42"
-                  , Stop 0.5  "#453a62"
-                  , Stop 0.75 "#5e5086"
-                  , Stop 1    "#8f4e8b"
+    -- background
+    Svg.rect
+      [ x      =: "-200"
+      , y      =: "-300"
+      , width  =: "400"
+      , height =: "600"
+      , fill   =: paintWith "background"
+      ]
+
+    aroundLogo 400 600 110
+      [ fill_rule =: Svg.Evenodd
+      , stroke    =: "none"
+      , fill      =: paintWith "lambda-pattern"
+      , transform =: Svg.translate (V2 (-200) (-300))
+      ]
+
+    -- center logo
+    Svg.g [ transform =: Svg.scale 6 ] do
+      pair [ transform =: Svg.translate (V2 0 (-12)) ]
+      pair [ transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 0 12) ]
+
+  where backgroundGradient = Svg.radial (pure stops) . (<> attributes)
+          where attributes =
+                  [ cx            =: "0"
+                  , cy            =: "0"
+                  , r             =: "400"
+                  , gradientUnits =: UserSpaceOnUse
+                  ]
+                stops =
+                  [ Svg.Stop 0    "#000000"
+                  , Svg.Stop 0.25 "#251a42"
+                  , Svg.Stop 0.5  "#453a62"
+                  , Svg.Stop 0.75 "#5e5086"
+                  , Svg.Stop 1    "#8f4e8b"
                   ]
 
         -- WebKitGTK was not handling transform-origin or %
@@ -217,73 +239,73 @@ haskellBack = mdo
         -- each logo is 17 units wide and 12 units tall, everything
         -- else is based on that
 
-        pair f = g_ (pure $ f [])
-          [ logo (pure [])
-          , logo $ pure $ translate (V2 17 0) $ flipAround (Deg 0) []
-          ]
+        pair attributes = Svg.g attributes do
+          logo []
+          logo [ transform =: Svg.translate (V2 17 0) <> Svg.flipAround (Deg 0) ]
 
-        logo attributes = g_ (rotate (Deg 20) . origin 8.5 6 <$> attributes)
-          [ path (pure leftAngle)  $ logoPart (fill "#fff7")
-          , path (pure lambda)     $ logoPart (fill "#fff6")
-          , path (pure topLine)    $ logoPart (fill "#fff5")
-          , path (pure bottomLine) $ logoPart (fill "#fff5")
-          ]
-        HaskellPaths {..} = haskellPaths def
-
-        logoPart attrs = pure $ attrs <> toAttributes def { width = 0.4, color = "#fff" }
+        logo :: AttributeSet t "g" "SVG" -> m ()
+        logo attributes = void $ Svg.g (base <> attributes) do
+          Svg.path $ part <> [ fill =: "#fff7", d =: leftAngle ]
+          Svg.path $ part <> [ fill =: "#fff6", d =: lambda ]
+          Svg.path $ part <> [ fill =: "#fff5", d =: topLine ]
+          Svg.path $ part <> [ fill =: "#fff5", d =: bottomLine ]
+          where part = [ stroke =: "#fff", stroke_width =: 0.4 ]
+                base = [ transform        =: Svg.rotate (Deg 20)
+                       , transform_origin =: Transforms.origin (V2 8.5 6)
+                       ]
 
         -- a path /around/ the logo in the center—a rectangle with a
         -- circle of the given radius removed from the center
         --
         -- using the EvenOdd fill rule will fill the rectangle but not
         -- the circle in the middle
-        aroundLogo width height radius = path $ pure
-          [ M 0 0
-          , v height
-          , h width
-          , v (-height)
-          , h (-width)
+        aroundLogo width height radius attributes =
+          Svg.path $ attributes <>
+            [ d =:
+              [ M 0 0
+              , v height
+              , h width
+              , v (-height)
+              , h (-width)
 
-          , M (width / 2) (height / 2)
-          , m radius 0
-          , a radius radius 0 True True (-2 * radius) 0
-          , a radius radius 0 True True (2 * radius) 0
-          , Z
-          ]
+              , M (width / 2) (height / 2)
+              , m radius 0
+              , a radius radius 0 True True (-2 * radius) 0
+              , a radius radius 0 True True (2 * radius) 0
+              , Z
+              ]
+            ]
 
-        smallLambda attributes = path (pure lambda) $
-          with (def { color = "#fff", width = 0.75 }) .
-          with (fill $ paintWith "background") <$> attributes
+        smallLambda attributes = Svg.path $ attributes <> [ d =: lambda ]
+          -- with (def { color = "#fff", width = 0.75 }) .
+          -- with (fill $ paintWith "background") <$> attributes
 
         -- a quadrant of lambdas facing up and down to be tiled:
         --
         -- ↑↓
         -- ↓↑
-        lambdaTile attributes = g_ attributes
-          [ top []
-          , bottom (translate (V2 (-1) 14) [])
-          ]
-          where λ f = use "small-lambda" (pure $ f $ origin 8 6 [])
-                top attrs = g_ (pure attrs)
-                  [ λ id
-                  , λ (flipAround (Deg 90) . translate (V2 8 0))
-                  , λ (translate (V2 16 0))
-                  ]
-                bottom attrs = g_ (pure attrs)
-                  [ λ (rotate (Deg 180))
-                  , λ (flipAround (Deg 0) . translate (V2 8 0))
-                  , λ (rotate (Deg 180) . translate (V2 16 0))
-                  ]
+        lambdaTile attributes = fst <$> Svg.g attributes do
+          top []
+          bottom [ transform =: Svg.translate (V2 (-1) 14) ]
+          where top attributes = Svg.g attributes do
+                  λ []
+                  λ [ transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 8 0) ]
+                  λ [ transform =: Svg.translate (V2 16 0) ]
+                bottom attributes = Svg.g attributes do
+                  λ [ transform =: Svg.rotate (Deg 180) ]
+                  λ [ transform =: Svg.flipAround (Deg 0) <> Svg.translate (V2 8 0) ]
+                  λ [ transform =: Svg.rotate (Deg 180) <> Svg.translate (V2 16 0) ]
+
+                λ attributes = Svg.use "small-lambda" $
+                  attributes <> [ transform_origin =: Transforms.origin (V2 8 6)
+                                , style =: [("transform-box", "fill-box")]
+                                ]
 
         lambdaPattern attributes =
-          fst <$> pattern_ attributes' (lambdaTile $ pure [])
-          where attributes' = (base <>) <$> attributes
-                base = [ ("viewBox", "6 0 16 28")
-                       , ("width", "12%")
-                       , ("height", "14%")
+          fst <$> Svg.pattern_ (base <> attributes) (lambdaTile [])
+          where base = [ viewBox =: ViewBox (V2 6 0) (V2 16 28)
+                       , width   =: "12%"
+                       , height  =: "14%"
                        ]
 
-        origin :: Double -> Double -> Map Text Text -> Map Text Text
-        origin x y =
-          setProperty "transform-origin" (Text.pack $ printf "%fpx %fpx" x y) .
-          setProperty "transform-box" "fill-box"
+        HaskellPaths { leftAngle, topLine, bottomLine, lambda } = haskellPaths def

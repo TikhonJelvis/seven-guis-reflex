@@ -21,11 +21,12 @@ import qualified Text.Printf                  as Text
 
 import           UI.Attributes                (AsAttributeValue (..),
                                                Attribute (..), Lowercase (..),
-                                               Transform (..), native,
-                                               skipHtmlWhitespace)
+                                               native, skipHtmlWhitespace)
 import           UI.Color                     (Color)
+import           UI.Css                       (Angle, Transform (..),
+                                               TransformOrigin, px)
+import           UI.Css.Values                (RelativeLength)
 import           UI.Id                        (Id (..))
-import           UI.Style                     (Angle, px, toCss)
 import           UI.SVG.Path                  (Path)
 import           UI.Units                     (Length)
 import qualified UI.Url                       as Url
@@ -33,63 +34,63 @@ import qualified UI.Url                       as Url
 -- * Sizes and Positions
 
 -- | The x coordinate of an element in the user coordinate system.
-x :: Attribute '["image", "rect", "svg", "use"] Length
+x :: Attribute '["image", "rect", "svg", "use"] RelativeLength
 x = native "x"
 
 -- | The y coordinate of an element in the user coordinate system.
-y :: Attribute '["image", "rect", "svg", "use"] Length
+y :: Attribute '["image", "rect", "svg", "use"] RelativeLength
 y = native "y"
 
 -- | The x coordinate of the start point in a line.
-x1 :: Attribute '["line", "linearGradient"] Length
+x1 :: Attribute '["line", "linearGradient"] RelativeLength
 x1 = native "x1"
 
 -- | 'x1' but cool
-x₁ :: Attribute '["line", "linearGradient"] Length
+x₁ :: Attribute '["line", "linearGradient"] RelativeLength
 x₁ = x1
 
 -- | The x coordinate of the end point in a line.
-x2 :: Attribute '["line", "linearGradient"] Length
+x2 :: Attribute '["line", "linearGradient"] RelativeLength
 x2 = native "x2"
 
 -- | 'x2' but cool
-x₂ :: Attribute '["line", "linearGradient"] Length
+x₂ :: Attribute '["line", "linearGradient"] RelativeLength
 x₂ = x2
 
 -- | The x coordinate of the start point in a line.
-y1 :: Attribute '["line", "linearGradient"] Length
+y1 :: Attribute '["line", "linearGradient"] RelativeLength
 y1 = native "y1"
 
 -- | 'y1' but cool
-y₁ :: Attribute '["line", "linearGradient"] Length
+y₁ :: Attribute '["line", "linearGradient"] RelativeLength
 y₁ = y1
 
 -- | The x coordinate of the start point in a line.
-y2 :: Attribute '["line", "linearGradient"] Length
+y2 :: Attribute '["line", "linearGradient"] RelativeLength
 y2 = native "y2"
 
 -- | 'y2' but cool
-y₂ :: Attribute '["line", "linearGradient"] Length
+y₂ :: Attribute '["line", "linearGradient"] RelativeLength
 y₂ = y2
 
 -- | The horizontal length of an element in the user coordinate system.
-width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Length
+width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] RelativeLength
 width = native "width"
 
 -- | The vertical length of an element in the user coordiante system.
-height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] Length
+height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] RelativeLength
 height = native "height"
 
 -- | The x coordinate of the shape's center.
-cx :: Attribute '["circle", "ellipse", "radialGradient"] Length
+cx :: Attribute '["circle", "ellipse", "radialGradient"] RelativeLength
 cx = native "cx"
 
 -- | The y coordinate of the shape's center.
-cy :: Attribute '["circle", "ellipse", "radialGradient"] Length
+cy :: Attribute '["circle", "ellipse", "radialGradient"] RelativeLength
 cy = native "cy"
 
 -- | The radius of the shape.
-r :: Attribute '["circle", "radialGradient"] Length
+r :: Attribute '["circle", "radialGradient"] RelativeLength
 r = native "r"
 
 -- ** Transforms
@@ -162,8 +163,8 @@ transform = native "transform"
 --      , transform =: [translate (V2 10 20)]
 --      ]
 -- @
-translate :: V2 Double -> Transform
-translate (V2 x y) = Translate (px x) (px y) "0"
+translate :: V2 Double -> [Transform]
+translate (V2 x y) = [Translate (px x) (px y) "0"]
 
 -- | Uniformly scale the element.
 --
@@ -177,7 +178,7 @@ translate (V2 x y) = Translate (px x) (px y) "0"
 --   circle [ cx =: 15, cy =: 5, r =: 2, fill =: "#f63" ]
 -- @
 scale :: Double -> [Transform]
-scale n = [Scale (toCss n) (toCss n)]
+scale n = [Scale (toAttributeValue n) (toAttributeValue n)]
 
 -- | Rotate an element in 2D around its @transform-origin@.
 --
@@ -245,6 +246,11 @@ matrix [a, b, c, d, tx, ty] =
 matrix invalid =
   error $ Text.printf "Invalid matrix: %s" (show invalid)
   -- TODO: is this function even a good idea?
+
+-- | The point in 3D space that an element's transform functions use
+-- as their origin.
+transform_origin :: Attribute '["SVG"] TransformOrigin
+transform_origin = native "transform-origin"
 
 -- ** viewBox
 

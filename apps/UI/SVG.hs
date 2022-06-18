@@ -308,15 +308,14 @@ path = svgElement'
 --   let stops = [Stop 0 "#fff", Stop 0.5 "#000", Stop 1 "#fff"]
 --
 --   defs
---     [ ("myLinear", linear (pure stops))
---     , ("myRadial", radial (pure stops))
+--     [ Def "myLinear" (linear $ pure stops) []
+--     , Def "myRadial" (radial $ pure stops) []
 --     ]
 --
---  let sample x y attributes = rect (pure $ r x y) (pure attributes)
---      r x y = Rectangle
---        { height = px 100, width = px 100, x = px x, y = px y }
---  sample 0 0 (fill $ paintWith "myLinear")
---  sample 110 110 (fill $ paintWith "myRadial")
+--  let sample x_ y_ attributes = rect $ attributes <>
+--        [ x =: px x_, y =: px y_, width =: px 100, height =: px 100 ]
+--  sample 0 0 [ fill =: paintWith "myLinear" ]
+--  sample 110 110 [ fill =: paintWith "myRadial" ]
 -- @
 
 -- | A gradient is made up of multiple __stops__ that specify the

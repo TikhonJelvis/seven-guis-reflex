@@ -9,6 +9,7 @@
 --  * [<transform-function>](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function)
 module UI.Css.Transforms where
 
+import           Data.Default.Class      (Default (..))
 import           Data.Foldable           (toList)
 import           Data.Hashable           (Hashable)
 import           Data.Text               (Text)
@@ -22,11 +23,12 @@ import           Linear                  (V2 (..), V3 (..))
 
 import           Text.Printf             (printf)
 
-import           UI.Attributes.Attribute (AsAttributeValue (..))
+import qualified UI.Attributes.Attribute as Attribute
+import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute)
 import qualified UI.Css.Rules            as Rules
 import           UI.Css.Rules            (CssRules)
-import           UI.Css.Values           (Angle, Factor, Length, RelativeLength,
-                                          px)
+import           UI.Css.Values           (Angle, Css, Factor, Length,
+                                          RelativeLength, px)
 
 -- | CSS supports a number of different __transform functions__. Each
 -- of these functions can be expressed as a matrix (with 'Matrix3D'),
@@ -250,3 +252,59 @@ matrix [a, b, c, d, tx, ty] = addTransform $
   Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, ty, tx, 0, 1]
 matrix invalid =
   error $ printf "Invalid matrix: %s" (show invalid)
+
+-- * Transform Origin
+
+-- | The point that an element's transform functions use as an origin.
+data TransformOrigin = TransformOrigin
+  { x :: RelativeLength
+  , y :: RelativeLength
+  , z :: Length
+  }
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+
+instance AsAttributeValue TransformOrigin where
+  toAttributeValue TransformOrigin { x, y, z } =
+    x <> " " <> y <> " " <> z
+
+  fromAttributeValue = error "CSS parsing not implemented yet"
+
+instance Default TransformOrigin where
+  def = TransformOrigin "50%" "50%" "0"
+
+-- | An absolute 'TransformOrigin' in 2D.
+--
+-- >>> origin (V2 10 10)
+-- TransformOrigin {x = "10.0px", y = "10.0px", z = "0"}
+origin :: V2 Double -> TransformOrigin
+origin (V2 x y) = def { x = px x, y = px y }
+
+-- * Transform Box
+
+-- | The layout box to which the 'transform' and 'transform_origin'
+-- properties apply.
+data TransformBox = ContentBox | BorderBox | FillBox | StrokeBox | ViewBox
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+
+instance AsAttributeValue TransformBox where
+  toAttributeValue = \case
+    ContentBox -> "content-box"
+    BorderBox  -> "border-box"
+    FillBox    -> "fill-box"
+    StrokeBox  -> "stroke-box"
+    ViewBox    -> "view-box"
+
+  fromAttributeValue = \case
+    "content-box" -> Just ContentBox
+    "border-box"  -> Just BorderBox
+    "fill-box"    -> Just FillBox
+    "stroke-box"  -> Just StrokeBox
+    "view-box"    -> Just ViewBox
+    _             -> Nothing
+
+-- | The layout box to which the 'transform' and 'transform_origin'
+-- properties apply.
+transform_box :: Attribute '["CSS"] (Css TransformBox)
+transform_box = Attribute.native "transform-box"

@@ -1,66 +1,78 @@
 {-# LANGUAGE MonadComprehensions #-}
 module UI.Drop where
 
-import           Control.Monad               (void)
+import           Control.Monad                     (void)
 
-import           Data.Default.Class          (def)
-import           Data.Map.Strict             (Map)
-import qualified Data.Map.Strict             as Map
-import           Data.Maybe                  (fromMaybe)
+import           Data.Default.Class                (def)
+import           Data.Map.Strict                   (Map)
+import qualified Data.Map.Strict                   as Map
+import           Data.Maybe                        (fromMaybe)
+import           Data.Text                         (Text)
 
-import           GHC.Generics                (Generic)
+import           GHC.Generics                      (Generic)
 
-import qualified GHCJS.DOM.Node              as Node
+import qualified GHCJS.DOM.Node                    as Node
 
-import           Language.Javascript.JSaddle (MonadJSM)
+import           Language.Javascript.JSaddle       (MonadJSM)
 
 import qualified Reflex
-import           Reflex                      (Dynamic, Event)
+import           Reflex                            (Dynamic, Event)
 
-import qualified UI.Drag                     as Drag
-import           UI.Drag                     (DragConfig (..), Drags (..))
-import qualified UI.Element                  as Element
-import           UI.Element                  (Dom, Html, area, el', elClass',
-                                              elDynAttr', overlap)
-import           UI.Element.IsElement        (IsElement, rawElement)
-import           UI.Main                     (Runnable (..), withCss)
-import           UI.Style                    (duration, property, s,
-                                              setProperty, transition,
-                                              translate)
-import           UI.Widget                   (label, output, range, ul)
+import           UI.Attributes                     (class_, style,
+                                                    toAttributeValue)
+import           UI.Attributes.AttributeSet.Reflex ((=:), (==:))
+import           UI.Color                          (Color)
+import           UI.Css                            (CssRules, s)
+import qualified UI.Css.Animations                 as Animations
+import           UI.Css.Animations                 (Transition (..))
+import qualified UI.Css.Transforms                 as Transforms
+import qualified UI.Drag                           as Drag
+import           UI.Drag                           (DragConfig (..), Drags (..))
+import qualified UI.Element                        as Element
+import           UI.Element                        (Dom)
+import           UI.Element.IsElement              (IsElement, rawElement)
+import qualified UI.Html                           as Html
+import           UI.Html                           (Html)
+import qualified UI.Html.Input                     as Input
+import           UI.Main                           (Runnable (..), withCss)
+import qualified UI.Widget                         as Widget
 
 import qualified Witherable
 
 demo :: forall m t. Dom t m => m ()
 demo = void do
-  ul (pure [("class", "drop-demo")])
+  Html.ul [ class_ =: ["drop-demo"] ]
     [ changeColor
     , moveElement
     ]
   where changeColor = mdo
           label "change color on hover, count drops"
-          (_, atLeast) <- el' "div" do
-            label "how much needed to overlap?"
-            range Reflex.never
+          (_, atLeast) <- Html.div_ [] do
+            snd <$> Html.label [] do
+              Element.text "how much needed to overlap?"
+              snd <$> Input.range [] Reflex.never
 
-          (container, _) <- elClass' "div" "draggable drop-example" mdo
-            (target, _)  <- elClass' "div" "drop-target" (pure ())
-            (element, _) <- elDynAttr' "div" attributes do
+          (container, _) <- Html.div_ [ class_ =: ["draggable", "drop-example"] ] mdo
+            (target, _)  <- Html.div_ [ class_ =: ["drop-target"] ] (pure ())
+            (element, _) <- Html.div_ attributes do
               let validDropped =
                     Reflex.attachWithMaybe validOverlap (Reflex.current atLeast) dropped
                   validOverlap threshold m = (>= threshold) <$> Map.lookup () m
 
               count <- Reflex.count $ Witherable.filter id validDropped
-              output @Int count
+              Widget.output @Int count
 
-            let attributes = do
+            let attributes =
+                  [ class_ =: ["draggable"]
+                  , style ==: rules
+                  ]
+                rules = do
                   threshold <- atLeast
-                  let isHovering =
-                        maybe False (> threshold) . Map.lookup ()
+                  let isHovering = maybe False (> threshold) . Map.lookup ()
                   colorHover <- colorIf "green" . isHovering <$> hovering
 
-                  move <- translate <$> total
-                  pure $ move $ colorHover [("class", "draggable")]
+                  move <- Transforms.translate <$> total
+                  pure $ move colorHover
 
 
             drags@Drags { total } <-
@@ -71,16 +83,19 @@ demo = void do
 
         moveElement = mdo
           label "Move element to target when dropped"
-          (container, _) <- elClass' "div" "draggable drop-example" mdo
-            (target, _) <- elClass' "div" "drop-target" (pure ())
-            (element, _) <- elDynAttr' "div" attributes (pure ())
+          (container, _) <- Html.div_ [ class_ =: ["draggable",  "drop-example"] ] mdo
+            (target, _) <- Html.div_ [ class_ =: ["drop-target"] ] (pure ())
+            (element, _) <- Html.div_ attributes (pure ())
             snapping <- Reflex.holdDyn id $
               Reflex.leftmost [id <$ start, snapTo <$ end]
-            let attributes = do
-                  let base = [("class", "draggable")]
-                  move    <- translate . fromMaybe 0 <$> current
+            let attributes =
+                  [ class_ =: ["draggable"]
+                  , style ==: rules
+                  ]
+                rules = do
+                  move    <- Transforms.translate . fromMaybe 0 <$> current
                   animate <- snapping
-                  pure $ animate $ move base
+                  pure $ animate $ move mempty
 
             drags@Drags { current, start, end } <-
               Drag.drags def { container = Just container } element
@@ -88,15 +103,19 @@ demo = void do
             Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
 
-        snapTo = transition smooth
-        smooth = def { property = "transform", duration = s 0.5 }
+        snapTo = Animations.transition
+          def { property = "transform", duration = s 0.5 }
 
+        colorIf :: Color -> Bool -> CssRules
         colorIf color flag
-          | flag      = setProperty "background-color" color
-          | otherwise = id
+          | flag      = [("background-color", toAttributeValue color)]
+          | otherwise = []
 
         moveTo (rawElement -> element) (rawElement -> parent) =
           Node.appendChild_ parent element
+
+        label :: Text -> m ()
+        label = void . Html.div_ [ class_ =: ["label"] ] . Element.text
 
 -- | Keeps track of how draggable elements are dropped onto a
 -- target. The set of droppable elements can change over time.
@@ -216,8 +235,8 @@ overlapProportion :: forall e e' m. (IsElement e, IsElement e', MonadJSM m)
 overlapProportion element target = do
   droppedBounds <- Element.bounds element
   targetBounds  <- Element.bounds target
-  pure case overlap droppedBounds targetBounds of
-    Just overlapped -> area overlapped / area droppedBounds
+  pure case Element.overlap droppedBounds targetBounds of
+    Just overlapped -> Element.area overlapped / Element.area droppedBounds
     Nothing         -> 0
 
 main :: IO ()

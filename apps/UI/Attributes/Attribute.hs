@@ -464,6 +464,9 @@ instance (Show a, Read a) => AsAttributeValue (Lowercase a) where
             Nothing      -> ""
             Just (c, cs) -> Text.cons (Char.toUpper c) cs
 
+instance (Show a) => Display (Lowercase a) where
+  displayBuilder = Builder.fromText . Text.toLower . Text.pack .show
+
 -- * Attribute Lexical Syntax
 
 -- | Is the character an HTML whitespace character?

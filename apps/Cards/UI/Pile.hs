@@ -31,14 +31,14 @@ pile = fst <$> div_ [class_ =: ["pile"]] do
   svg [] do
     defs [Def "background" background
            [ viewBox =: ViewBox (V2 4 0) (V2 8 14)
-           , width   =: 3.5 --TODO: %
-           , height  =: 3.7 --TODO: %
+           , width   =: "3.5%"
+           , height  =: "3.7%"
            ]
          ]
-    rect [ x      =: 0
-         , y      =: 0
-         , width  =: 100
-         , height =: 100
+    rect [ x      =: "0"
+         , y      =: "0"
+         , width  =: "100"
+         , height =: "100"
          , fill   =: paintWith "background"
          ]
       -- TODO: 100 ⇒ 100%
