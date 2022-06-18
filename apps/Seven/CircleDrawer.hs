@@ -12,19 +12,17 @@ import           Linear              (V2 (..))
 
 import qualified Reflex
 import           Reflex              (Dynamic, Event, (<@), (<@>))
-import qualified Reflex.Dom          as Dom
-import           Reflex.Dom          (dynText)
 
 import qualified Text.Printf         as Text
 
 import           UI.Attributes       (ToAttributes (..), setClass)
-import           UI.Dialog           (DialogElement (..), ModalState (..),
-                                      dialog)
 import           UI.Element          (Dom)
 import           UI.Event
 import qualified UI.History          as History
 import           UI.History          (Undos (..))
 import           UI.Main             (Runnable (..), withCss)
+import           UI.Modal            (DialogElement (..), ModalState (..),
+                                      dialog)
 import qualified UI.PushMap          as PushMap
 import           UI.PushMap          (PushMap)
 import           UI.SVG              (Circle (..), Stroke (..), Svg, circle,

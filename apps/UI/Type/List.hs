@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE PolyKinds            #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- | Basic functionality for working with type-level lists.
@@ -58,3 +59,9 @@ type family ShowElements (xs :: [Symbol]) :: Symbol where
   ShowElements '[] = ""
   ShowElements '[x] = x
   ShowElements (x ': xs) = AppendSymbol (AppendSymbol x ", ") (ShowElements xs)
+
+-- | Concatenate two lists of symbols.
+type family xs <> ys :: [k] where
+  '[] <> ys = ys
+  xs <> '[] = xs
+  (x ': xs) <> ys = x ': (xs <> ys)

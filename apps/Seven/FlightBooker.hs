@@ -1,21 +1,26 @@
 module Seven.FlightBooker where
 
-import           Control.Applicative    ((<|>))
-import           Control.Monad          (void)
-import           Control.Monad.IO.Class (MonadIO (liftIO))
+import           Control.Applicative               ((<|>))
+import           Control.Monad                     (void)
+import           Control.Monad.IO.Class            (MonadIO)
 
-import           Data.Text.Display      (Display (..))
-import qualified Data.Text.Lazy.Builder as Text
-import           Data.Time              (Day)
-import qualified Data.Time              as Time
+import           Data.Text.Display                 (Display (..))
+import qualified Data.Text.Lazy.Builder            as Text
+import           Data.Time                         (Day)
 
 import qualified Reflex
-import           Reflex                 (Dynamic)
-import qualified Reflex.Dom             as Dom
 
-import qualified Text.Printf            as Text
+import qualified Text.Printf                       as Text
 
+import           UI.Attributes                     (class_)
+import           UI.Attributes.AttributeSet.Reflex ((=:), (==:))
+import qualified UI.Element                        as Element
 import           UI.Element
+import qualified UI.Html                           as Html
+import           UI.Html                           (Button (..))
+import qualified UI.Html.Input                     as Input
+import           UI.Html.Input                     (Enabled (..), enabled,
+                                                    enabledIf)
 import           UI.Widget
 
 -- | A UI with three parts:
@@ -36,18 +41,19 @@ import           UI.Widget
 -- details chosen (ie "A one-way flight on <date>" or "A return flight
 -- from <date> to <date>").
 widget :: forall m t. (MonadIO m, Dom t m) => m ()
-widget = Dom.elClass "div" "flight-booker" do
+widget = void $ Html.div_ [ class_ =: ["flight-booker"] ] do
   mode  <- selectEnum @Mode
-  there <- dateInput (pure Enabled)
-  back  <- dateInput (enabledIf . (== Return) <$> mode)
+  there <- snd <$> Input.date [] Reflex.never
+  back  <- snd <$>
+    Input.date [ enabled ==: enabledIf . (== Return) <$> mode ] Reflex.never
 
   let canBook = enableButton <$> mode <*> there <*> back
-  bookClick <- button' "Book" canBook
+  Button { pressed } <- Html.button' "Book" [ enabled ==: canBook ]
 
   let trip = toTrip <$> mode <*> there <*> back
-  booked <- Reflex.foldDyn (<|>) Nothing (Reflex.tag (Reflex.current trip) bookClick)
+  booked <- Reflex.foldDyn (<|>) Nothing (Reflex.tag (Reflex.current trip) pressed)
 
-  void $ Dom.dyn $ confirmationMessage <$> booked
+  void $ Element.dyn $ confirmationMessage <$> booked
   where enableButton OneWay Just{} _ = Enabled
         enableButton Return (Just start) (Just end)
           | start <= end = Enabled
@@ -58,25 +64,6 @@ widget = Dom.elClass "div" "flight-booker" do
 
         confirmationMessage Nothing     = pure ()
         confirmationMessage (Just trip) = output $ pure trip
-
--- | A date input with validation.
---
--- If the user inputs an invalid date, this will contain 'Nothing' and
--- the div containing the date input will have the @invalid@ CSS
--- class.
-dateInput :: (Dom t m, MonadIO m)
-          => Dynamic t Enabled
-          -> m (Dynamic t (Maybe Day))
-dateInput enabled = do
-  today <- liftIO getLocalDay
-  rec date <- Dom.elDynClass "div" (invalidClass <$> date) do
-        readInput @Day today Dom.never enabled
-  pure date
-  where getLocalDay =
-          Time.localDay . Time.zonedTimeToLocalTime <$> Time.getZonedTime
-
-        invalidClass Nothing = "date invalid"
-        invalidClass Just{}  = "date"
 
 -- | The kinds of flights we can book. "One way" requires a single
 -- date, "return" requires two dates.

@@ -1,21 +1,26 @@
 module Seven.TemperatureConverter where
 
-import           Data.Text   (Text)
+import           Control.Monad                     (void)
+
+import           Data.Text                         (Text)
 
 import qualified Reflex
-import qualified Reflex.Dom  as Dom
 
-import           Text.Printf (printf)
+import           Text.Printf                       (printf)
 
+import           UI.Attributes                     (class_)
+import           UI.Attributes.AttributeSet.Reflex ((=:))
+import qualified UI.Element                        as Element
 import           UI.Element
-import           UI.Widget
+import qualified UI.Html                           as Html
+import qualified UI.Html.Input                     as Input
 
 -- | The Temperature Converter has a frame with two text fields (°C
 -- and °F) that convert automatically.
 widget :: Dom t m => m ()
-widget = Dom.elClass "div" "converter" $ do
+widget = void $ Html.div_ [ class_ =: ["converter"] ] do
   rec f <- temperature "°F" (-32) updateF
-      Dom.text "="
+      Element.text "="
       c <- temperature "°C" 0 updateC
       let updateF = toF <$> Reflex.updated c
           updateC = toC <$> Reflex.updated f
@@ -42,7 +47,8 @@ temperature :: Dom t m
             -> Reflex.Event t Temperature
             -- ^ Updates to the displayed temperature.
             -> m (Reflex.Dynamic t Temperature)
-temperature unit start updates = Dom.elClass "div" "temperature" $ do
-  t <- readInput start updates (pure Enabled)
-  label unit
-  ignoreNothing start t
+temperature unit start updates = snd <$> Html.div_ [ class_ =: ["temperature"] ] do
+  t <- snd <$> Input.number [ Input.number_value =: toDouble start ] (toDouble <$> updates)
+  Html.div_ [ class_ =: ["label"] ] do
+    Element.text unit
+  pure $ Temperature <$> t

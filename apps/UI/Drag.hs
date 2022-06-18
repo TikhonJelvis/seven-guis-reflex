@@ -41,7 +41,6 @@ import           UI.Event                          (Modifier (Shift),
                                                     on, performJs)
 import qualified UI.Html                           as Html
 import           UI.Html                           (Html)
-import           UI.Html.Attributes                (for)
 import qualified UI.Html.Input                     as Input
 import           UI.Main                           (Runnable (..), withCss)
 
@@ -152,7 +151,7 @@ demo = void do
         enableDisable = mdo
           label "Enable or disable dragging interactively."
           (_, enabled) <- Html.div_ [] do
-            snd <$> Html.label [ for =: "toggle-drag" ] do
+            snd <$> Html.label [ Input.for =: "toggle-drag" ] do
               Dom.text "Enabled dragging"
               snd <$> Input.checkbox [ class_ =: ["toggle-drag"] ] Reflex.never
           (container, _) <- Html.div_ [ class_ =: ["drag-example"] ] mdo

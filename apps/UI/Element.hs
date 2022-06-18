@@ -7,8 +7,12 @@ module UI.Element
   , dynText
   , createElement
 
+  , dyn
+
   , InputConfig (..)
   , createInputElement
+
+  , createSelectElement
 
   , getAttribute
   , setAttribute
@@ -26,7 +30,7 @@ where
 
 import           Control.Monad.Fix           (MonadFix)
 
-import           Data.Default.Class          (Default)
+import           Data.Default.Class          (Default, def)
 import           Data.Hashable               (Hashable)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
@@ -127,6 +131,14 @@ createElement namespace tagName attrs body = do
   pure (element, result)
 {-# INLINABLE createElement #-}
 
+-- | Create a dynamic set of elements.
+--
+-- See 'Dom.dyn'
+dyn :: forall a m t. Dom t m => Dynamic t (m a) -> m (Event t a)
+dyn = Dom.dyn
+
+-- ** Inputs and Controls
+
 -- | Controlling the value and checked status of an @input@, as
 -- appropriate.
 --
@@ -168,6 +180,27 @@ createInputElement namespace attrs InputConfig {..} = do
     , Dom._inputElementConfig_setChecked     = setChecked
     }
 {-# INLINABLE createInputElement #-}
+
+-- | Create a @select@ element.
+createSelectElement :: forall a m t. Dom t m
+                    => Dynamic t (Map Text Text)
+                    -- ^ Attributes
+                    -> Text
+                    -- ^ Initial value
+                    -> Event t Text
+                    -- ^ Explicitly set selection
+                    -> m a
+                    -- ^ Body, typically full of @option@ elements
+                    -> m (Dom.SelectElement Event.EventResult Dom.GhcjsDomSpace t, a)
+createSelectElement attributes initial setValue body = do
+  config <- elementConfig Nothing attributes
+  let selectConfig = Dom.SelectElementConfig
+        { Dom._selectElementConfig_setValue      = Just setValue
+        , Dom._selectElementConfig_initialValue  = initial
+        , Dom._selectElementConfig_elementConfig = config
+        }
+  Dom.selectElement selectConfig body
+{-# INLINABLE createSelectElement #-}
 
 -- * Element Properties
 

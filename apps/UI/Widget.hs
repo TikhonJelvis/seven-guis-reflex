@@ -161,54 +161,26 @@ newtype Name = Name { toText :: Text }
 --         toAttributes Enabled  = Map.empty
 --         toAttributes Disabled = Map.fromList [("disabled", "true")]
 
--- -- | A drop-down selection menu for an element of an enumerable type.
--- --
--- -- The select will show every possible value of the type from
--- -- 'minBound' to 'maxBound', using the 'Display' instance for
--- -- user-facing text.
--- --
--- -- The initial value selected is 'minBound'.
--- selectEnum :: forall a m t. (DomBuilder t m, Enum a, Bounded a, Display a)
---            => m (Dynamic t a)
--- selectEnum = do
---   (element, _) <- Dom.selectElement config options
---   pure $ toEnum . read . Text.unpack <$> Dom._selectElement_value element
---   where options = mapM @[] toOption [minBound @a .. maxBound]
---         toOption value =
---           Dom.elAttr "option" ("value" =: showEnum value) $
---             Dom.text (Display.display value)
+-- | A drop-down selection menu for an element of an enumerable type.
+--
+-- The select will show every possible value of the type from
+-- 'minBound' to 'maxBound', using the 'Display' instance for
+-- user-facing text.
+--
+-- The initial value selected is 'minBound'.
+selectEnum :: forall a m t. (Dom t m, Enum a, Bounded a, Display a)
+           => m (Dynamic t a)
+selectEnum = do
+  (element, _) <- Dom.selectElement config options
+  pure $ toEnum . read . Text.unpack <$> Dom._selectElement_value element
+  where options = mapM @[] toOption [minBound @a .. maxBound]
+        toOption value =
+          Dom.elAttr "option" ("value" =: showEnum value) $
+            Dom.text (Display.display value)
 
---         config = def & Dom.selectElementConfig_initialValue .~ showEnum (minBound @a)
+        config = def & Dom.selectElementConfig_initialValue .~ showEnum (minBound @a)
 
---         showEnum = Text.pack . show . fromEnum
-
--- -- | A range input element (a slider).
--- --
--- -- The argument is an 'Event' that sets the slider to the given
--- -- value. Values < 0 will be clamped to 0; values > 1 will be clamped
--- -- to 1.
--- --
--- -- If you do not want to set the element, you can use
--- --
--- -- @
--- -- range Reflex.never
--- -- @
--- --
--- -- Returns the position as a 'Double' between 0 and 1.
--- range :: forall m t. Dom t m => Event t Double -> m (Dynamic t Double)
--- range (fmap (Text.pack . show) -> setEvents) = do
---   e <- Dom.inputElement config
---   pure $ readValue <$> Dom.value e
---   where config = def & Dom.inputElementConfig_initialValue .~ "0.5"
---                      & Dom.inputElementConfig_setValue .~ setEvents
---                      & Dom.initialAttributes .~ [ ("type", "range")
---                                                 , ("min", "0.0")
---                                                 , ("max", "1.0")
---                                                 , ("step", "any") ]
-
---         -- This should only be Nothing if somebody is manually
---         -- screwing around with the DOM or something...
---         readValue = fromMaybe 0 . readMaybe . Text.unpack
+        showEnum = Text.pack . show . fromEnum
 
 -- -- | An interactive box that displays a dynamic sequence of
 -- -- values. One value at a time can be selected.
