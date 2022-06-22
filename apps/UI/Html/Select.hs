@@ -4,14 +4,11 @@ module UI.Html.Select
   , select
 
     -- ** Options
-  , Entry (..)
+  , Entry
+  , disabled
   , option
   , placeholder
   , group
-
-  -- ** Option Attributes
-  , selected
-  , disabled
   )
 where
 

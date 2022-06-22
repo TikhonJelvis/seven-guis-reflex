@@ -6,8 +6,10 @@
 module UI.Html.Select.Internal where
 
 import           Control.Monad                     (forM_)
+import           Control.Monad.State               (evalState, get, put)
 
 import           Data.Hashable                     (Hashable)
+import           Data.Maybe                        (fromMaybe)
 import           Data.Text                         (Text)
 import           Data.Text.Display                 (Display, display)
 
@@ -15,11 +17,13 @@ import           GHC.Generics                      (Generic)
 
 import qualified GHCJS.DOM.Types                   as GHCJS
 
+import qualified Reflex
 import           Reflex                            (Dynamic, Event, Reflex)
 import qualified Reflex.Dom                        as Dom
 
 import           UI.Attributes                     (AsAttributeValue, boolean,
-                                                    native, toAttributeValue)
+                                                    fromAttributeValue, native,
+                                                    toAttributeValue)
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
 import qualified UI.Element                        as Element
 import           UI.Element                        (Dom, createSelectElement)
@@ -29,6 +33,8 @@ import qualified UI.Html                           as Html
 import           UI.Html                           (Html)
 import qualified UI.Html.Input                     as Input
 import           UI.Html.Input                     (Enabled)
+import           UI.Main                           (Runnable (Runnable),
+                                                    withCss)
 
 -- * Select Elements
 
@@ -54,7 +60,7 @@ instance Reflex t => Dom.HasDomEvent t (HtmlSelect t) en where
     Dom.domEvent eventName $ Dom._selectElement_element e
 
 -- | A drop-down select menu with a set of options.
-select :: forall k m t. (AsAttributeValue k, Dom t m)
+select :: forall k m t. (Eq k, AsAttributeValue k, Dom t m)
        => AttributeSet t "select" "HTML"
        -- ^ Attributes
        -> Maybe k
@@ -67,14 +73,42 @@ select :: forall k m t. (AsAttributeValue k, Dom t m)
        -- ^ Explicitly override the selected value.
        -> [Entry k]
        -- ^ Options to display to the user.
-       -> m (HtmlSelect t)
+       -> m (HtmlSelect t, Dynamic t (Maybe k))
        -- ^ Returns the element and the currently selected value (if
        -- any).
-select attributes (toAttributeValue -> initial) setValue options = do
+select attributes initial setValue options = do
   let set = toAttributeValue <$> setValue
-  (element, _) <- createSelectElement (toDom attributes) initial set do
-    mapM_ createEntry options
-  pure $ HtmlSelect element
+  (element, _) <- createSelectElement (toDom attributes) (toAttributeValue initial) set do
+    mapM_ createEntry $ maybe options selectInitial initial
+  pure (HtmlSelect element, parse <$> Dom._selectElement_value element)
+  where selectInitial k = evalState (go k options) False
+
+        -- special handling: always treat value="" as Nothing
+        --
+        -- without this, using a select with a Text key means that
+        -- placeholders are treated as Just "" rather than Nothing,
+        -- which is confusing and inconsistent with how value="" is
+        -- interpreted by HTML
+        parse = \case
+          ""   -> Nothing
+          text -> fromAttributeValue text
+
+        -- select only the /first/ option with a key that matches
+        -- initial
+        --
+        -- TODO: less fiddly implementation of this logic?
+        go k opts = get >>= \case
+          True  -> pure opts
+          False -> case opts of
+            o@(Option _ _ (Just k') _) : rest
+              | k == k'   -> (selected o : rest) <$ put True
+            o@Option{} : rest ->
+              (o :) <$> go k rest
+            (Group enabled label groupOpts : rest) -> do
+              group' <- Group enabled label <$> go k groupOpts
+              rest' <- go k rest
+              pure (group' : rest')
+            [] -> pure []
 {-# INLINABLE select #-}
 
     -- TODO: support select menus with multiple selection
@@ -142,14 +176,14 @@ data Entry k where
 -- select [] Nothing never
 --   [ placeholder "--please select an ingredient--"
 --   , group "Fruit"
---       [ option "Apple"
---       , option "Pear"
---       , disabled (option "Banana")
---       ]
+--     [ option "Apple"
+--     , option "Pear"
+--     , disabled (option "Banana")
+--     ]
 --   , disabled $ group "Vegetables"
---       [ disabled (option "Cucumber")
---       , option "Squash" -- disabled since group is disabled
---       ]
+--     [ disabled (option "Cucumber")
+--     , option "Squash" -- disabled since group is disabled
+--     ]
 --   ]
 -- @
 disabled :: forall k. Entry k -> Entry k
@@ -160,6 +194,12 @@ disabled = \case
 -- | Make an option selected by default.
 --
 -- Does not do anything if applied to a group.
+--
+-- Note: the initially selected value is currently /not/ reflected in
+-- the 'Dynamic' returned from 'select'. Instead, the initial value
+-- passed to 'select' is used until some event changes the value. This
+-- is a limitation of reflex-dom's 'Dom.selectElement' function so it
+-- will hopefully change in the future.
 --
 -- __Example__
 --
@@ -250,3 +290,39 @@ createEntry = \case
                 , Input.enabled                   =: enabled
                 ]
           fst <$> Html.html @"option" attributes (Element.text label)
+
+_demo :: IO ()
+_demo = do
+  withCss "css/ui.css" $ Runnable do
+    Html.div_ [] do
+      Html.label [] do
+        Element.text "No default:"
+        (_, selectedValue) <- select [] Nothing Reflex.never
+          [ placeholder "--please select an ingredient--"
+          , group "Fruit"
+            [ option "Apple"
+            , option "Pear"
+            , disabled (option "Banana")
+            ]
+          , disabled $ group "Vegetables"
+            [ disabled (option "Cucumber")
+            , option "Squash"
+            ]
+          ]
+        Element.dynText (fromMaybe "<none>" <$> selectedValue)
+
+    Html.div_ [] do
+      Html.label [] do
+        Element.text "With default selected:"
+        (_, selectedValue) <- select [] (Just "Pear") Reflex.never
+          [ group "Fruit"
+            [ option "Apple"
+            , option "Pear"
+            , disabled (option "Banana")
+            ]
+          , disabled $ group "Vegetables"
+            [ disabled (option "Cucumber")
+            , option "Squash"
+            ]
+          ]
+        Element.dynText (fromMaybe "<none>" <$> selectedValue)
