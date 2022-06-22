@@ -84,7 +84,6 @@ module UI.Html.Input
   )
 where
 
-
 import           Data.Bool                         (bool)
 import qualified Data.Colour                       as Colour
 import           Data.Default.Class                (def)
@@ -135,8 +134,7 @@ import           UI.Url                            (Url (..))
 -- if you're interfacing with the DOM object directly through
 -- 'IsHtmlInput'.
 
--- | An HTML DOM /input/ element (ie @HTMLInputElement@ in
--- JavaScript).
+-- | An HTML DOM @input@ element (@HTMLInputElement@ in JavaScript).
 newtype HtmlInput t = HtmlInput
   (Dom.InputElement Event.EventResult Dom.GhcjsDomSpace t)
   deriving stock (Generic)
@@ -154,6 +152,7 @@ instance IsHtmlInput (HtmlInput t) where
 
 instance Reflex t => Dom.HasDomEvent t (HtmlInput t) en where
   type DomEventType (HtmlInput t) en = Event.EventResultType en
+
   domEvent eventName (HtmlInput e) =
     Dom.domEvent eventName $ Dom._inputElement_element e
 
@@ -769,7 +768,7 @@ color attributes setColor = do
   pure (e, fromMaybe (Opaque Colour.black) <$> v)
 {-# INLINABLE color #-}
 
--- ** Attributes
+-- * Input Attributes
 
 -- | Associates a 'label' or 'output' with a control.
 --
@@ -869,7 +868,7 @@ minlength = native "minlength"
 maxlength :: Attribute '["input", "password"] Word
 maxlength = native "maxlength"
 
--- *** Value
+-- ** Value
 
 -- $ Different types of inputs have different types of values. To
 -- support this with reasonable type inference and error messages, we
@@ -877,7 +876,7 @@ maxlength = native "maxlength"
 -- types.
 
 -- | The default value element for inputs—unstructured text.
-value :: Attribute '["input", "text", "search", "tel"] Text
+value :: Attribute '["input", "option", "text", "search", "tel"] Text
 value = native "value"
 
 -- | A value for numeric input fields.
@@ -1007,20 +1006,3 @@ email_value = native "value"
 -- @
 emails_value :: Attribute '["emails"] (Vector Email)
 emails_value = native "value"
-
--- * Select Elements
-
-newtype HtmlSelect t = HtmlSelect
-  (Dom.SelectElement Event.EventResult Dom.GhcjsDomSpace t)
-  deriving stock (Generic)
-
-instance Dom.HasValue (HtmlSelect t) where
-  type Value (HtmlSelect t) = Dynamic t Text
-  value (HtmlSelect e) = Dom._selectElement_value e
-
-select :: forall a m t. Dom t m
-       => AttributeSet t "select" "HTML"
-       -> Event t Text
-       -> m a
-       -> m (HtmlSelect t, a)
-select = undefined

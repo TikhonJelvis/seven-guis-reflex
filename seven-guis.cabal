@@ -80,6 +80,8 @@ executable guis
     UI.Html
     UI.Html.Attributes
     UI.Html.Input
+    UI.Html.Select
+    UI.Html.Select.Internal
     UI.Id
     UI.Main
     UI.Modal

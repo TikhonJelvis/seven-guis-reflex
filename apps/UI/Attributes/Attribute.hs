@@ -391,6 +391,16 @@ class AsAttributeValue a where
   combineAttributeValues :: a -> a -> a
   combineAttributeValues _old new = new
 
+-- | For optional values. When nothing, convert to HTML as the empty
+-- string (@""@).
+--
+-- Note: for @Text@, this means that @Just ""@ and @Nothing@ are not
+-- distinguishable as attribute values.
+instance AsAttributeValue a => AsAttributeValue (Maybe a) where
+  toAttributeValue = maybe "" toAttributeValue
+  fromAttributeValue ""   = Just Nothing
+  fromAttributeValue text = Just <$> fromAttributeValue text
+
 instance AsAttributeValue Text where
   toAttributeValue = id
   fromAttributeValue = Just
