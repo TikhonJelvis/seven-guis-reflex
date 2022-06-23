@@ -17,7 +17,6 @@ import           UI.Attributes.AttributeSet.Internal ((=:), (==:))
 import qualified UI.Element                          as Element
 import           UI.Element                          (Dom)
 import qualified UI.Html                             as Html
-import           UI.Html                             (Button (..))
 import qualified UI.Html.Input                       as Input
 import           UI.Html.Input                       (Enabled (..), enabled,
                                                       enabledIf)
@@ -53,7 +52,7 @@ widget = void $ Html.div_ [ class_ =: ["flight-booker"] ] do
     Input.date [ enabled ==: enabledIf . (== Return) <$> mode ] Reflex.never
 
   let canBook = enableButton <$> mode <*> there <*> back
-  Button { pressed } <- Html.button' "Book" [ enabled ==: canBook ]
+  pressed <- snd <$> Html.button' "Book" [ enabled ==: canBook ]
 
   let trip = toTrip <$> mode <*> there <*> back
   booked <- Reflex.foldDyn (<|>) Nothing (Reflex.tag (Reflex.current trip) pressed)

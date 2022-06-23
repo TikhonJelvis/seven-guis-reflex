@@ -30,7 +30,7 @@ import           UI.Drag                           (DragConfig (..), Drags (..))
 import qualified UI.Element                        as Element
 import           UI.Element                        (Dom)
 import qualified UI.Html                           as Html
-import           UI.Html                           (Button (..), Html)
+import           UI.Html                           (Html)
 import           UI.Html.Attributes                (src)
 import           UI.Main                           (Runnable (..), withCss)
 import qualified UI.SVG                            as Svg
@@ -51,7 +51,7 @@ demo :: forall m t. Dom t m => m ()
 demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
   label "Cards draggable across body"
 
-  Button { pressed } <- Html.button' "flip cards" []
+  pressed <- snd <$> Html.button' "flip cards" []
   faceUp <- Reflex.toggle True pressed
   let facing = bool FaceDown FaceUp <$> faceUp
 

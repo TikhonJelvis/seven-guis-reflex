@@ -1,38 +1,41 @@
 module Seven.CRUD where
 
-import           Control.Applicative (liftA2)
-import           Control.Lens        ((??))
+import           Control.Applicative        (liftA2)
+import           Control.Lens               ((??))
+import           Control.Monad              (void)
 
-import           Data.Default.Class  (def)
-import           Data.Text           (Text)
-import qualified Data.Text           as Text
-import           Data.Text.Display   (Display (displayBuilder))
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Data.Text.Display          (Display (displayBuilder))
 
 import qualified Reflex
-import           Reflex              (Dynamic, Event, (<@>))
-import qualified Reflex.Dom          as Dom
+import           Reflex                     (Dynamic, Event, (<@>))
 
-import           UI.Element          (Dom)
-import           UI.Main             (Runnable (..), withCss)
-import qualified UI.PushMap          as PushMap
-import           UI.Widget           (label, listbox)
+import           UI.Attributes              (class_, id_)
+import           UI.Attributes.AttributeSet ((=:))
+import           UI.Element                 (Dom)
+import qualified UI.Html                    as Html
+import qualified UI.Html.Input              as Input
+import           UI.Main                    (Runnable (..), withCss)
+import qualified UI.PushMap                 as PushMap
+import           UI.Widget                  (listbox)
 
-import qualified Witherable          (Filterable (filter))
+import qualified Witherable                 (Filterable (filter))
 
 widget :: forall m t. Dom t m => m ()
-widget = Dom.elClass "div" "crud" do
+widget = void $ Html.div_ [ class_ =: ["crud"] ] do
   rec let updates = Reflex.current (liftA2 act selected entered) <@> action
       names <- Reflex.foldDynMaybe ($) mempty updates
 
       prefix   <- prefixEntry
       selected <- listbox $ liftA2 filterPrefix prefix names
-      entered  <- Dom.elClass "div" "name-input" nameInput
+      entered  <- snd <$> Html.div_ [ class_ =: ["name-input"] ] nameInput
       action   <- crud
   pure ()
   where
-    prefixEntry = Dom.elClass "div" "filter" do
-      label "Filter prefix: "
-      Dom.value <$> Dom.inputElement def
+    prefixEntry = snd <$> Html.div_ [ class_ =: ["filter"] ] do
+      Html.labelFor "prefix" "Filter prefix: "
+      snd <$> Input.text [ id_ =: "prefix" ] Reflex.never
 
     act selected entered action names = case action of
       Create -> pure $ PushMap.push entered names
@@ -52,10 +55,10 @@ data Crud = Create | Update | Delete
 --  2. Update
 --  3. Delete
 crud :: Dom t m => m (Event t Crud)
-crud = Dom.elClass "div" "crud-controls" do
-  create <- Dom.button "Create"
-  update <- Dom.button "Update"
-  delete <- Dom.button "Delete"
+crud = snd <$> Html.div_ [ class_ =: ["crud-controls"] ] do
+  create <- snd <$> Html.button' "Create" []
+  update <- snd <$> Html.button' "Update" []
+  delete <- snd <$> Html.button' "Delete" []
   pure $ Reflex.leftmost [Create <$ create, Update <$ update, Delete <$ delete]
 
 -- * Names
@@ -74,12 +77,12 @@ instance Display Name where
 -- | Two textboxes: one for first name, one for surname. Either part
 -- can be blank—no validation on the names the user enters.
 nameInput :: Dom t m => m (Dynamic t Name)
-nameInput = Dom.el "div" do
-  label "Name: "
-  first <- Dom.value <$> Dom.inputElement def
+nameInput = snd <$> Html.div_ [] do
+  Html.labelFor "first-name" "Name: "
+  first <- snd <$> Input.text [ id_ =: "first-name" ] Reflex.never
 
-  label "Surname: "
-  surname <- Dom.value <$> Dom.inputElement def
+  Html.labelFor "surname" "Surname: "
+  surname <- snd <$> Input.text [ id_ =: "surname" ] Reflex.never
 
   pure (liftA2 Name first surname)
 

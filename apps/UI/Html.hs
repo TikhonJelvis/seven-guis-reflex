@@ -15,10 +15,10 @@ module UI.Html
   , ul
   , ul_
 
-  , Button (..)
   , button
   , button'
   , label
+  , labelFor
 
   , img
   )
@@ -39,13 +39,15 @@ import qualified GHCJS.DOM.Types                   as GHCJS
 import           Reflex                            (Event, Reflex)
 import qualified Reflex.Dom                        as Dom
 
-import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
 import           UI.Element                        (Dom, createElement, dynText,
                                                     text)
 import           UI.Element.IsElement              (FromElement (..),
                                                     IsElement (..), IsHtml (..))
 import qualified UI.Event                          as Event
 import           UI.Event                          (EventName (..))
+import           UI.Html.Attributes                (for)
+import           UI.Id                             (Id)
 
 
 -- * HTML Elements
@@ -231,25 +233,17 @@ ul_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
 
 -- ** Controls
 
--- | A button element. Has the underlying HTML element for the button
--- as well as an event that fires when the button is pressed.
-data Button t = Button
-  { element :: Html t
-  , pressed :: Event t ()
-  }
-  deriving stock (Generic)
-
 -- | A pressable button.
 button :: forall a m t. Dom t m
        => AttributeSet t "button" "HTML"
        -- ^ attributes
        -> m a
        -- ^ button body (often a text label)
-       -> m (Button t, a)
+       -> m ((Html t, Event t ()), a)
 button attributes body = do
   (element, a) <- html attributes body
   let pressed = void $ Dom.domEvent Click element
-  pure (Button { element, pressed }, a)
+  pure ((element, pressed), a)
 
 -- | A button with a static text label.
 button' :: forall m t. Dom t m
@@ -257,7 +251,7 @@ button' :: forall m t. Dom t m
         -- ^ button label
         -> AttributeSet t "button" "HTML"
         -- ^ attributes
-        -> m (Button t)
+        -> m (Html t, Event t ())
 button' t attributes = fst <$> button attributes (text t)
 
 -- | A label that can be associated with an input or control. Clicking
@@ -279,8 +273,8 @@ button' t attributes = fst <$> button attributes (text t)
 --
 -- @
 -- example = do
---   labelFor "username" [] (text "Username:")
---   input [ type_ =: Text, id_ =: "username" ]
+--   label [ for_ =: "username" ] (text "Username:")
+--   Input.text [ id_ =: "username" ]
 -- @
 --
 -- Associate with an 'input' by putting the input element /in/ the
@@ -298,6 +292,18 @@ label :: forall a m t. Dom t m
       -- ^ Body
       -> m (Html t, a)
 label = html
+
+-- | Shorthand for creating a text label for a given id.
+--
+-- __Example__
+--
+-- @
+-- example = do
+--   labelFor "username" "Username:"
+--   Input.text [ id_ =: "username" ]
+-- @
+labelFor :: forall m t. Dom t m => Id -> Text -> m (Html t)
+labelFor id_ = fmap fst . label [ for =: id_ ] . text
 
 -- ** Media
 

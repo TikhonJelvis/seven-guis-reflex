@@ -40,7 +40,7 @@ widget = void $ Html.div_ [ class_ =: ["timer"] ] do
       r <- snd <$> Input.range [] Reflex.never
       let duration = realToFrac . (* 120) <$> r
 
-      Html.Button { pressed } <- fst <$> Html.button [] do
+      (_, pressed) <- fst <$> Html.button [] do
         Element.dynText $ elapsed <&> \ e ->
           if isJust e then "Reset" else "Start"
       let resetTime = Reflex.tag (Just <$> Reflex.current time) pressed

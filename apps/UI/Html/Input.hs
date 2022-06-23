@@ -48,9 +48,6 @@ module UI.Html.Input
 
   , color
 
-  , for
-  , for_
-
   , Enabled (..)
   , enabledIf
   , enabled
@@ -119,7 +116,6 @@ import           UI.Element.IsElement              (IsElement (..), IsHtml (..),
                                                     IsHtmlInput (..))
 import           UI.Email                          (Email, validate)
 import qualified UI.Event                          as Event
-import           UI.Id                             (Id, Ids)
 import           UI.Password                       (Password (..))
 import           UI.Type.List                      (KnownSymbols, type (<>))
 import           UI.Url                            (Url (..))
@@ -769,53 +765,6 @@ color attributes setColor = do
 {-# INLINABLE color #-}
 
 -- * Input Attributes
-
--- | Associates a 'label' or 'output' with a control.
---
--- 'input' elements can only be associated with one element, but
--- 'output' elements can support multiple elements. To set multiple
--- elements for an 'output', see 'fors'.
---
--- __Example__
---
--- Associate a label with a text input. When activated (eg by
--- clicking), the label will move the focus to the associated input.
---
--- @
--- example = do
---   input [ type_ =: Text, id_ =: "username" ]
---   label [ for =: "username" ] (text "username")
--- @
-for :: Attribute '["label", "output"] Id
-for = native "for"
-
--- | Associates an 'output' with /multiple/ elements. Plural version
--- of 'for'.
---
--- Used multiple times, this attribute will combine the values into a
--- single list.
---
--- __Example__
---
--- Associate an 'output' with two inputs:
---
--- @
--- example = do
---   input [ type_ =: Range, id_ =: "a", value =: "5" ]
---   input [ type_ =: Range, id_ =: "b", value =: "10" ]
---   output [ for_ =: ["a", "b"] ] (text "15")
--- @
---
--- Alternative, equivalent option:
---
--- @
--- example = do
---   input [ type_ =: Range, id_ =: "a", value =: "5" ]
---   input [ type_ =: Range, id_ =: "b", value =: "10" ]
---   output [ for_ =: ["a"], for_ =: ["b"] ] (text "15")
--- @
-for_ :: Attribute '["output"] Ids
-for_ = native "for"
 
 -- | Whether an input element is enabled or disabled.
 --

@@ -14,8 +14,8 @@ import           Reflex                     (Dynamic, Event)
 
 import           UI.Attributes.AttributeSet ((==:))
 import           UI.Element
-import           UI.Html                    (Button (..), button')
-import           UI.Html.Attributes         (enabled, enabledIf)
+import           UI.Html                    (button')
+import           UI.Html.Input              (enabled, enabledIf)
 
 -- * History
 
@@ -93,7 +93,7 @@ undoButton :: forall a m t. Dom t m
            -> m (Event t a)
            -- ^ Event with the action to undo
 undoButton history = do
-  Button { pressed } <- button' "↶" [ enabled ==: enabledIf . hasUndo <$> history ]
+  pressed <- snd <$> button' "↶" [ enabled ==: enabledIf . hasUndo <$> history ]
   pure $ Reflex.attachWithMaybe (&) (Reflex.current history) (toUndo <$ pressed)
 
 -- | A button with the label @"↷"@ that fires an event with the action
@@ -104,7 +104,7 @@ redoButton :: forall a m t. Dom t m
            -> m (Event t a)
            -- ^ Event with the action to undo
 redoButton history = do
-  Button { pressed } <- button' "↷" [ enabled ==: enabledIf . hasRedo <$> history ]
+  pressed <- snd <$> button' "↷" [ enabled ==: enabledIf . hasRedo <$> history ]
   pure $ Reflex.attachWithMaybe (&) (Reflex.current history) (toRedo <$ pressed)
 
 -- | A control pane with an undo button and a redo button that manage
