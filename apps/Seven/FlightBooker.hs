@@ -1,27 +1,29 @@
 module Seven.FlightBooker where
 
-import           Control.Applicative               ((<|>))
-import           Control.Monad                     (void)
-import           Control.Monad.IO.Class            (MonadIO)
+import           Control.Applicative                 ((<|>))
+import           Control.Monad                       (void)
+import           Control.Monad.IO.Class              (MonadIO)
 
-import           Data.Text.Display                 (Display (..))
-import qualified Data.Text.Lazy.Builder            as Text
-import           Data.Time                         (Day)
+import           Data.Text.Display                   (Display (..))
+import qualified Data.Text.Lazy.Builder              as Text
+import           Data.Time                           (Day)
 
 import qualified Reflex
 
-import qualified Text.Printf                       as Text
+import qualified Text.Printf                         as Text
 
-import           UI.Attributes                     (class_)
-import           UI.Attributes.AttributeSet.Reflex ((=:), (==:))
-import qualified UI.Element                        as Element
-import           UI.Element
-import qualified UI.Html                           as Html
-import           UI.Html                           (Button (..))
-import qualified UI.Html.Input                     as Input
-import           UI.Html.Input                     (Enabled (..), enabled,
-                                                    enabledIf)
-import           UI.Widget
+import           UI.Attributes                       (class_)
+import           UI.Attributes.AttributeSet.Internal ((=:), (==:))
+import qualified UI.Element                          as Element
+import           UI.Element                          (Dom)
+import qualified UI.Html                             as Html
+import           UI.Html                             (Button (..))
+import qualified UI.Html.Input                       as Input
+import           UI.Html.Input                       (Enabled (..), enabled,
+                                                      enabledIf)
+import           UI.Html.Select                      (selectEnum)
+import           UI.Main                             (Runnable (..), withCss)
+import           UI.Widget                           (output)
 
 -- | A UI with three parts:
 --
@@ -31,8 +33,10 @@ import           UI.Widget
 --
 -- The second text box is only enabled when "return flight" is selected.
 --
--- If a text box has an invalid date syntax, it is colored red and the
--- "book" button is disabled.
+-- Note: the "correct" version of the task should use a text input
+-- field and highlight it in red if the date syntax is not valid. I
+-- used to have this behavior, but changed it to a dedicated date
+-- input when I added support for those.
 --
 -- If the "return flight" option is on and the second text box has a
 -- date before the first text box, the "book" button is disabled.
@@ -42,7 +46,8 @@ import           UI.Widget
 -- from <date> to <date>").
 widget :: forall m t. (MonadIO m, Dom t m) => m ()
 widget = void $ Html.div_ [ class_ =: ["flight-booker"] ] do
-  mode  <- selectEnum @Mode
+  (_, mode) <- selectEnum @Mode [] Reflex.never
+
   there <- snd <$> Input.date [] Reflex.never
   back  <- snd <$>
     Input.date [ enabled ==: enabledIf . (== Return) <$> mode ] Reflex.never
@@ -81,3 +86,7 @@ instance Display Trip where
       Text.fromString $ Text.printf "One way trip on %s" (show day)
     Return' start end ->
       Text.fromString $ Text.printf "Return trip from %s to %s" (show start) (show end)
+
+
+main :: IO ()
+main = withCss "css/tasks.css" (Runnable widget)
