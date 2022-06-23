@@ -2,6 +2,7 @@ module UI.Html.Select
   ( -- * Select Elements
     HtmlSelect
   , select
+  , selectEnum
 
     -- ** Options
   , Entry (..)
@@ -14,19 +15,69 @@ module UI.Html.Select
   )
 where
 
-import           Data.Maybe              (fromMaybe)
-import           Data.Text               (Text)
-import           Data.Text.Display       (Display, display)
+import           Data.Maybe                        (fromMaybe)
+import           Data.Text                         (Text)
+import           Data.Text.Display                 (Display, display)
 
 import qualified Reflex
+import           Reflex                            (Dynamic, Event)
 
-import           UI.Attributes           (AsAttributeValue)
-import qualified UI.Element              as Element
-import qualified UI.Html                 as Html
-import qualified UI.Html.Input           as Input
+import           UI.Attributes                     (AsAttributeValue)
+import           UI.Attributes.AttributeSet.Reflex (AttributeSet)
+import qualified UI.Element                        as Element
+import           UI.Element                        (Dom)
+import qualified UI.Html                           as Html
+import qualified UI.Html.Input                     as Input
 import           UI.Html.Select.Internal
-import           UI.Main                 (Runnable (Runnable), withCss)
+import           UI.Main                           (Runnable (Runnable),
+                                                    withCss)
 
+-- | A drop-down selection menu for an element of an enumerable type.
+--
+-- The select will show every possible value of the type from
+-- 'minBound' to 'maxBound', using the 'Display' instance for
+-- user-facing text.
+--
+-- The initially selected value is 'minBound'. If an invalid value
+-- gets selected—which requires either invalid 'Enum'/'Bounded'
+-- instances or changing the @select@ element with some external
+-- code/tool—this will default back to 'minBound'.
+--
+-- __Example__
+--
+-- An element to select a permission level:
+--
+-- @
+-- data Level = User
+--            | Member
+--            | Administrator
+--   deriving (Show, Eq, Ord, Enum, Bounded)
+--
+-- instance Display Level where {- ... -}
+--
+-- selectLevel :: forall m t. Dom t m => m (Dynamic t Level)
+-- selectLevel = selectEnum [] never
+-- @
+--
+-- Note: the @k@ type can often be ambiguous, so it's a good idea to
+-- either use an explicit type signature or, alternatively, an
+-- explicit type application:
+--
+-- @
+-- selectEnum @Level [] never
+-- @
+selectEnum :: forall k m t. (Dom t m, Enum k, Bounded k, Display k)
+           => AttributeSet t "select" "HTML"
+           -- ^ Attributes
+           -> Event t k
+           -- ^ Explicitly set which value is selected
+           -> m (HtmlSelect t, Dynamic t k)
+selectEnum attributes setValue = do
+  let initial = Just $ fromEnum @k minBound
+      setValue' = Just . fromEnum <$> setValue
+  (element, value) <- select attributes initial setValue'
+    [ option' (fromEnum k) (display k) | k <- [minBound @k .. maxBound] ]
+  pure (element, maybe minBound toEnum <$> value)
 
 -- | Make an option or group disabled by default.
 --

@@ -1,4 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
 -- | Widgets that I use throughout the seven example tasks.
 module UI.Widget where
 
@@ -21,7 +20,6 @@ import qualified Reflex.Dom                 as Dom
 import           Reflex.Dom                 (DomBuilderSpace)
 
 import           Text.Printf                (printf)
-import           Text.URI.QQ                (uri)
 
 import           UI.Attributes              (class_, style)
 import           UI.Attributes.AttributeSet ((=:), (==:))
@@ -33,13 +31,12 @@ import           UI.Html.Attributes         (src)
 import           UI.Main                    (Runnable (..), withCss)
 import qualified UI.PushMap                 as PushMap
 import           UI.PushMap                 (PushMap)
-import           UI.Url                     (Url (..))
 
 -- * Widgets
 
 demo :: forall m t. Dom t m => m ()
 demo = void $ ul [ class_ =: "widget-demo" ]
-  [ example "image" $ img [ src =: Url [uri|https://haskell.org/img/haskell-logo.svg|] ]
+  [ example "image" $ img [ src =: "https://haskell.org/img/haskell-logo.svg" ]
   ]
   where example :: Text -> m a -> m a
         example description body = do
@@ -160,27 +157,6 @@ newtype Name = Name { toText :: Text }
 
 --         toAttributes Enabled  = Map.empty
 --         toAttributes Disabled = Map.fromList [("disabled", "true")]
-
--- | A drop-down selection menu for an element of an enumerable type.
---
--- The select will show every possible value of the type from
--- 'minBound' to 'maxBound', using the 'Display' instance for
--- user-facing text.
---
--- The initial value selected is 'minBound'.
-selectEnum :: forall a m t. (Dom t m, Enum a, Bounded a, Display a)
-           => m (Dynamic t a)
-selectEnum = do
-  (element, _) <- Dom.selectElement config options
-  pure $ toEnum . read . Text.unpack <$> Dom._selectElement_value element
-  where options = mapM @[] toOption [minBound @a .. maxBound]
-        toOption value =
-          Dom.elAttr "option" ("value" =: showEnum value) $
-            Dom.text (Display.display value)
-
-        config = def & Dom.selectElementConfig_initialValue .~ showEnum (minBound @a)
-
-        showEnum = Text.pack . show . fromEnum
 
 -- -- | An interactive box that displays a dynamic sequence of
 -- -- values. One value at a time can be selected.
