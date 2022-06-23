@@ -96,7 +96,8 @@ svgElement :: forall element a m t. (KnownSymbol element, Dom t m)
            -- ^ body
            -> m (Svg t, a)
 svgElement attributes body = do
-  (element, result) <- createElement Nothing tag (toDom attributes) body
+  (element, result) <-
+    createElement (Just svgNamespace) tag (toDom attributes) body
   pure (Svg element, result)
   where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
 {-# INLINABLE svgElement #-}

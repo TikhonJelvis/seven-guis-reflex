@@ -23,7 +23,8 @@ import           UI.Attributes                     (class_, style)
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..), classIf)
 import qualified UI.Css                            as Css
-import           UI.Css                            (Angle (..), Transform (..))
+import           UI.Css                            (Angle (..), Transform (..),
+                                                    u)
 import qualified UI.Css.Transforms                 as Transforms
 import qualified UI.Drag                           as Drag
 import           UI.Drag                           (DragConfig (..), Drags (..))
@@ -249,7 +250,7 @@ haskellBack = mdo
           Svg.path $ part <> [ fill =: "#fff6", d =: lambda ]
           Svg.path $ part <> [ fill =: "#fff5", d =: topLine ]
           Svg.path $ part <> [ fill =: "#fff5", d =: bottomLine ]
-          where part = [ stroke =: "#fff", stroke_width =: 0.4 ]
+          where part = [ stroke =: "#fff", stroke_width =: u 0.4 ]
                 base = [ transform        =: Svg.rotate (Deg 20)
                        , transform_origin =: Transforms.origin (V2 8.5 6)
                        ]

@@ -1,43 +1,54 @@
 module Seven.CircleDrawer where
 
-import           Control.Applicative (liftA2)
-import           Control.Lens        ((<&>), (??))
+import           Control.Applicative        (liftA2)
+import           Control.Lens               (view, (<&>), (??))
+import           Control.Monad              (void)
 
-import           Data.Default.Class  (def)
-import           Data.Maybe          (fromMaybe)
-import qualified Data.Text           as Text
-import           Data.Text.Display   (Display, ShowInstance (..))
+import           Data.Bool                  (bool)
+import           Data.Hashable              (Hashable)
+import           Data.Maybe                 (fromMaybe)
+import qualified Data.Text                  as Text
+import           Data.Text.Display          (Display, ShowInstance (..))
 
-import           Linear              (V2 (..))
+import           GHC.Generics               (Generic)
+
+import           Linear                     (V2 (..), _x, _y)
 
 import qualified Reflex
-import           Reflex              (Dynamic, Event, (<@), (<@>))
+import           Reflex                     (Dynamic, Event, (<@), (<@>))
 
-import qualified Text.Printf         as Text
+import qualified Text.Printf                as Text
 
-import           UI.Attributes       (ToAttributes (..), setClass)
-import           UI.Element          (Dom)
-import           UI.Event
-import qualified UI.History          as History
-import           UI.History          (Undos (..))
-import           UI.Main             (Runnable (..), withCss)
-import           UI.Modal            (DialogElement (..), ModalState (..),
-                                      dialog)
-import qualified UI.PushMap          as PushMap
-import           UI.PushMap          (PushMap)
-import           UI.SVG              (Circle (..), Stroke (..), Svg, circle,
-                                      svgAttr')
+import           UI.Attributes              (class_)
+import           UI.Attributes.AttributeSet ((=:), (==:))
+import           UI.Css                     (u)
+import           UI.Element                 (Dom, dynText)
+import qualified UI.Event                   as Event
+import           UI.Event                   (MouseButton (..),
+                                             MouseEventResult (..))
+import qualified UI.History                 as History
+import           UI.History                 (Undos (..))
+import qualified UI.Html                    as Html
+import qualified UI.Html.Input              as Input
+import           UI.Main                    (Runnable (..), withCss)
+import           UI.Modal                   (ModalState (..), closed, modal)
+import qualified UI.PushMap                 as PushMap
+import           UI.PushMap                 (PushMap)
+import qualified UI.SVG                     as Svg
+import           UI.SVG                     (Svg)
+import           UI.SVG.Attributes          (cx, cy, r, stroke, stroke_width)
 import           UI.Widget
 
-import           Witherable          (Filterable (..), catMaybes, (<&?>))
+import           Witherable                 (Filterable (..), catMaybes, (<&?>))
 
 main :: IO ()
 main = withCss "css/tasks.css" (Runnable widget)
 
 widget :: forall m t. Dom t m => m ()
-widget = Dom.elClass "div" "circle-drawer" do
-  rec Undos { undoActions, redoActions } <- Dom.elClass "div" "centered controls" $
-        History.undoControls modifies
+widget = void $ Html.div_ [ class_ =: ["circle-drawer"] ] do
+  rec Undos { undoActions, redoActions } <-
+        snd <$> Html.div_ [ class_ =: ["centered", "controls"] ] do
+          History.undoControls modifies
 
       (canvas, clicked) <- circlesCanvas circles beingModified
 
@@ -74,8 +85,13 @@ widget = Dom.elClass "div" "circle-drawer" do
         getCircle (Just i) circles = (i,) <$> PushMap.lookup i circles
         getCircle Nothing _        = Nothing
 
-        mainClicks = Witherable.filter isMain . Dom.domEvent Dom.Click
+        mainClicks = Witherable.filter isMain . Event.domEvent Event.Click
         isMain e = button e == Main
+
+-- | A circle defined by its center and radius.
+data Circle = Circle { center :: V2 Double, radius :: Double }
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
 
 -- | The SVG element where the circles are rendered.
 --
@@ -88,8 +104,8 @@ circlesCanvas :: forall m t. Dom t m
               -- ^ The full set of circles to render.
               -> Dynamic t (Maybe Int)
               -- ^ Which circle, if any, should be highlighted.
-              -> m (Svg t , Event t Int)
-circlesCanvas circles highlighted = svgAttr' "svg" [("class", "canvas")] do
+              -> m (Svg t, Event t Int)
+circlesCanvas circles highlighted = Svg.svg [ class_ =: ["canvas"] ] do
   rawClicks <- selectView highlighted circles (withId svgCircle)
   let clicks = rawClicks <&?> \ (MouseEventResult { button }, i) ->
         [i | button == Auxiliary]
@@ -103,10 +119,17 @@ svgCircle :: forall m t. Dom t m
           -> Dynamic t Bool
           -> m (Event t MouseEventResult)
 svgCircle c isSelected = do
-  element <- circle c $ class_ <*> pure defaults
-  pure $ Dom.domEvent Dom.Click element
-  where class_ = setClass "selected" <$> isSelected
-        defaults = toAttributes def { width = 2 }
+  element <- Svg.circle
+    [ cx ==: u . view _x . center <$> c
+    , cy ==: u . view _y . center <$> c
+    , r  ==: u . radius <$> c
+
+    , class_ ==: bool [] ["selected"] <$> isSelected
+
+    , stroke       =: "#000"
+    , stroke_width =: u 2
+    ]
+  pure $ Event.domEvent Event.Click element
 
 -- | The dialog that lets us control the radius of a cricle.
 --
@@ -129,12 +152,12 @@ circleDialog :: forall m t. Dom t m
              -- ^ The 'Event' fires when a modification is saved; the
              -- 'Dynamic' is always up to date with the set radius.
 circleDialog beingModified targetCircle = do
-  (dialogElement, (old, new)) <- dialog showHide (pure []) do
+  (dialogElement, (old, new)) <- modal showHide [] do
     dynText $ message . center . fromMaybe blank <$> targetCircle
 
     let oldCircle = Reflex.tagPromptlyDyn targetCircle showHide
         oldRadius = radius <$> catMaybes oldCircle
-    newRadius <- fmap (* maxRadius) <$> range ((/ maxRadius) <$> oldRadius)
+    (_, newRadius) <- fmap (* maxRadius) <$> Input.range [] Reflex.never
 
     pure (oldRadius, newRadius)
 

@@ -26,12 +26,12 @@ import qualified Reflex.Dom                        as Dom
 
 import           UI.Attributes                     (class_)
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
-import           UI.Element
+import           UI.Element                        (Dom)
 import           UI.Element.IsElement              (IsElement (..))
 import           UI.Event                          (on)
 import           UI.Html                           (Html, html)
 import           UI.Main                           (Runnable (..), withCss)
-import           UI.Widget
+import           UI.Widget                         (output)
 
 -- | HTML modal dialogs can either be hidden or shown in two ways:
 --

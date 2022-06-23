@@ -202,7 +202,8 @@ instance GShow (AttributeKey element namespace) where gshowsPrec = showsPrec
 
 instance GEq (AttributeKey element namespace) where
   geq (AttributeKey a) (AttributeKey b)
-    | Attribute.type_ a == Attribute.type_ b = Just $ Unsafe.unsafeCoerce Refl
+    | Attribute.type_ a == Attribute.type_ b &&
+      Attribute.name a  == Attribute.name b = Just $ Unsafe.unsafeCoerce Refl
     | otherwise                              = Nothing
       -- as long as (type_ a) matches the value type of a—which the
       -- smart constructors for Attribute ensure—this is safe

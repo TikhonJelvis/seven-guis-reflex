@@ -16,6 +16,7 @@ module UI.Css.Values
 
   , Length
   , px
+  , u
   , RelativeLength
   , Factor
 
@@ -83,9 +84,14 @@ instance AsAttributeValue a => AsAttributeValue (Css a) where
 -- | CSS @<length>@ units like @px@, @cm@ and @rem@.
 type Length = Text
 
--- | A 'Double' in @px@.
+-- | Lengths measured in pixels.
 px :: Double -> Length
 px x = toAttributeValue x <> "px"
+
+-- | Lengths measured in unitless "user space coordinates". Only
+-- applies for SVG.
+u :: Double -> Length
+u = toAttributeValue
 
 -- | CSS @<length>@ or @<percentage>@.
 type RelativeLength = Text

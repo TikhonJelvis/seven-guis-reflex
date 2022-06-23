@@ -25,10 +25,9 @@ import           UI.Attributes                (AsAttributeValue (..),
 import           UI.Color                     (Color)
 import           UI.Css                       (Angle, Transform (..),
                                                TransformOrigin, px)
-import           UI.Css.Values                (RelativeLength)
+import           UI.Css.Values                (Length, RelativeLength)
 import           UI.Id                        (Id (..))
 import           UI.SVG.Path                  (Path)
-import           UI.Units                     (Length)
 import qualified UI.Url                       as Url
 
 -- * Sizes and Positions
