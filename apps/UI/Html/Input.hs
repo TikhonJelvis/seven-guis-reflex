@@ -589,7 +589,8 @@ range :: forall m t. Dom t m
       -- ^ Set the number. Use 'never' if you don't need this.
       -> m (HtmlInput t, Dynamic t Double)
       -- ^ The element and the currently picked number
-range = numeric "range" number_value
+range attributes = numeric "range" number_value (base <> attributes)
+  where base = [ number_min =: 0, number_max =: 1, number_step =: Nothing ]
 {-# INLINABLE range #-}
 
 -- | A numeric input for integers within a range.
@@ -609,7 +610,8 @@ integerRange :: forall m t. Dom t m
              => AttributeSet t "integer" "HTML"
              -> Event t Integer
              -> m (HtmlInput t, Dynamic t Integer)
-integerRange = numeric "range" integer_value
+integerRange attributes = numeric "range" integer_value (base <> attributes)
+  where base = [ integer_min =: 0, integer_max =: 100, integer_step =: 1 ]
 {-# INLINABLE integerRange #-}
 
 -- ** Date and Time
@@ -867,7 +869,7 @@ integer_max = native "max"
 --
 -- If the user enters a value that does not conform to the step, the
 -- browser will round it to the nearest valid value.
-integer_step :: Attribute '["input", "number"] Integer
+integer_step :: Attribute '["input", "integer"] Integer
 integer_step = native "step"
 
 -- | A value for URL entries.

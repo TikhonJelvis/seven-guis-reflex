@@ -157,9 +157,9 @@ circleDialog beingModified targetCircle = do
 
     let oldCircle = Reflex.tagPromptlyDyn targetCircle showHide
         oldRadius = radius <$> catMaybes oldCircle
-    (_, newRadius) <- fmap (* maxRadius) <$> Input.range [] Reflex.never
+    (_, setting) <- Input.range [] ((/ maxRadius) <$> oldRadius)
 
-    pure (oldRadius, newRadius)
+    pure (oldRadius, (maxRadius *) <$> setting)
 
   old' <- Reflex.holdDyn 0 old
   let both = liftA2 (,) old' new
