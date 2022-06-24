@@ -32,7 +32,7 @@ import           UI.PushMap                          (PushMap)
 
 _demo :: IO ()
 _demo = withCss "css/ui-demo.css" $ Runnable $ void $
-  ul [ class_ =: "widget-demo" ]
+  ul [ class_ =: "widget-demo" ] $ pure
     [ example "image" $ img [ src =: "https://haskell.org/img/haskell-logo.svg" ] ]
   where example description body = do
           div_ [ class_ =: "label" ] (text description)

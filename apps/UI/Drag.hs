@@ -48,7 +48,7 @@ import qualified Witherable
 
 demo :: forall m t. Dom t m => m ()
 demo = void do
-  Html.ul [ class_ =: ["drag-demo"] ]
+  Html.ul [ class_ =: ["drag-demo"] ] $ pure
     [ example "Follow cursor exactly" def translate
     , example "Follow with transition" def withTransition
     , example "Horizontal only" def xOnly

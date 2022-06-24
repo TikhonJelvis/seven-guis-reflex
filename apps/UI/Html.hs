@@ -24,6 +24,7 @@ module UI.Html
   )
 where
 
+import           Control.Lens                      ((<&>))
 import           Control.Monad                     (void)
 
 import           Data.Proxy                        (Proxy (..))
@@ -36,12 +37,12 @@ import           GHC.TypeLits                      (KnownSymbol, symbolVal)
 import qualified GHCJS.DOM.Element                 as Element
 import qualified GHCJS.DOM.Types                   as GHCJS
 
-import           Reflex                            (Event, Reflex)
+import           Reflex                            (Dynamic, Event, Reflex)
 import qualified Reflex.Dom                        as Dom
 
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
-import           UI.Element                        (Dom, createElement, dynText,
-                                                    text)
+import           UI.Element                        (Dom, createElement, dyn,
+                                                    dynText, text)
 import           UI.Element.IsElement              (FromElement (..),
                                                     IsElement (..), IsHtml (..))
 import qualified UI.Event                          as Event
@@ -164,13 +165,15 @@ article = html
 -- A list with plain text entries:
 --
 -- @
--- ol [] ["one", "two", "three"]
+-- ol [] (pure [text "one", text "two", text "three"])
 -- @
 ol :: forall a m t. Dom t m
    => AttributeSet t "ol" "HTML"
-   -> [m a]
-   -> m (Html t, [a])
-ol attributes = html attributes . mapM (fmap snd . html @"li" [])
+   -> Dynamic t [m a]
+   -- ^ Dynamic list of items.
+   -> m (Html t, Event t [a])
+ol attributes items = html attributes do
+  dyn $ items <&> mapM (fmap snd . html @"li" [])
 {-# INLINABLE ol #-}
 
 -- | An ordered list with items automatically wrapped in @li@
@@ -181,17 +184,18 @@ ol attributes = html attributes . mapM (fmap snd . html @"li" [])
 -- A list with a mix of elements as items:
 --
 -- @
--- ol_ []
---   [ "a plain text item"
+-- ol_ [] $ pure
+--   [ text "a plain text item"
 --   , img [href =: "img/example.png"]
 --   ]
 -- @
 ol_ :: forall a m t. Dom t m
     => AttributeSet t "ol" "HTML"
-    -> [m a]
+    -> Dynamic t [m a]
+    -- ^ Dynamic list of items.
     -> m (Html t)
-ol_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
-
+ol_ attributes items = fst <$> html attributes do
+  dyn $ mapM_ (html @"li" []) <$> items
 {-# INLINABLE ol_ #-}
 
 -- | An unordered list with items automatically wrapped in @li@
@@ -202,13 +206,14 @@ ol_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
 -- A list with plain text entries:
 --
 -- @
--- ul [] ["one", "two", "three"]
+-- ul [] (pure [text "one", text "two", text "three"])
 -- @
 ul :: forall a m t. Dom t m
    => AttributeSet t "ul" "HTML"
-   -> [m a]
-   -> m (Html t, [a])
-ul attributes = html attributes . mapM (fmap snd . html @"li" [])
+   -> Dynamic t [m a]
+   -> m (Html t, Event t [a])
+ul attributes items = html attributes do
+  dyn $ items <&> mapM (fmap snd . html @"li" [])
 {-# INLINABLE ul #-}
 
 -- | An unordered list with items automatically wrapped in @li@
@@ -219,16 +224,19 @@ ul attributes = html attributes . mapM (fmap snd . html @"li" [])
 -- A list with a mix of elements as items:
 --
 -- @
--- ul_ []
---   [ "a plain text item"
+-- ul_ [] $ pure
+--   [ text "a plain text item"
 --   , img [href =: "img/example.png"]
 --   ]
 -- @
 ul_ :: forall a m t. Dom t m
     => AttributeSet t "ul" "HTML"
-    -> [m a]
+    -- ^ Attributes
+    -> Dynamic t [m a]
+    -- ^ Set of items. Can change over time.
     -> m (Html t)
-ul_ attributes = fmap fst . html attributes . mapM_ (html @"li" [])
+ul_ attributes items = fst <$> html attributes do
+  dyn $ mapM_ (html @"li" []) <$> items
 {-# INLINABLE ul_ #-}
 
 -- ** Controls
