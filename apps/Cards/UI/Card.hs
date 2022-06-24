@@ -34,17 +34,17 @@ import qualified UI.Html                           as Html
 import           UI.Html                           (Html)
 import           UI.Html.Attributes                (src)
 import           UI.Main                           (Runnable (..), withCss)
-import qualified UI.SVG                            as Svg
-import           UI.SVG                            (Command (..), Def (..), Svg,
+import qualified UI.Svg                            as Svg
+import           UI.Svg                            (Command (..), Def (..), Svg,
                                                     a, d, h, m, v, viewBox)
-import           UI.SVG.Attributes                 (GradientUnits (..),
+import           UI.Svg.Attributes                 (GradientUnits (..),
                                                     ViewBox (..), cx, cy, fill,
                                                     fill_rule, gradientUnits,
                                                     height, paintWith, r,
                                                     stroke, stroke_width,
                                                     transform, transform_origin,
                                                     width, x, y)
-import           UI.SVG.Haskell                    (HaskellPaths (..),
+import           UI.Svg.Haskell                    (HaskellPaths (..),
                                                     haskellPaths)
 import qualified UI.Url                            as Url
 

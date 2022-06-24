@@ -1,4 +1,4 @@
-module UI.SVG
+module UI.Svg
   ( Svg
 
   , svgElement
@@ -13,12 +13,12 @@ module UI.SVG
   , use
   , pattern_
 
-  , module UI.SVG.Attributes
+  , module UI.Svg.Attributes
 
   , circle
   , rect
 
-  , module UI.SVG.Path
+  , module UI.Svg.Path
   , path
 
   , Stop (..)
@@ -54,8 +54,8 @@ import           UI.Element.IsElement              (FromElement (..),
                                                     IsElement (..))
 import qualified UI.Event                          as Event
 import           UI.Id                             (Id (..))
-import           UI.SVG.Attributes
-import           UI.SVG.Path
+import           UI.Svg.Attributes
+import           UI.Svg.Path
 import qualified UI.Url                            as Url
 
 -- * SVG Elements

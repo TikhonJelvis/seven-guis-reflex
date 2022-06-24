@@ -87,10 +87,10 @@ executable guis
     UI.Modal
     UI.Password
     UI.PushMap
-    UI.SVG
-    UI.SVG.Attributes
-    UI.SVG.Haskell
-    UI.SVG.Path
+    UI.Svg
+    UI.Svg.Attributes
+    UI.Svg.Haskell
+    UI.Svg.Path
     UI.Type.List
     UI.Units
     UI.Url

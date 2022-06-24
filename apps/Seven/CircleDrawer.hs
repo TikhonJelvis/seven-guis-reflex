@@ -34,9 +34,9 @@ import           UI.Main                    (Runnable (..), withCss)
 import           UI.Modal                   (ModalState (..), closed, modal)
 import qualified UI.PushMap                 as PushMap
 import           UI.PushMap                 (PushMap)
-import qualified UI.SVG                     as Svg
-import           UI.SVG                     (Svg)
-import           UI.SVG.Attributes          (cx, cy, r, stroke, stroke_width)
+import qualified UI.Svg                     as Svg
+import           UI.Svg                     (Svg)
+import           UI.Svg.Attributes          (cx, cy, r, stroke, stroke_width)
 import           UI.Widget
 
 import           Witherable                 (Filterable (..), catMaybes, (<&?>))

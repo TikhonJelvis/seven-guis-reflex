@@ -41,7 +41,7 @@ import qualified Witherable
 
 demo :: forall m t. Dom t m => m ()
 demo = void do
-  Html.ul [ class_ =: ["drop-demo"] ]
+  Html.ul [ class_ =: ["drop-demo"] ] $ pure
     [ changeColor
     , moveElement
     ]

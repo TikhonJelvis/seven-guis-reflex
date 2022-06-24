@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-module UI.SVG.Attributes where
+module UI.Svg.Attributes where
 
 import           Control.Applicative          (optional)
 
@@ -27,7 +27,7 @@ import           UI.Css                       (Angle, Transform (..),
                                                TransformOrigin, px)
 import           UI.Css.Values                (Length, RelativeLength)
 import           UI.Id                        (Id (..))
-import           UI.SVG.Path                  (Path)
+import           UI.Svg.Path                  (Path)
 import qualified UI.Url                       as Url
 
 -- * Sizes and Positions

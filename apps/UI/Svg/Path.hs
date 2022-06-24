@@ -2,7 +2,7 @@
 --
 -- This module provides a lightwieght library for writing and
 -- manipulating paths.
-module UI.SVG.Path where
+module UI.Svg.Path where
 
 import           Data.Hashable (Hashable)
 import qualified Data.Text     as Text

@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 -- | An extended example of using the SVG @path@ element to draw
 -- variations on the Haskell logo.
-module UI.SVG.Haskell where
+module UI.Svg.Haskell where
 import           Data.Default.Class                (Default (..))
 import           Data.Hashable                     (Hashable)
 
@@ -12,7 +12,7 @@ import           Linear                            (V2 (..))
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
 import           UI.Element                        (Dom)
 import           UI.Main                           (Runnable (..), withCss)
-import           UI.SVG                            (Command (..), Path, Svg,
+import           UI.Svg                            (Command (..), Path, Svg,
                                                     ViewBox (..), d, fill, g, h,
                                                     l, path, svg, v, viewBox)
 

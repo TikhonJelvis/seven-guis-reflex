@@ -14,12 +14,12 @@ import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
 import           UI.Element                        (Dom)
 import           UI.Html                           (Html, div_)
 import           UI.Main                           (Runnable (..), withCss)
-import           UI.SVG                            (Def (..), ViewBox (..),
+import           UI.Svg                            (Def (..), ViewBox (..),
                                                     defs, path, pattern_, rect,
                                                     svg)
-import           UI.SVG.Attributes                 (d, fill, height, paintWith,
+import           UI.Svg.Attributes                 (d, fill, height, paintWith,
                                                     viewBox, width, x, y)
-import           UI.SVG.Haskell                    (HaskellPaths (..),
+import           UI.Svg.Haskell                    (HaskellPaths (..),
                                                     haskellPaths)
 
 demo :: forall m t. Dom t m => m ()
