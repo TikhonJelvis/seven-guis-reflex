@@ -140,7 +140,7 @@ singleton :: forall f (element :: Symbol) (namespace :: Symbol). Applicative f
           => SetAttribute f element namespace
           -> AttributeSet f element namespace
 singleton = \case
-  SetAttribute attribute value ->
+  SetAttribute attribute _ value ->
     AttributeSet $ DMap.singleton (AttributeKey attribute) value
 
 instance Display (AttributeSet f element namespace) where
@@ -157,10 +157,8 @@ instance Applicative f => IsList (AttributeSet f element namespace) where
     where go :: SetAttribute f element namespace
              -> DMap (AttributeKey element namespace) f
              -> DMap (AttributeKey element namespace) f
-          go (SetAttribute attribute v)=
-            DMap.insertWithKey' (combineDyn attribute) (AttributeKey attribute) v
-
-          combineDyn attribute _ = liftA2 (Attribute.combine attribute)
+          go (SetAttribute attribute f v) =
+            DMap.insertWithKey' (\ _ -> liftA2 f) (AttributeKey attribute) v
 
   toList :: AttributeSet f element namespace -> [SetAttribute f element namespace]
   toList (AttributeSet dmap) = DMap.foldrWithKey go [] dmap
@@ -168,7 +166,8 @@ instance Applicative f => IsList (AttributeSet f element namespace) where
              -> f v
              -> [SetAttribute f element namespace]
              -> [SetAttribute f element namespace]
-          go (AttributeKey attribute) v sets = SetAttribute attribute v : sets
+          go (AttributeKey attribute) v sets =
+            SetAttribute attribute (Attribute.combine attribute) v : sets
 
 -- * Accessing Attribute Values
 
@@ -273,13 +272,17 @@ type family Incompatible element namespace supports :: Constraint where
      'Text "(" ':<>: 'Text namespace ':<>: 'Text ")" ':$$:
      'Text "Attribute supports: " ':<>: 'Text (ShowList supports))
 
--- * SetAttribute
+-- * Setting Attributes
 
--- | Set an attribute to a value of a compatible type.
+-- | Set or update an attribute.
 data SetAttribute f element namespace where
   SetAttribute :: (KnownSymbols supports, Compatible element namespace supports)
                => Attribute supports a
+               -> (a -> a -> a)
+               -- ^ Function for combining the new and existing
+               -- values.
                -> f a
+               -- ^ New value.
                -> SetAttribute f element namespace
 
 -- | Set an attribute to a static value that does /not/ change over
@@ -299,7 +302,8 @@ data SetAttribute f element namespace where
      -> a
      -- ^ static value
      -> SetAttribute f element namespace
-attribute =: value = SetAttribute attribute (pure value)
+attribute =: value =
+  SetAttribute attribute (Attribute.combine attribute) (pure value)
 infixr 1 =:
 
 -- | Set an attribute to a dynamic value that /can/ change over time.
@@ -317,7 +321,8 @@ infixr 1 =:
       -> f a
       -- ^ dynamic value
       -> SetAttribute f element namespace
-(==:) = SetAttribute
+attribute ==: value =
+  SetAttribute attribute (Attribute.combine attribute) value
 infixr 1 ==:
 
 -- * Rendering to text
