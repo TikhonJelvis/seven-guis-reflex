@@ -1,0 +1,205 @@
+* Attribute Sets
+
+The main reflex-dom pattern for working with DOM elements has two levels:
+
+  1. Pulling together time-varying values (dynamics/etc) to specify
+     the time-varying attributes of an element.
+  2. Attaching the time-varying set of attributes to an actual DOM
+     element in a ≈Blaze-style writer monad.
+
+When I started using reflex-dom, I found that most of my logic lived
+in layer 1. Unlike other frameworks where the *element* is the core
+concept, I naturally focused on *attribute sets* /without attaching
+them to a specific element/. A particular attribute set could be used
+for multiple distinct DOM elements—potentially with different tags—but
+even when attribute set was immediately used to write a DOM element,
+the attribute set's definition /did not logically depend on the DOM
+element being created/.
+
+To reflect this, I organized my structured DOM library around two key
+concepts: *attributes* and *attribute sets*.
+
+  - attribute :: an attribute of a DOM element like ~class~ or
+    ~width~. An attribute supports some type of value that can change
+    over time and controls an aspect of an element.
+
+    Note that this reasonably describes both *native* attributes of
+    DOM elements as well as *logical* attributes that map a value to
+    zero or more native attributes on an element.
+    
+  - attribute set :: a set of attribute definitions, mapping
+    attributes to values that can change over time. The attributes for
+    a given element often pull in values and logic from distinct parts
+    of the code, so we also need a uniform mechanism for /combining/
+    or /extending/ attribute sets.
+
+** Attributes
+
+*** Logical Attributes
+
+Originally, I had attributes map 1:1 with the attributes defined by
+HTML or SVG. However, I later found it was useful to support *logical*
+attributes where a single Haskell value would map to zero or more
+*native* attributes:
+
+  1. Structured attributes. Example: ~center~ takes 2D points as
+     values and maps to the native ~cx~ and ~cy~ attributes in SVG.
+
+  2. Boolean attributes. Example: ~enabled~ is either ~Enabled~ or
+     ~Disabled~. When ~Disabled~, it sets the ~disabled~ attribute
+     on the element with no value; when ~Enabled~, it removes the
+     ~disabled~ attribute (if set).
+
+**** Overlap
+
+Open design question: how should we handle an attribute set where
+multiple attributes try to set a value for a single native
+attribute? (Example: what do we do if somebody sets both ~center~
+/and/ ~cx~?)
+
+Thinking about it, this should probably be handled the same way as
+what we do when somebody tries to define/set the same attribute
+multiple times.
+
+We might also want to provide some code facilities that make it easier
+to understand how the structured definitions in an attribute set get
+mapped to native attributes with string values.
+
+** Attribute Sets
+
+*** Nesting
+
+Most attributes have a single scalar value (like a number or string),
+but some attributes like ~style~ have a nested structure of their
+own. This is important in practice: controlling an element's style
+often takes more logic than setting all the other attributes!
+
+*** Extension
+
+In writing base reflex-dom code, a common pattern I encountered was
+wanting to combine attributes from multiple places. For example, to
+make an element draggable, we need to:
+
+  1. Create the element in the DOM, passing in an attribute set
+  2. Get a reference /to the created element/ so that we can add event
+     handlers
+  3. Change the element's attributes based on these event handlers
+
+A function for making an element draggable would need some way to take
+attributes specified by a user and then /add/ or /override/ several
+CSS properties like ~transform~, ~cursor~ or ~transition~.
+
+Attributes can be extended or overridden in different ways:
+
+  - most attributes can only be set or overridden: an element can only
+    have one ~width~, one ~background-color~... etc.
+  - some attributes can be usefully combined: an element can have any
+    number of CSS classes; we often want to set some classes
+    statically while adding/removing other classes dynamically
+  - some attributes have nested structure: the ~style~ attribute
+    behaves like an attribute set itself more than as a single
+    attribute
+
+Being able to provide a set of attributes for users to extend or
+extending a set of attributes provided by the user is one of the key
+ways to reuse code, so we need to make sure that the way attribute
+sets can be combined is intuitive and flexible.
+
+My original design defined attribute set as a monoid. If two attribute
+sets defined the same attribute, the attribute's values would combine
+in a type-directed way. In most cases the value from the second
+attribute set would override the value from the first; special cases
+like ~class~ would have their own logic (set union in the case of
+~class~).
+
+This worked reasonably well but had a couple of limitations:
+
+  1. The order in which sets were combined mattered, which could get
+     confusing.
+  2. There was no easy way to represent removing or updating existing
+     attributes.
+
+**** Diffs
+
+An alternate design I am considering is to differentiate between
+attribute sets and *diffs* between attribute sets. Instead of
+combining multiple sets of attributes as a monoid, we would have an
+explicit ~extend~ operation that applies a diff to a base set of
+attributes. Diffs themselves would compose monoidally.
+
+This approach makes the design more complex by introducing an extra
+concept but has several advantages:
+
+  - diffs can support operations like removing or applying a function
+    to an existing attribute
+  - the ~extend~ operation is not symmetric—the structure directly
+    reflects which argument will override the other
+
+Of course, if code ends up applying /multiple/ diffs to the same
+attribute set, the order of diffs will matter. I expect that this will
+still be clearer than the entirely symmetric monoidal operation and
+will also come up a lot less often than applying a diff to a base
+attribute set.
+
+** In Haskell
+
+Since attributes and attribute sets are key concepts for this library,
+we want to reflect them directly in our code as types (~Attribute~ and
+~AttributeSet~ respectively).
+
+*** Attributes
+
+An attribute is fundamentally defined by:
+
+  - the attribute's name
+  - which tags support the attribute
+  - what values it supports
+
+Since we want to support both *native* /and/ *logical* attributes in
+Haskell, we need to know:
+
+  - the type of Haskell values an attribute can take
+  - how to map a Haskell value to zero or more DOM attributes, with
+    values correctly converted to strings in the DOM
+
+**** Different Tags
+
+Most attributes only apply to certain kinds of elements. If an
+attribute is set on an element that does not support that attribute,
+the browser will ignore its value but will not raise an error. An
+unsupported attribute /probably/ signals a mistake by the programmer,
+but ignoring unsupported attributes would make it easier to share
+attribute sets between different elements—we would not need to carve
+a large set of attributes into element-specific pieces.
+
+Initially, I made this part of an attribute's type:
+
+#+begin_src haskell
+  id_ :: Attribute ["HTML", "SVG"] Id -- global
+  src :: Attribute '["img"] Url       -- element-specific
+#+end_src
+
+Correspondingly, functions to write tags specify both the tag name
+/and/ the broader namespace (~"HTML"~, ~"SVG"~... etc) in their types:
+
+#+begin_src haskell
+  img :: Dom t m => AttributeSet t "img" "HTML" -> m (Html t)
+#+end_src
+
+However, this has proved to be an awkward design.
+
+The separation between the tag name (~"img"~) and namespace (~"HTML"~)
+is arbitrary and doesn't always correspond to the hierarchy in the
+native DOM libraries. It also leads to duplicated type-level logic and
+worse error messages.
+
+An ~Attribute~ needs to know every tag that supports it while tags do
+not need to know about attributes, which creates friction for defining
+new (logical) attributes. The conceptual design for this library
+intentionally emphasizes attributes and attribute sets over tags and
+elements, so it would make more sense for the dependency to go in the
+other direction (tags need to know about /native/ attributes,
+attributes do not need to know about tags).
+
+Tags are represented as /functions that write the corresponding tag to
+the DOM/. When a user of the library defines a custom element...
