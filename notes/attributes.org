@@ -1,5 +1,4 @@
 * Attribute Sets
-
 The main reflex-dom pattern for working with DOM elements has two levels:
 
   1. Pulling together time-varying values (dynamics/etc) to specify
@@ -34,9 +33,7 @@ concepts: *attributes* and *attribute sets*.
     or /extending/ attribute sets.
 
 ** Attributes
-
 *** Logical Attributes
-
 Originally, I had attributes map 1:1 with the attributes defined by
 HTML or SVG. However, I later found it was useful to support *logical*
 attributes where a single Haskell value would map to zero or more
@@ -66,16 +63,13 @@ to understand how the structured definitions in an attribute set get
 mapped to native attributes with string values.
 
 ** Attribute Sets
-
 *** Nesting
-
 Most attributes have a single scalar value (like a number or string),
 but some attributes like ~style~ have a nested structure of their
 own. This is important in practice: controlling an element's style
 often takes more logic than setting all the other attributes!
 
 *** Extension
-
 In writing base reflex-dom code, a common pattern I encountered was
 wanting to combine attributes from multiple places. For example, to
 make an element draggable, we need to:
@@ -120,7 +114,6 @@ This worked reasonably well but had a couple of limitations:
      attributes.
 
 **** Diffs
-
 An alternate design I am considering is to differentiate between
 attribute sets and *diffs* between attribute sets. Instead of
 combining multiple sets of attributes as a monoid, we would have an
@@ -142,13 +135,11 @@ will also come up a lot less often than applying a diff to a base
 attribute set.
 
 ** In Haskell
-
 Since attributes and attribute sets are key concepts for this library,
 we want to reflect them directly in our code as types (~Attribute~ and
 ~AttributeSet~ respectively).
 
 *** Attributes
-
 An attribute is fundamentally defined by:
 
   - the attribute's name
@@ -162,8 +153,7 @@ Haskell, we need to know:
   - how to map a Haskell value to zero or more DOM attributes, with
     values correctly converted to strings in the DOM
 
-**** Different Tags
-
+**** Tags
 Most attributes only apply to certain kinds of elements. If an
 attribute is set on an element that does not support that attribute,
 the browser will ignore its value but will not raise an error. An
@@ -172,7 +162,21 @@ but ignoring unsupported attributes would make it easier to share
 attribute sets between different elements—we would not need to carve
 a large set of attributes into element-specific pieces.
 
-Initially, I made this part of an attribute's type:
+***** Typechecking Attribute Support
+Ideally, we would like to track which tags support which attributes in
+the type system in order to:
+
+  1. Catch errors at compile time
+  2. Provide better structure for tools (autocomplete... etc)
+  3. Act as first-class documentation on tags + attributes
+
+How can we do this cleanly in Haskell? After experimenting with the
+design space, it isn't clear that we /can/: Haskell may not be
+flexible enough to do this without compromising on ergonomics,
+expressiveness or modularity.
+
+****** Tags in Attribute Types
+Initially, I made supported tags part of an attribute's type:
 
 #+begin_src haskell
   id_ :: Attribute ["HTML", "SVG"] Id -- global
@@ -188,18 +192,95 @@ Correspondingly, functions to write tags specify both the tag name
 
 However, this has proved to be an awkward design.
 
-The separation between the tag name (~"img"~) and namespace (~"HTML"~)
-is arbitrary and doesn't always correspond to the hierarchy in the
-native DOM libraries. It also leads to duplicated type-level logic and
-worse error messages.
+The two-level separation between tags (~img~) and namespaces
+(~HTML~) is arbitrary and doesn't always correspond to the hierarchy
+in the native DOM libraries. It also leads to duplicated type-level
+logic and worse error messages.
 
-An ~Attribute~ needs to know every tag that supports it while tags do
-not need to know about attributes, which creates friction for defining
-new (logical) attributes. The conceptual design for this library
-intentionally emphasizes attributes and attribute sets over tags and
-elements, so it would make more sense for the dependency to go in the
-other direction (tags need to know about /native/ attributes,
-attributes do not need to know about tags).
+~Attributes~ knowing about tags also goes counter to the rest of the
+system's design. Attributes are a first-class object in the system,
+while tags are expressed as /functions that create the corresponding
+element/. Tags in the attribute set's type are a problem for both:
 
-Tags are represented as /functions that write the corresponding tag to
-the DOM/. When a user of the library defines a custom element...
+  1. Creating a new logical attribute requires explicitly listing all
+     the tags that it supports
+  2. Creating a function that takes an attribute set as an argument
+     requires choosing a /specific/ tag or namespace in the type which
+     should be an implementation detail—even if another tag supports
+     the same attributes, switching over changes the function's type.
+
+*** Attribute Sets
+**** Syntax
+Even in simple examples, I needed to define /a lot/ of attribute
+sets. Having nice syntax for attribute sets has a real impact on how
+easy the code is to read /and/ write.
+***** Operators
+The normal way to define a map's values in Haskell is with a list of
+pairs:
+#+begin_src haskell
+  example = Map.fromList
+    [ ("class", "draggable card")
+    , ("id", "card-1")
+    ]
+#+end_src
+
+I've found that just replacing ~(,)~ with an operator is an
+improvement:
+
+#+begin_src haskell
+  (=:) :: a -> b -> (a, b)
+  a =: b = (a, b)
+  infixr 1 =:
+
+  example = Map.fromList
+    [ "class" =: "draggable card"
+    , "id" =: "card-1"
+    ]
+#+end_src
+
+Combining this with ~OverloadedLists~ gives us a decent approximation
+of native map syntax (albeit with some potential type inference/error
+message downsides):
+
+For our dynamic DOM logic, this has two additional advantages:
+
+  1. The operator can abstract over GADT/existential type machinery to
+     support attributes with different types of values.
+  2. We can have separate operators for constant values vs dynamic
+     values. No need to write ~class_ =: pure "draggable"~ anymore!
+
+The two operators along with a way to /combine/ values for attributes
+like ~class_~ made it much easier to mix constant and dynamic
+values—which comes up pretty often and required a lot of syntactic
+noise otherwise.
+
+#+begin_src haskell
+  [ class_ =: ["card"]
+  , class_ ==: classIf "dragging" <$> dragging
+  ]
+#+end_src
+
+***** Overloaded Lists
+List literals are a convenient syntax for specifying attribute sets:
+
+  1. Easy to read and format multiple definitions
+  2. Avoids precedence issues between definitions—no need for noisy
+     parentheses
+
+However, there are a few disadvantages with this approach:
+
+  1. ~OverloadedLists~ can cause inference problems and weird type
+     error messages
+  2. List syntax forces the type of each item to be the same. We can
+     support attributes with different types of values by
+     existentially quantifying the value type, but we can't surface
+     the types individually
+
+These limitations are a problem. Haskell doesn't have a great story
+for row types at the best of times, but we can't even /try/ to have
+them if we want to use list literals since each list item has to have
+exactly the same type.
+
+In practice, this means that list literals for attribute sets work
+well when they're defined where they're used but cause problems when
+they're moved to a helper variable, returned from a function... etc.
