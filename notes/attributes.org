@@ -175,6 +175,14 @@ design space, it isn't clear that we /can/: Haskell may not be
 flexible enough to do this without compromising on ergonomics,
 expressiveness or modularity.
 
+My initial approach (tags in attribute types) did not work
+particularly well, and attempting to fix this by tracking attribute
+names at the type level—while likely an improvement over the initial
+approach—ended up too complex to be worth doing. Until I come up with
+something better (perhaps using an existing extensible records
+library?), I'm going to keep things simple and /not/ check for
+attribute compatibility statically.
+
 ****** Tags in Attribute Types
 Initially, I made supported tags part of an attribute's type:
 

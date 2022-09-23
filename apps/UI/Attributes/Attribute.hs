@@ -3,12 +3,12 @@
 -- | The 'Attribute' type represents HTML/SVG/XML
 -- attributes.
 --
--- Attributes are structured in Haskell based on:
+-- An attribute tracks:
 --
---  1. The type of values they take
---
---  2. What elements they apply to (either globally for HTML/SVG/etc,
---  or specific elements like @a@ and @area@)
+--   1. The name of the attribute
+--   2. The type of values the attribute supports
+--   3. How to map from values to the DOM
+--   4. How to combine multiple instances of the same attribute
 --
 -- If you need to set an attribute with a non-standard or dynamically
 -- generated name, you can use 'textAttribute' or 'Attribute''s
@@ -24,20 +24,22 @@
 -- The @class@ attribute, global across all HTML and SVG elements:
 --
 -- @
--- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
---                            ↑               ↑
---                         supports     type of values
+-- class_ :: Attribute (Set ClassName)
 -- @
 --
 -- Note: when a name overlaps with a reserved word or Prelude function
 -- in Haskell (like @class@ or @id@), it will always be named with a
 -- single trailing underscore (@class_@, @id_@).
 --
--- The @placeholder@ attribute which only applies to HTML @input@
--- elements:
+-- An element can have any number of classes where order and
+-- duplicates do not matter, so we model values as sets of class names
+-- that are combined with set union. This is useful for mixing static
+-- and dynamic classes:
 --
 -- @
--- placeholder :: Attribute ["input"] Text
+-- div [ class_ := ["draggable", "card"]
+--     , class_ :== classIf "dragged" <$> beingDragged
+--     ]
 -- @
 --
 -- 'Attribute' values don't have to map 1:1 to actual attributes on
@@ -46,7 +48,7 @@
 -- @p@ attribute that expands to @x@ and @y@:
 --
 -- @
--- p :: Attribute ["p"] Color
+-- p :: Attribute Color
 -- p = logical "p" \ V2 x y ->
 --   ["x" =. x, "y" =. y]
 -- @
@@ -54,7 +56,6 @@ module UI.Attributes.Attribute
   ( Attribute
   , name
   , type_
-  , supports
   , toAttributes
   , combine
 
@@ -79,21 +80,24 @@ where
 import           Control.Applicative          ((<|>))
 
 import qualified Data.Char                    as Char
+import           Data.GADT.Compare            (GCompare (..), GEq (..),
+                                               GOrdering (..))
+import           Data.GADT.Show               (GShow (..))
 import           Data.Map                     (Map)
 import           Data.Proxy                   (Proxy (..))
 import           Data.Set                     (Set)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Data.Text.Display            (Display (..))
+import           Data.Text.Display            (Display (..), display)
 import qualified Data.Text.Lazy.Builder       as Builder
 import           Data.Time                    (Day, LocalTime, TimeOfDay)
 import qualified Data.Time.Format.ISO8601     as Time
-import           Data.Typeable                (TypeRep, Typeable, typeRep)
+import           Data.Typeable                (TypeRep, Typeable,
+                                               type (:~:) (..), typeRep)
 import           Data.Vector                  (Vector)
 import qualified Data.Vector                  as Vector
 
 import           GHC.Generics                 (Generic)
-import           GHC.TypeLits                 (Symbol)
 
 import           Numeric.Natural              (Natural)
 
@@ -101,17 +105,9 @@ import           Text.ParserCombinators.ReadP (ReadP, many1, satisfy, sepBy,
                                                skipMany, string)
 import           Text.Read                    (readMaybe)
 
-import           UI.Type.List                 (KnownSymbols, knownSymbols)
+import qualified Unsafe.Coerce                as Unsafe
 
 -- * Attributes
-
--- $setup
--- >>> import Data.Maybe
--- >>> import Text.ParserCombinators.ReadP
--- >>> import Data.Text.Display (display)
--- >>> let class_ = native "class" @["HTML", "SVG"] @ClassName
--- >>> let href = native "href" @["a", "area", "base", "link"] @Url
--- Not in scope: type constructor or class ‘ClassName’
 
 -- | An attribute that can be set on HTML or XML elements.
 --
@@ -133,7 +129,7 @@ import           UI.Type.List                 (KnownSymbols, knownSymbols)
 -- An attribute that can be set on /any/ HTML or SVG element:
 --
 -- @
--- class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
+-- class_ :: Attribute (Set ClassName)
 -- class_ = native
 -- @
 --
@@ -144,18 +140,18 @@ import           UI.Type.List                 (KnownSymbols, knownSymbols)
 -- An attribute that can be set on HTML @input@ elements:
 --
 -- @
--- placeholder :: Attribute ["input"] Text
+-- placeholder :: Attribute Text
 -- placeholder = native
 -- @
 --
 -- A logical attribute that maps to several concrete attributes:
 --
 -- @
--- c :: Attribute ["circle"] Circle
+-- c :: Attribute Circle
 -- c = logical \ Circle { center = V2 x y, radius } ->
 --   ["cx" =. x, "cy" =. y, "r" =. radius]
 -- @
-data Attribute (supports :: [Symbol]) a = Attribute
+data Attribute a = Attribute
   { toAttributes :: a -> Map Text Text
   -- ^ How to convert the attribute value to one or more HTML
   -- attributes.
@@ -186,29 +182,53 @@ data Attribute (supports :: [Symbol]) a = Attribute
   deriving stock (Generic)
 
 -- | Just the attribute name
---
--- >>> display class_
--- "class"
-instance Display (Attribute supports a) where
+instance Display (Attribute a) where
   displayBuilder = Builder.fromText . name
 
--- | Get the elements an attribute supports.
+instance Show (Attribute a) where show = Text.unpack . display
+
+-- instances we need to use attributes as keys to DMaps
+
+instance GShow Attribute where gshowsPrec = showsPrec
+
+instance GEq Attribute where
+  geq a b
+    | type_ a == type_ b && name a == name b =
+      Just $ Unsafe.unsafeCoerce Refl
+    | otherwise =
+      Nothing
+      -- as long as (type_ a) matches the value type of a—which the
+      -- smart constructors for Attribute ensure—this is safe
+      --
+      -- there is presumably a way to do this without unsafeCoerce,
+      -- but I do not know what it is
+
+
+-- | When attributes have the same name, the /lower/ attribute
+-- according to this ordering will take priority
 --
--- >>> supports class_
--- ["HTML","SVG"]
+-- In particular, this means that if the same name has a key with
+-- @type_ = Nothing@ and a key with @type_ = Just ...@, the version
+-- with @Nothing@ will take precedence.
 --
--- >>> supports href
--- ["a","area","base","link"]
-supports :: forall supports a. KnownSymbols supports
-         => Attribute supports a -> [Text]
-supports _ = knownSymbols @supports
+-- When the same name has /multiple/ @type_ = Just typeRep@ keys the
+-- ordering is unspecified—currently depends on the 'Ord' instance for
+-- 'SomeTypeRep'.
+instance GCompare Attribute where
+  gcompare a b
+    | Just Refl <- geq a b = GEQ
+    | isLessThan           = GLT
+    | otherwise            = GGT
+    where isLessThan
+            | name a == name b = type_ a < type_ b
+            | otherwise        = name a < name b
 
 -- | Define a __native__ attribute: an 'Attribute' that corresponds 1:1
 -- with an attribute on the element.
-native :: forall supports a. (Typeable a, AsAttributeValue a)
+native :: forall a. (Typeable a, AsAttributeValue a)
        => Text
        -- ^ attribute name
-       -> Attribute supports a
+       -> Attribute a
 native name = Attribute
   { toAttributes = \ a -> [(name, toAttributeValue a)]
   , combine      = combineAttributeValues
@@ -225,16 +245,16 @@ native name = Attribute
 -- __Example__
 --
 -- @
--- c :: Attribute '["circle"] (Last Circle)
+-- c :: Attribute Circle
 -- c = logical "c" \ Circle { center = V2 x y, radius } ->
 --       ["cx" =. x, "cy" =. y, "r" =. radius]
 -- @
-logical :: forall supports a. Typeable a
+logical :: forall a. Typeable a
         => Text
         -- ^ attribute name
         -> (a -> Map Text Text)
         -- ^ mapping to native attributes
-        -> Attribute supports a
+        -> Attribute a
 logical name toAttributes = Attribute
   { toAttributes
   , combine = const
@@ -250,7 +270,7 @@ logical name toAttributes = Attribute
 -- The @checked@ attribute for checkboxes:
 --
 -- @
--- checked :: Attribute '["input", "checkbox"] Bool
+-- checked :: Attribute Bool
 -- checked = boolean "checked"
 -- @
 --
@@ -263,7 +283,7 @@ logical name toAttributes = Attribute
 -- checkbox [ checked =: False ] never
 -- -- ⇒ <input type="checkbox">
 -- @
-boolean :: forall supports. Text -> Attribute supports Bool
+boolean :: Text -> Attribute Bool
 boolean name = logical name $ \case
   True  -> [(name, "")]
   False -> []
@@ -273,7 +293,7 @@ boolean name = logical name $ \case
 -- This is a helper function for defining logical attributes:
 --
 -- @
--- c :: Attribute '["circle"] Circle
+-- c :: Attribute Circle
 -- c = logical "c" \ Circle { center = V2 x y, radius } ->
 --       ["cx" =. x, "cy" =. y, "r" =. radius]
 -- @
@@ -281,7 +301,7 @@ boolean name = logical name $ \case
 -- is the same as:
 --
 -- @
--- c :: Attribute '["circle"] Circle
+-- c :: Attribute Circle
 -- c = logical "c" \ Circle { center = V2 x y, radius } ->
 --       [ ("cx", toAttributeValue x)
 --       , ("cy", toAttributeValue y)
@@ -314,7 +334,7 @@ attribute =. value = (attribute, toAttributeValue value)
 -- Setting a @data-<foo>@ attribute with a dynamic name:
 --
 -- @
--- data_ :: Text -> Attribute ["HTML", "SVG"] Text
+-- data_ :: Text -> Attribute Text
 -- data_ name = override ("data-" <> name)
 --
 -- myElement dataValue = div [ data_ "my-data" =: dataValue ] (pure ())
@@ -333,7 +353,7 @@ attribute =. value = (attribute, toAttributeValue value)
 -- @
 -- input @"text" [ override "autocorrect" =: "off" ]
 -- @
-override :: forall supports. Text -> Attribute supports Text
+override :: Text -> Attribute Text
 override name = Attribute
   { name
   , type_        = Nothing -- different than "normal" Text attribute

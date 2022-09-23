@@ -67,7 +67,7 @@ import           UI.Main                           (Runnable (Runnable),
 -- selectEnum @Level [] never
 -- @
 selectEnum :: forall k m t. (Dom t m, Enum k, Bounded k, Display k)
-           => AttributeSet t "select" "HTML"
+           => AttributeSet t
            -- ^ Attributes
            -> Event t k
            -- ^ Explicitly set which value is selected

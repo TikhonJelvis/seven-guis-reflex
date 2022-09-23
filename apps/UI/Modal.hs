@@ -101,13 +101,13 @@ instance IsElement (ModalElement t) where rawElement = rawElement . element
 modal :: forall a m t. (Dom t m)
       => Event t ModalState
       -- ^ Events controlling when the dialog is shown or closed.
-      -> AttributeSet t "dialog" "HTML"
+      -> AttributeSet t
       -- ^ attributes
       -> m a
       -- ^ dialog body
       -> m (ModalElement t, a)
 modal states attributes body = do
-  (element, result) <- html attributes body
+  (element, result) <- html "dialog" attributes body
   Reflex.performEvent_ $ setDialogState element <$> states
 
   canceled <- element `on` "cancel"

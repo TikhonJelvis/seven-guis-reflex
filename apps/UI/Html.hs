@@ -27,12 +27,9 @@ where
 import           Control.Lens                      ((<&>))
 import           Control.Monad                     (void)
 
-import           Data.Proxy                        (Proxy (..))
 import           Data.Text                         (Text)
-import qualified Data.Text                         as Text
 
 import           GHC.Generics                      (Generic)
-import           GHC.TypeLits                      (KnownSymbol, symbolVal)
 
 import qualified GHCJS.DOM.Element                 as Element
 import qualified GHCJS.DOM.Types                   as GHCJS
@@ -84,17 +81,18 @@ instance Reflex t => Dom.HasDomEvent t (Html t) en where
 -- __Example__
 --
 -- @
--- html @"div" [ class_ =: "draggable" ] do
+-- html "div" [ class_ =: "draggable" ] do
 --   text "Drag me!"
 -- @
-html :: forall element a m t. (KnownSymbol element, Dom t m)
-     => AttributeSet t element "HTML"
+html :: forall a m t. (Dom t m)
+     => Text
+     -- ^ tag
+     -> AttributeSet t
      -- ^ attributes
      -> m a
      -- ^ body
      -> m (Html t, a)
-html attributes body = do
-  let tag = Text.pack $ symbolVal (Proxy @element)
+html tag attributes body = do
   (element, result) <- createElement Nothing tag (toDom attributes) body
   pure (Html element, result)
 {-# INLINABLE html #-}
@@ -107,12 +105,10 @@ html attributes body = do
 -- __Example__
 --
 -- @
--- html' @"img" [ src =: "img/example.png", alt =: "An example image." ]
+-- html' "img" [ src =: "img/example.png", alt =: "An example image." ]
 -- @
-html' :: forall element m t. (KnownSymbol element, Dom t m)
-      => AttributeSet t element "HTML"
-      -> m (Html t)
-html' attributes = fst <$> html attributes (pure ())
+html' :: forall m t. (Dom t m) => Text -> AttributeSet t -> m (Html t)
+html' tag attributes = fst <$> html tag attributes (pure ())
 {-# INLINABLE html' #-}
 
 -- ** Structure
@@ -128,12 +124,12 @@ html' attributes = fst <$> html attributes (pure ())
 --   text "When applicable, semantic elements like article are preferred over div."
 -- @
 div_ :: forall a m t. Dom t m
-     => AttributeSet t "div" "HTML"
+     => AttributeSet t
      -- ^ attributes
      -> m a
      -- ^ body
      -> m (Html t, a)
-div_ = html
+div_ = html "div"
 {-# INLINE div_ #-}
 
 -- | Create an @article@ element which structures self-contained
@@ -147,12 +143,12 @@ div_ = html
 --   body
 -- @
 article :: forall a m t. Dom t m
-        => AttributeSet t "article" "HTML"
+        => AttributeSet t
         -- ^ attributes
         -> m a
         -- ^ body
         -> m (Html t, a)
-article = html
+article = html "article"
 {-# INLINE article #-}
 
 -- *** Lists
@@ -168,12 +164,12 @@ article = html
 -- ol [] (pure [text "one", text "two", text "three"])
 -- @
 ol :: forall a m t. Dom t m
-   => AttributeSet t "ol" "HTML"
+   => AttributeSet t
    -> Dynamic t [m a]
    -- ^ Dynamic list of items.
    -> m (Html t, Event t [a])
-ol attributes items = html attributes do
-  dyn $ items <&> mapM (fmap snd . html @"li" [])
+ol attributes items = html "ol" attributes do
+  dyn $ items <&> mapM (fmap snd . html "li" [])
 {-# INLINABLE ol #-}
 
 -- | An ordered list with items automatically wrapped in @li@
@@ -190,12 +186,12 @@ ol attributes items = html attributes do
 --   ]
 -- @
 ol_ :: forall a m t. Dom t m
-    => AttributeSet t "ol" "HTML"
+    => AttributeSet t
     -> Dynamic t [m a]
     -- ^ Dynamic list of items.
     -> m (Html t)
-ol_ attributes items = fst <$> html attributes do
-  dyn $ mapM_ (html @"li" []) <$> items
+ol_ attributes items = fst <$> html "ol" attributes do
+  dyn $ mapM_ (html "li" []) <$> items
 {-# INLINABLE ol_ #-}
 
 -- | An unordered list with items automatically wrapped in @li@
@@ -209,11 +205,11 @@ ol_ attributes items = fst <$> html attributes do
 -- ul [] (pure [text "one", text "two", text "three"])
 -- @
 ul :: forall a m t. Dom t m
-   => AttributeSet t "ul" "HTML"
+   => AttributeSet t
    -> Dynamic t [m a]
    -> m (Html t, Event t [a])
-ul attributes items = html attributes do
-  dyn $ items <&> mapM (fmap snd . html @"li" [])
+ul attributes items = html "ul" attributes do
+  dyn $ items <&> mapM (fmap snd . html "li" [])
 {-# INLINABLE ul #-}
 
 -- | An unordered list with items automatically wrapped in @li@
@@ -230,26 +226,26 @@ ul attributes items = html attributes do
 --   ]
 -- @
 ul_ :: forall a m t. Dom t m
-    => AttributeSet t "ul" "HTML"
+    => AttributeSet t
     -- ^ Attributes
     -> Dynamic t [m a]
     -- ^ Set of items. Can change over time.
     -> m (Html t)
-ul_ attributes items = fst <$> html attributes do
-  dyn $ mapM_ (html @"li" []) <$> items
+ul_ attributes items = fst <$> html "ul" attributes do
+  dyn $ mapM_ (html "li" []) <$> items
 {-# INLINABLE ul_ #-}
 
 -- ** Controls
 
 -- | A pressable button.
 button :: forall a m t. Dom t m
-       => AttributeSet t "button" "HTML"
+       => AttributeSet t
        -- ^ attributes
        -> m a
        -- ^ button body (often a text label)
        -> m ((Html t, Event t ()), a)
 button attributes body = do
-  (element, a) <- html attributes body
+  (element, a) <- html "button" attributes body
   let pressed = void $ Dom.domEvent Click element
   pure ((element, pressed), a)
 
@@ -257,7 +253,7 @@ button attributes body = do
 button' :: forall m t. Dom t m
         => Text
         -- ^ button label
-        -> AttributeSet t "button" "HTML"
+        -> AttributeSet t
         -- ^ attributes
         -> m (Html t, Event t ())
 button' t attributes = fst <$> button attributes (text t)
@@ -294,12 +290,12 @@ button' t attributes = fst <$> button attributes (text t)
 --   Input.text []
 -- @
 label :: forall a m t. Dom t m
-      => AttributeSet t "label" "HTML"
+      => AttributeSet t
       -- ^ Attributes
       -> m a
       -- ^ Body
       -> m (Html t, a)
-label = html
+label = html "label"
 
 -- | Shorthand for creating a text label for a given id.
 --
@@ -323,6 +319,6 @@ labelFor id_ = fmap fst . label [ for =: id_ ] . text
 -- img [ src =: "img/example.png", alt =: "An example image." ]
 -- @
 img :: forall m t. Dom t m
-    => AttributeSet t "img" "HTML"
+    => AttributeSet t
     -> m (Html t)
-img = html'
+img = html' "img"

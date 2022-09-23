@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 -- | HTML controls and input widgets: @select@, @textarea@ and
@@ -81,44 +80,44 @@ module UI.Html.Input
   )
 where
 
-import           Data.Bool                         (bool)
-import qualified Data.Colour                       as Colour
-import           Data.Default.Class                (def)
-import           Data.Hashable                     (Hashable)
-import           Data.Maybe                        (fromMaybe)
-import           Data.Text                         (Text)
-import qualified Data.Text                         as Text
-import           Data.Time                         (Day, LocalTime, TimeOfDay)
-import qualified Data.Time.Format.ISO8601          as Time
-import           Data.Vector                       (Vector)
-import qualified Data.Vector                       as Vector
+import           Data.Bool                           (bool)
+import qualified Data.Colour                         as Colour
+import           Data.Default.Class                  (def)
+import           Data.Hashable                       (Hashable)
+import           Data.Maybe                          (fromMaybe)
+import           Data.Text                           (Text)
+import qualified Data.Text                           as Text
+import           Data.Time                           (Day, LocalTime, TimeOfDay)
+import qualified Data.Time.Format.ISO8601            as Time
+import           Data.Vector                         (Vector)
+import qualified Data.Vector                         as Vector
 
-import           GHC.Generics                      (Generic)
-import           GHC.TypeLits                      (KnownSymbol)
+import           GHC.Generics                        (Generic)
 
-import qualified GHCJS.DOM.Types                   as GHCJS
+import qualified GHCJS.DOM.Types                     as GHCJS
 
 import qualified Reflex
-import           Reflex                            (Dynamic, Event, Reflex)
-import qualified Reflex.Dom                        as Dom
+import           Reflex                              (Dynamic, Event, Reflex)
+import qualified Reflex.Dom                          as Dom
 
-import           UI.Attributes                     (AsAttributeValue, Attribute,
-                                                    boolean, fromAttributeValue,
-                                                    isHtmlWhitespace, logical,
-                                                    native, toAttributeValue,
-                                                    (=.))
-import qualified UI.Attributes.AttributeSet.Reflex as AttributeSet
-import           UI.Attributes.AttributeSet.Reflex (AttributeSet, toDom, (=:))
-import           UI.Color                          (Opaque (..))
-import           UI.Element                        (Dom, InputConfig (..),
-                                                    createInputElement)
-import           UI.Element.IsElement              (IsElement (..), IsHtml (..),
-                                                    IsHtmlInput (..))
-import           UI.Email                          (Email, validate)
-import qualified UI.Event                          as Event
-import           UI.Password                       (Password (..))
-import           UI.Type.List                      (KnownSymbols, type (<>))
-import           UI.Url                            (Url (..))
+import           UI.Attributes.Attribute             (AsAttributeValue,
+                                                      Attribute, boolean,
+                                                      fromAttributeValue,
+                                                      isHtmlWhitespace, logical,
+                                                      native, toAttributeValue,
+                                                      (=.))
+import qualified UI.Attributes.AttributeSet.Internal as AttributeSet (lookup)
+import           UI.Attributes.AttributeSet.Reflex   (AttributeSet, toDom, (=:))
+import           UI.Color                            (Opaque (..))
+import           UI.Element                          (Dom, InputConfig (..),
+                                                      createInputElement)
+import           UI.Element.IsElement                (IsElement (..),
+                                                      IsHtml (..),
+                                                      IsHtmlInput (..))
+import           UI.Email                            (Email, validate)
+import qualified UI.Event                            as Event
+import           UI.Password                         (Password (..))
+import           UI.Url                              (Url (..))
 
 -- * Input Elements
 
@@ -211,10 +210,10 @@ type Inputs = ["input"
 -- @
 -- input @"password" def [ inputmode =: Numeric ]
 -- @
-input :: forall type_ m t. (KnownSymbol type_, Dom t m)
+input :: forall m t. (Dom t m)
       => Text
       -- ^ Setting for the @type@ attribute.
-      -> AttributeSet t type_ "HTML"
+      -> AttributeSet t
       -- ^ Attributes
       -> InputConfig t
       -- ^ Config for setting the input value externally.
@@ -223,17 +222,17 @@ input type_ attributes config = do
   element <- createInputElement Nothing domAttributes config
   pure $ HtmlInput element
   where domAttributes =
-          toDom $ attributes <> [native @'["HTML"] "type" =: type_]
+          toDom $ attributes <> [native "type" =: type_]
         -- NOTE: using native rather than override so that "type" can
         -- always be overriden by the caller
 {-# INLINABLE input #-}
 
 -- | A version of 'input' that automatically handles converting
 -- to/from types with 'AsAttributeValue' instances.
-input' :: forall type_ a m t. (KnownSymbol type_, Dom t m, AsAttributeValue a)
+input' :: forall a m t. (Dom t m, AsAttributeValue a)
        => Text
        -- ^ Setting for the @type@ attribute
-       -> AttributeSet t type_ "HTML"
+       -> AttributeSet t
        -- ^ Attributes
        -> Event t a
        -- ^ Explicitly override the current value. Use 'never' if you
@@ -258,7 +257,7 @@ input' type_ attributes setValue = do
 -- text [ value =: "initial value" ] never
 -- @
 text :: forall m t. Dom t m
-     => AttributeSet t "text" "HTML"
+     => AttributeSet t
      -- ^ Attributes
      -> Event t Text
      -- ^ Explicitly set the value of the input. Use 'never' if you
@@ -277,7 +276,7 @@ text attributes setValue = do
 -- world. However, browsers may change the onscreen keyboard or
 -- display the element differently from plain text inputs.
 tel :: forall m t. Dom t m
-    => AttributeSet t "tel" "HTML"
+    => AttributeSet t
     -- ^ Attributes
     -> Event t Text
     -- ^ Explicitly set the value of the input. Use 'never' if you
@@ -304,7 +303,7 @@ tel attributes setValue = do
 -- search [ placeholder =: "search" ] never
 -- @
 search :: forall m t. Dom t m
-       => AttributeSet t "search" "HTML"
+       => AttributeSet t
        -- ^ Attributes
        -> Event t Text
        -- ^ Explicitly set the text value of the input. Use 'never' if
@@ -330,7 +329,7 @@ search attributes setValue = do
 -- url [ url_value =: "https://example.com" ]
 -- @
 url :: forall m t. Dom t m
-       => AttributeSet t "url" "HTML"
+       => AttributeSet t
        -- ^ Attributes
        -> Event t Url
        -- ^ Explicitly set the text value of the input. Use 'never' if
@@ -346,16 +345,16 @@ url = input' "url"
 -- On most browsers, the exact text the user types will be hidden,
 -- with each character displayed as @*@ or @•@.
 password :: forall m t. Dom t m
-         => AttributeSet t "password" "HTML"
+         => AttributeSet t
          -- ^ Attributes
          -> Event t Text
          -- ^ Override the current value. Use 'never' if you don't
          -- need this.
-         -> m (HtmlInput t, Dynamic t Password)
+         -> m (HtmlInput t, Dynamic t UI.Password.Password)
          -- ^ The input element and the current value of the input.
 password attributes setValue = do
   (e, v) <- input' "password" attributes setValue
-  pure (e, Password . fromMaybe "" <$> v)
+  pure (e, UI.Password.Password . fromMaybe "" <$> v)
 {-# INLINABLE password #-}
 
 -- | An email address input.
@@ -374,7 +373,7 @@ password attributes setValue = do
 -- email [ email_value =: "john.doe@example.com" ] never
 -- @
 email :: forall m t. Dom t m
-      => AttributeSet t "email" "HTML"
+      => AttributeSet t
       -> Event t Email
       -> m (HtmlInput t, Dynamic t (Maybe Email))
 email = input' "email"
@@ -393,16 +392,16 @@ email = input' "email"
 -- email [ emails_value =: ["a@example.com", "b@example.com"] ] never
 -- @
 emails :: forall m t. (Dom t m)
-       => AttributeSet t "emails" "HTML"
+       => AttributeSet t
        -> Event t (Vector Email)
        -> m (HtmlInput t, Dynamic t (Vector (Maybe Email)))
 emails attributes setEmails = do
   let config = def { setValue = Just $ toAttributeValue <$> setEmails }
   e <- input "email" attributes' config
   pure (e, getEmails <$> Dom.value e)
-  where attributes' :: AttributeSet t "emails" "HTML"
+  where attributes' :: AttributeSet t
         attributes' = attributes <>
-          [ boolean @'["emails"] "multiple" =: True ]
+          [ boolean "multiple" =: True ]
         getEmails = Vector.fromList . map validate .
           filter (Text.all isHtmlWhitespace) . Text.split (== ',')
 {-# INLINABLE emails #-}
@@ -441,7 +440,7 @@ emails attributes setEmails = do
 --   ]
 -- @
 checkbox :: forall m t. Dom t m
-         => AttributeSet t "checkbox" "HTML"
+         => AttributeSet t
          -> Event t Bool
          -- ^ Set the state of the checkbox explicitly. 'True':
          -- checked, 'False': unchecked.
@@ -463,20 +462,17 @@ checkbox attributes setChecked = do
 
 -- | An input that takes on numeric values: either @type="number"@ or
 -- @type="range"@.
-numeric :: forall type_ n m supports t.
+numeric :: forall n m t.
            ( Num n
            , AsAttributeValue n
            , Dom t m
-           , KnownSymbol type_
-           , KnownSymbols supports
-           , AttributeSet.Compatible type_ "HTML" supports
            )
         => Text
         -- ^ Type of input (usually @"number"@ or @"range"@)
-        -> Attribute supports n
+        -> Attribute n
         -- ^ Specialized attribute for values of type @n@ (eg
         -- 'integer_value' or 'number_value').
-        -> AttributeSet t type_ "HTML"
+        -> AttributeSet t
         -- ^ Attributes
         -> Event t n
         -- ^ Override current value. Use 'never' if you don't need
@@ -526,7 +522,7 @@ numeric type_ valueAttribute attributes setValue = do
 -- This will still return the value as a 'Double'; you can use
 -- 'integer' to get 'Integer' values instead.
 number :: forall m t. Dom t m
-       => AttributeSet t "number" "HTML"
+       => AttributeSet t
        -> Event t Double
        -> m (HtmlInput t, Dynamic t Double)
 number = numeric "number" number_value
@@ -545,7 +541,7 @@ number = numeric "number" number_value
 -- integer [ integer_min =: 500, integer_max =: 1000, integer_step =: 25 ] never
 -- @
 integer :: forall m t. Dom t m
-        => AttributeSet t "integer" "HTML"
+        => AttributeSet t
         -> Event t Integer
         -> m (HtmlInput t, Dynamic t Integer)
 integer = numeric "number" integer_value
@@ -583,7 +579,7 @@ integer = numeric "number" integer_value
 -- The result value is still returned as a 'Double'; if you only want
 -- integers, consider 'integerRange' instead.
 range :: forall m t. Dom t m
-      => AttributeSet t "number" "HTML"
+      => AttributeSet t
       -- ^ Attributes
       -> Event t Double
       -- ^ Set the number. Use 'never' if you don't need this.
@@ -607,7 +603,7 @@ range attributes = numeric "range" number_value (base <> attributes)
 -- integerRange [ integer_min =: 500, integer_max =: 1000, integer_step =: 25 ] never
 -- @
 integerRange :: forall m t. Dom t m
-             => AttributeSet t "integer" "HTML"
+             => AttributeSet t
              -> Event t Integer
              -> m (HtmlInput t, Dynamic t Integer)
 integerRange attributes = numeric "range" integer_value (base <> attributes)
@@ -629,7 +625,7 @@ integerRange attributes = numeric "range" integer_value (base <> attributes)
 -- month [ month_value =: (2022, 12) ] never
 -- @
 month :: forall m t. Dom t m
-      => AttributeSet t "month" "HTML"
+      => AttributeSet t
       -- ^ Attributes
       -> Event t (Integer, Int)
       -- ^ Explicitly set the year-month value of the input. Use
@@ -656,7 +652,7 @@ month attributes setMonth = do
 -- week [ week_value =: (2022, 37) ] never
 -- @
 week :: forall m t. Dom t m
-     => AttributeSet t "week" "HTML"
+     => AttributeSet t
      -- ^ Attributes
      -> Event t (Integer, Int)
      -- ^ Explicitly set the year-week value of the input. Use
@@ -684,7 +680,7 @@ week attributes setWeek = do
 -- date [ date_value =: read "2022-12-23" ] never
 -- @
 date :: forall m t. Dom t m
-     => AttributeSet t "date" "HTML"
+     => AttributeSet t
      -> Event t Day
      -> m (HtmlInput t, Dynamic t (Maybe Day))
 date = input' "date"
@@ -702,7 +698,7 @@ date = input' "date"
 -- time [ time_value =: read "14:25" ] never
 -- @
 time :: forall m t. Dom t m
-     => AttributeSet t "time" "HTML"
+     => AttributeSet t
      -- ^ Attributes.
      -> Event t TimeOfDay
      -- ^ Set the value explicitly. Use 'never' if you don't need
@@ -726,7 +722,7 @@ time = input' "time"
 -- datetime [ datetime_value =: read "2022-12-23 14:23:00" ] never
 -- @
 datetime :: forall m t. Dom t m
-         => AttributeSet t "datetime-local" "HTML"
+         => AttributeSet t
          -- ^ Attributes
          -> Event t LocalTime
          -- ^ Explicitly set the value of the date picker. Use
@@ -754,7 +750,7 @@ datetime = input' "datetime-local"
 -- color [ color_value =: Opaque Colour.red ] never
 -- @
 color :: forall m t. Dom t m
-      => AttributeSet t "color" "HTML"
+      => AttributeSet t
       -- ^ Attributes
       -> Event t Opaque
       -- ^ Set the picked color. Use 'never' if you don't want to
@@ -782,9 +778,7 @@ enabledIf :: Bool -> Enabled
 enabledIf = bool Disabled Enabled
 
 -- | Set whether an input is enabled or disabled.
-enabled :: Attribute
-  ('["button", "fieldset", "optgroup", "option", "select", "textarea"] <> Inputs)
-  Enabled
+enabled :: Attribute Enabled
 enabled = logical "enabled" \case
   Enabled  -> []
   Disabled -> [("disabled", "")]
@@ -806,17 +800,17 @@ enabled = logical "enabled" \case
 -- checkbox [ checked =: False ] never
 -- -- ⇒ <input type="checkbox">
 -- @
-checked :: Attribute '["input", "checkbox"] Bool
+checked :: Attribute Bool
 checked = boolean "checked"
 
 -- | The minimum number of a characters a password input accepts,
 -- measured in UTF-16 code units.
-minlength :: Attribute '["input", "password"] Word
+minlength :: Attribute Word
 minlength = native "minlength"
 
 -- | The maximum number of a characters a password input accepts,
 -- measured in UTF-16 code units.
-maxlength :: Attribute '["input", "password"] Word
+maxlength :: Attribute Word
 maxlength = native "maxlength"
 
 -- ** Value
@@ -827,19 +821,19 @@ maxlength = native "maxlength"
 -- types.
 
 -- | The default value element for inputs—unstructured text.
-value :: Attribute '["input", "option", "text", "search", "tel"] Text
+value :: Attribute Text
 value = native "value"
 
 -- | A value for numeric input fields.
-number_value :: Attribute '["input", "number"] Double
+number_value :: Attribute  Double
 number_value = native "value"
 
 -- | The minimum number a numeric input should accept.
-number_min :: Attribute '["input", "number"] Double
+number_min :: Attribute Double
 number_min = native "min"
 
 -- | The maximum number a numeric input should accept.
-number_max :: Attribute '["input", "number"] Double
+number_max :: Attribute Double
 number_max = native "max"
 
 -- | The step by which a numeric input can change.
@@ -848,32 +842,32 @@ number_max = native "max"
 --
 -- If the user enters a value that does not conform to the step, the
 -- browser will round it to the nearest valid value.
-number_step :: Attribute '["input", "number"] (Maybe Double)
+number_step :: Attribute (Maybe Double)
 number_step = logical "step" \case
   Just n  -> ["step" =. n]
   Nothing -> ["step" =. ("any" :: Text)]
 
 -- | The value for numeric inputs restricted to integers.
-integer_value :: Attribute '["input", "integer"] Integer
+integer_value :: Attribute Integer
 integer_value = native "value"
 
 -- | The minimum value for numeric inputs restricted to integers.
-integer_min :: Attribute '["input", "integer"] Integer
+integer_min :: Attribute Integer
 integer_min = native "min"
 
 -- | The maximum value for numeric inputs restricted to integers.
-integer_max :: Attribute '["input", "integer"] Integer
+integer_max :: Attribute Integer
 integer_max = native "max"
 
 -- | The step by which an integer numeric input can change.
 --
 -- If the user enters a value that does not conform to the step, the
 -- browser will round it to the nearest valid value.
-integer_step :: Attribute '["input", "integer"] Integer
+integer_step :: Attribute Integer
 integer_step = native "step"
 
 -- | A value for URL entries.
-url_value :: Attribute '["input", "url"] Url
+url_value :: Attribute Url
 url_value = native "value"
 
 -- | A value for colors. Only opaque colors are supported.
@@ -883,7 +877,7 @@ url_value = native "value"
 -- @
 -- color [ color_value =: Opaque Colour.red ] never
 -- @
-color_value :: Attribute '["input", "color"] Opaque
+color_value :: Attribute Opaque
 color_value = native "value"
 
 -- | A value for month inputs: (year, day) pairs.
@@ -893,7 +887,7 @@ color_value = native "value"
 -- @
 -- month [ month_value =: (2022, 12) ] never
 -- @
-month_value :: Attribute '["month"] (Integer, Int)
+month_value :: Attribute (Integer, Int)
 month_value = logical "value" (\ month -> [("value", toText month)])
   where toText = Text.pack . Time.formatShow Time.yearMonthFormat
 
@@ -904,7 +898,7 @@ month_value = logical "value" (\ month -> [("value", toText month)])
 -- @
 -- week [ week_value =: (2022, 37) ] never
 -- @
-week_value :: Attribute '["week"] (Integer, Int)
+week_value :: Attribute (Integer, Int)
 week_value = logical "value" (\ month -> [("value", toText month)])
   where toText = Text.pack . Time.formatShow (Time.yearWeekFormat Time.ExtendedFormat)
 
@@ -915,7 +909,7 @@ week_value = logical "value" (\ month -> [("value", toText month)])
 -- @
 -- date [ date_value =: read "2022-12-23" ] never
 -- @
-date_value :: Attribute '["date"] Day
+date_value :: Attribute Day
 date_value = native "value"
 
 -- | A value for time pickers.
@@ -925,7 +919,7 @@ date_value = native "value"
 -- @
 -- time [ time_value =: read "14:25" ] never
 -- @
-time_value :: Attribute '["time"] TimeOfDay
+time_value :: Attribute TimeOfDay
 time_value = native "value"
 
 -- | A value for datetime-local inputs.
@@ -935,7 +929,7 @@ time_value = native "value"
 -- @
 -- datetime [ datetime_value =: read "2022-12-23 14:23:00" ] never
 -- @
-datetime_value :: Attribute '["datetime-local"] LocalTime
+datetime_value :: Attribute LocalTime
 datetime_value = native "value"
 
 -- | A value for email inputs.
@@ -945,7 +939,7 @@ datetime_value = native "value"
 -- @
 -- email [ email_value =: "john.doe@example.com" ]
 -- @
-email_value :: Attribute '["email"] Email
+email_value :: Attribute Email
 email_value = native "value"
 
 -- | A value for email inputs allowing multiple emails.
@@ -955,5 +949,5 @@ email_value = native "value"
 -- @
 -- email [ emails_value =: ["a@example.com", "b@example.com"] ]
 -- @
-emails_value :: Attribute '["emails"] (Vector Email)
+emails_value :: Attribute (Vector Email)
 emails_value = native "value"

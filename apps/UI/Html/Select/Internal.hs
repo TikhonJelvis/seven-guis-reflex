@@ -56,7 +56,7 @@ instance Reflex t => Dom.HasDomEvent t (HtmlSelect t) en where
 
 -- | A drop-down select menu with a set of options.
 select :: forall k m t. (Eq k, AsAttributeValue k, Dom t m)
-       => AttributeSet t "select" "HTML"
+       => AttributeSet t
        -- ^ Attributes
        -> Maybe k
        -- ^ Initial selected attribute (optional).
@@ -179,16 +179,16 @@ createEntry = \case
   Group enabled label options -> do
     let attributes =
           [ Input.enabled =: enabled
-          , native @'["optgroup"] "label" =: label
+          , native "label" =: label
           ]
-    fst <$> Html.html @"optgroup" attributes do
+    fst <$> Html.html "optgroup" attributes do
       forM_ options \ (Option optionEnabled isSelected key optionLabel) ->
         optionElement optionEnabled isSelected key optionLabel
   where optionElement enabled isSelected key label = do
           let attributes =
                 [ Input.value                     =: toAttributeValue key
-                , boolean @'["option"] "selected" =: isSelected
+                , boolean "selected" =: isSelected
                 , Input.enabled                   =: enabled
                 ]
-          fst <$> Html.html @"option" attributes (Element.text label)
+          fst <$> Html.html "option" attributes (Element.text label)
 {-# INLINABLE createEntry #-}

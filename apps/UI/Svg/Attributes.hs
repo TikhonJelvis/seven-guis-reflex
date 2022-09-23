@@ -33,63 +33,63 @@ import qualified UI.Url                       as Url
 -- * Sizes and Positions
 
 -- | The x coordinate of an element in the user coordinate system.
-x :: Attribute '["image", "rect", "svg", "use"] RelativeLength
+x :: Attribute RelativeLength
 x = native "x"
 
 -- | The y coordinate of an element in the user coordinate system.
-y :: Attribute '["image", "rect", "svg", "use"] RelativeLength
+y :: Attribute RelativeLength
 y = native "y"
 
 -- | The x coordinate of the start point in a line.
-x1 :: Attribute '["line", "linearGradient"] RelativeLength
+x1 :: Attribute RelativeLength
 x1 = native "x1"
 
 -- | 'x1' but cool
-x₁ :: Attribute '["line", "linearGradient"] RelativeLength
+x₁ :: Attribute RelativeLength
 x₁ = x1
 
 -- | The x coordinate of the end point in a line.
-x2 :: Attribute '["line", "linearGradient"] RelativeLength
+x2 :: Attribute RelativeLength
 x2 = native "x2"
 
 -- | 'x2' but cool
-x₂ :: Attribute '["line", "linearGradient"] RelativeLength
+x₂ :: Attribute RelativeLength
 x₂ = x2
 
 -- | The x coordinate of the start point in a line.
-y1 :: Attribute '["line", "linearGradient"] RelativeLength
+y1 :: Attribute RelativeLength
 y1 = native "y1"
 
 -- | 'y1' but cool
-y₁ :: Attribute '["line", "linearGradient"] RelativeLength
+y₁ :: Attribute RelativeLength
 y₁ = y1
 
 -- | The x coordinate of the start point in a line.
-y2 :: Attribute '["line", "linearGradient"] RelativeLength
+y2 :: Attribute RelativeLength
 y2 = native "y2"
 
 -- | 'y2' but cool
-y₂ :: Attribute '["line", "linearGradient"] RelativeLength
+y₂ :: Attribute RelativeLength
 y₂ = y2
 
 -- | The horizontal length of an element in the user coordinate system.
-width :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] RelativeLength
+width :: Attribute RelativeLength
 width = native "width"
 
 -- | The vertical length of an element in the user coordiante system.
-height :: Attribute '["image", "mask", "pattern", "rect", "svg", "use"] RelativeLength
+height :: Attribute RelativeLength
 height = native "height"
 
 -- | The x coordinate of the shape's center.
-cx :: Attribute '["circle", "ellipse", "radialGradient"] RelativeLength
+cx :: Attribute RelativeLength
 cx = native "cx"
 
 -- | The y coordinate of the shape's center.
-cy :: Attribute '["circle", "ellipse", "radialGradient"] RelativeLength
+cy :: Attribute RelativeLength
 cy = native "cy"
 
 -- | The radius of the shape.
-r :: Attribute '["circle", "radialGradient"] RelativeLength
+r :: Attribute RelativeLength
 r = native "r"
 
 -- ** Transforms
@@ -146,7 +146,7 @@ r = native "r"
 --      , transform =: [translate (V2 10 10)]
 --      ]
 -- @
-transform :: Attribute '["SVG"] [Transform]
+transform :: Attribute [Transform]
 transform = native "transform"
 
 -- | Translate an element along the given X and Y distances in @px@.
@@ -248,7 +248,7 @@ matrix invalid =
 
 -- | The point in 3D space that an element's transform functions use
 -- as their origin.
-transform_origin :: Attribute '["SVG"] TransformOrigin
+transform_origin :: Attribute TransformOrigin
 transform_origin = native "transform-origin"
 
 -- ** viewBox
@@ -283,7 +283,7 @@ instance AsAttributeValue ViewBox where
 
 -- | The @viewBox@ attribute defines how the coordinate space of an
 -- SVG element maps to the element's viewport.
-viewBox :: Attribute ["marker", "pattern", "svg", "symbol", "view"] ViewBox
+viewBox :: Attribute ViewBox
 viewBox = native "viewBox"
 
 -- * Paths
@@ -291,14 +291,12 @@ viewBox = native "viewBox"
 -- | The @d@ attribute that specifies the shape of a path.
 --
 -- See 'Path' for details and examples.
-d :: Attribute '["path", "glyph", "missing-glyph"] Path
+d :: Attribute Path
 d = native "d"
 
 -- | The total length of a path in user units. Setting this scales the
 -- distance for drawing an element by @pathLength/computedLength)@.
-pathLength :: Attribute
-  '["circle", "ellipse", "pathLength", "line", "path", "polygon", "polyline", "rect"]
-  Length
+pathLength :: Attribute Length
 pathLength = native "pathLength"
 
 -- * Gradients
@@ -330,7 +328,7 @@ data SpreadMethod = Pad
 -- | How a gradient should behave outside of its bounds.
 --
 -- See 'SpreadMethod'.
-spreadMethod :: Attribute Gradients SpreadMethod
+spreadMethod :: Attribute SpreadMethod
 spreadMethod = native "spreadMethod"
 
 -- | The coordinate system for a gradient.
@@ -370,7 +368,7 @@ instance AsAttributeValue GradientUnits where
 -- | The coordinate system for the gradient.
 --
 -- See 'GradientUnits'
-gradientUnits :: Attribute Gradients GradientUnits
+gradientUnits :: Attribute GradientUnits
 gradientUnits = native "gradientUnits"
 
 -- ** Gradient Stops
@@ -378,11 +376,11 @@ gradientUnits = native "gradientUnits"
 -- | The color for a gradient stop.
 --
 -- See 'linear' and 'radial' for details.
-stop_color :: Attribute '["stop"] Color
+stop_color :: Attribute Color
 stop_color = native "stop-color"
 
 -- | How far along the gradient to place this stop.
-offset :: Attribute '["stop"] Double
+offset :: Attribute Double
 offset = native "offset"
 
 -- * Presentation
@@ -404,10 +402,7 @@ offset = native "offset"
 -- @
 -- [ fill =: paintWith "my-gradient" ]
 -- @
-fill :: Attribute
-  ["circle", "ellipse", "path", "polygon", "polyline", "rect",
-   "text", "textPath", "tspan"]
-  Paint
+fill :: Attribute Paint
 fill = native "fill"
 
              -- TODO: illustrated examples
@@ -438,9 +433,7 @@ data FillRule = Nonzero
 -- | Set the algorithm to use for filling complex shapes.
 --
 -- See 'FillRule' for details.
-fill_rule :: Attribute
-  ["path", "polygon", "polyline", "text", "textPath", "tspan"]
-  FillRule
+fill_rule :: Attribute FillRule
 fill_rule = native "fill-rule"
 
 -- ** Stroke
@@ -483,17 +476,17 @@ type Stroked =
 -- @
 -- [ stroke =: paintWith "my-gradient", stroke_width =: 1 ]
 -- @
-stroke :: Attribute Stroked Paint
+stroke :: Attribute Paint
 stroke = native "stroke"
 
 -- | The width of the stroke.
-stroke_width :: Attribute Stroked Length
+stroke_width :: Attribute Length
 stroke_width = native "stroke-width"
 
 -- | Explicitly set the opacity of the stroke.
 --
 -- Should be a number between 0 and 1.
-stroke_opacity :: Attribute Stroked Double
+stroke_opacity :: Attribute Double
 stroke_opacity = native "stroke-opacity"
 
 -- | A pattern of lengths specifying the alternating length of dashes
@@ -540,12 +533,12 @@ instance AsAttributeValue Dasharray where
 -- @
 -- [ stroke_dasharray =: [2, 2, 3, 2] ]
 -- @
-stroke_dasharray :: Attribute Stroked Dasharray
+stroke_dasharray :: Attribute Dasharray
 stroke_dasharray = native "stroke-dasharray"
 
                    -- TODO: examples
 -- | An offset on rendering the stroke's dasharray.
-stroke_dashoffset :: Attribute Stroked Length
+stroke_dashoffset :: Attribute Length
 stroke_dashoffset = native "stroke-dashoffset"
 
 -- | The shape at the end of lines.
@@ -577,9 +570,7 @@ data Linecap = Butt
 -- @
 -- [ stroke_linecap =: Round ]
 -- @
-stroke_linecap :: Attribute
-  '["path", "polyline", "line", "text", "textPath", "tspan"]
-  Linecap
+stroke_linecap :: Attribute Linecap
 stroke_linecap = native "stroke-linecap"
 
 -- | How to draw the joints between two line segments.
@@ -606,18 +597,14 @@ instance AsAttributeValue Linejoin where
 
     -- TODO: examples
 -- | How to draw the joints between line segments in a stroke.
-stroke_linejoin :: Attribute
-  '["path", "polygon", "polyline", "rect", "text", "textPath", "tspan"]
-  Linejoin
+stroke_linejoin :: Attribute Linejoin
 stroke_linejoin = native "stroke-linejoin"
 
 -- | Limit the ratio of the miter length to 'stroke_width'. When the
 -- limit is exceeded, the miter becomes a bevel.
 --
 -- Must be ≥ 1.
-stroke_miterlimit :: Attribute
-  '["path", "polygon", "polyline", "rect", "text", "textPath", "tspan"]
-  Double
+stroke_miterlimit :: Attribute Double
 stroke_miterlimit = native "stroke-miterlimit"
 
 -- ** Paint

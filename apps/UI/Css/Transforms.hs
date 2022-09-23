@@ -306,5 +306,5 @@ instance AsAttributeValue TransformBox where
 
 -- | The layout box to which the 'transform' and 'transform_origin'
 -- properties apply.
-transform_box :: Attribute '["CSS"] (Css TransformBox)
+transform_box :: Attribute (Css TransformBox)
 transform_box = Attribute.native "transform-box"

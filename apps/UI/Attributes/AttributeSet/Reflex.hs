@@ -4,7 +4,6 @@ module UI.Attributes.AttributeSet.Reflex
     AttributeSet
 
     -- ** Setting attributes
-  , Compatible
   , SetAttribute (..)
   , (=:)
   , (==:)
@@ -30,6 +29,5 @@ import qualified UI.Attributes.AttributeSet.Internal as Internal
 import           UI.Attributes.AttributeSet.Internal hiding (AttributeSet)
 
 -- | 'Internal.AttributeSet' specialized to 'Dynamic'
-type AttributeSet t element namespace =
-  Internal.AttributeSet (Dynamic t) element namespace
+type AttributeSet t = Internal.AttributeSet (Dynamic t)
 

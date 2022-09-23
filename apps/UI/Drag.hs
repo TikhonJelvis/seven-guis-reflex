@@ -63,7 +63,7 @@ demo = void do
     , enableDisable
     ]
   dragAnywhere
-  where translate :: Dynamic t (V2 Double) -> AttributeSet t "div" "HTML"
+  where translate :: Dynamic t (V2 Double) -> AttributeSet t
         translate p = [ style ==: Transforms.translate <$> p <*> pure mempty ]
 
         withTransition p = translate p <> [ class_ =: ["smooth-drag"] ]
@@ -74,13 +74,13 @@ demo = void do
         snapTo n p = translate (fmap (toGrid n) <$> p) <> [ class_ =: ["smooth-drag"] ]
         toGrid n x = fromInteger $ round x - (round x `mod` n)
 
-        rotateByDistance :: Dynamic t (V2 Double) -> AttributeSet t "div" "HTML"
+        rotateByDistance :: Dynamic t (V2 Double) -> AttributeSet t
         rotateByDistance dragged = [ style ==: rotated ]
           where rotated = do
                   p <- dragged
                   pure $ Transforms.rotate (Turn $ distance p 0 / 100) mempty
 
-        scaleByDistance :: Dynamic t (V2 Double) -> AttributeSet t "div" "HTML"
+        scaleByDistance :: Dynamic t (V2 Double) -> AttributeSet t
         scaleByDistance dragged = [ style ==: scaled ]
           where scaled = do
                   p <- dragged
@@ -100,7 +100,7 @@ demo = void do
 
         example :: Text
                 -> DragConfig d t
-                -> (Dynamic t (V2 Double) -> AttributeSet t "div" "HTML")
+                -> (Dynamic t (V2 Double) -> AttributeSet t)
                 -> m ()
         example description config doDrag = mdo
           label description
@@ -128,7 +128,7 @@ demo = void do
             pure ()
           pure ()
 
-        dragOrSnap :: Dynamic t (Maybe (V2 Double)) -> AttributeSet t "div" "HTML"
+        dragOrSnap :: Dynamic t (Maybe (V2 Double)) -> AttributeSet t
         dragOrSnap current = [ style ==: rules ]
           where rules = current <&> \case
                   Just d  -> Transforms.translate d mempty

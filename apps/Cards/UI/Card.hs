@@ -65,7 +65,7 @@ demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
           def { attributes = dragAttributes drags }
 
   pure ()
-  where dragAttributes :: Drags t -> Maybe (AttributeSet t "div" "HTML")
+  where dragAttributes :: Drags t -> Maybe (AttributeSet t)
         dragAttributes Drags { current } = Just
           [ class_ ==: classIf "dragging" . isJust <$> current
           , style  ==: whenDragged . isJust <$> current
@@ -87,7 +87,7 @@ data CardConfig t = CardConfig
   , draggingEnabled :: Maybe (Dynamic t Bool)
     -- ^ Is dragging enabled for the card?
 
-  , attributes      :: Maybe (AttributeSet t "div" "HTML")
+  , attributes      :: Maybe (AttributeSet t)
     -- ^ Any additional dynamic attributes.
     --
     -- Note that various card-specific properties will add to or
@@ -160,7 +160,7 @@ draggable
 front :: forall m t. Dom t m
       => Card
       -- ^ The card this represents.
-      -> AttributeSet t "div" "HTML"
+      -> AttributeSet t
       -- ^ Additional attributes for the element.
       -> m (Html t)
 front Card { rank, suit } attributes = do
@@ -180,7 +180,7 @@ back :: forall a m t. Dom t m
      => m a
      -- ^ Design for the card back. Should be an element that can fill
      -- the space (example: 'haskellBack').
-     -> AttributeSet t "div" "HTML"
+     -> AttributeSet t
      -- ^ Additional attributes for the element.
      -> m (Html t, a)
 back backDesign attributes =
@@ -244,7 +244,7 @@ haskellBack = mdo
           logo []
           logo [ transform =: Svg.translate (V2 17 0) <> Svg.flipAround (Deg 0) ]
 
-        logo :: AttributeSet t "g" "SVG" -> m ()
+        logo :: AttributeSet t -> m ()
         logo attributes = void $ Svg.g (base <> attributes) do
           Svg.path $ part <> [ fill =: "#fff7", d =: leftAngle ]
           Svg.path $ part <> [ fill =: "#fff6", d =: lambda ]

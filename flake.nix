@@ -43,7 +43,7 @@
           # acceleration
           #
           # see: https://github.com/NixOS/nixpkgs/pull/170070
-          WEBKIT_DISABLE_COMPOSITING_MODE = 1;
+          # WEBKIT_DISABLE_COMPOSITING_MODE = 1;
         };
       });
 }

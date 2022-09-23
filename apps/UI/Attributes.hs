@@ -38,7 +38,7 @@ import           UI.Url                  (Url)
 --   ...
 -- }
 -- @
-id_ :: Attribute ["HTML", "SVG"] Id
+id_ :: Attribute Id
 id_ = native "id"
 
 -- ** CSS Classes
@@ -69,12 +69,12 @@ id_ = native "id"
 --      , class_ ==: classIf "dragged" <$> beingDragged
 --      ]
 -- @
-class_ :: Attribute ["HTML", "SVG"] (Set ClassName)
+class_ :: Attribute (Set ClassName)
 class_ = native "class"
 
          -- TODO: structured version of CSS style attribute
 -- | Set the CSS styles for an element.
-style :: Attribute ["HTML", "SVG"] CssRules
+style :: Attribute CssRules
 style = native "style"
 
 -- * Element Attributes
@@ -86,5 +86,5 @@ style = native "style"
 -- @
 -- a [href =: "https://example.com"] "link to example.com"
 -- @
-href :: Attribute ["a", "area", "base", "link", "use"] Url
+href :: Attribute Url
 href = native "href"

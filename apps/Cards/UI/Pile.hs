@@ -43,7 +43,7 @@ pile = fst <$> div_ [class_ =: ["pile"]] do
          ]
       -- TODO: 100 ⇒ 100%
       -- TODO: stroke =: "none"
-  where background :: AttributeSet t "pattern" "SVG" -> m ()
+  where background :: AttributeSet t -> m ()
         background attributes = void $ pattern_ attributes do
           let HaskellPaths { lambda } = haskellPaths def
           path [ d =: lambda, fill =: "#aaa" ]

@@ -31,7 +31,7 @@ import           UI.Url        (Url)
 -- @
 -- img [ src =: "img/decoration.png", alt =: "" ]
 -- @
-alt :: Attribute '["img"] Text
+alt :: Attribute Text
 alt = native "alt"
 
 -- | The URL of the resource to fetch and embed in the document.
@@ -41,7 +41,7 @@ alt = native "alt"
 -- @
 -- img [ src =: "img/example.png", alt =: "An example image." ]
 -- @
-src :: Attribute '["img"] Url
+src :: Attribute Url
 src = native "src"
 
 -- * Forms
@@ -62,7 +62,7 @@ src = native "src"
 --   input [ type_ =: Text, id_ =: "username" ]
 --   label [ for =: "username" ] (text "username")
 -- @
-for :: Attribute '["label", "output"] Id
+for :: Attribute Id
 for = native "for"
 
 -- | Associates an 'output' with /multiple/ elements. Plural version
@@ -90,6 +90,6 @@ for = native "for"
 --   input [ type_ =: Range, id_ =: "b", value =: "10" ]
 --   output [ for_ =: ["a"], for_ =: ["b"] ] (text "15")
 -- @
-for_ :: Attribute '["output"] Ids
+for_ :: Attribute Ids
 for_ = native "for"
 

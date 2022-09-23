@@ -36,12 +36,9 @@ import           Data.Functor                      ((<&>))
 import           Data.Hashable                     (Hashable (..))
 import           Data.Map                          (Map)
 import qualified Data.Map                          as Map
-import           Data.Proxy                        (Proxy (..))
 import           Data.Text                         (Text)
-import qualified Data.Text                         as Text
 
 import           GHC.Generics                      (Generic)
-import           GHC.TypeLits                      (KnownSymbol, symbolVal)
 
 import           Reflex                            (Dynamic, Reflex)
 import qualified Reflex.Dom                        as Dom
@@ -89,17 +86,18 @@ instance Reflex t => Dom.HasDomEvent t (Svg t) en where
 --   svgElement @"circle" [class_ =: "ball"] (pure ())
 --   svgElement' @"circle" [class_ =: "ball"]
 -- @
-svgElement :: forall element a m t. (KnownSymbol element, Dom t m)
-           => AttributeSet t element "SVG"
+svgElement :: forall a m t. (Dom t m)
+           => Text
+           -- ^ Tag
+           -> AttributeSet t
            -- ^ attributes
            -> m a
            -- ^ body
            -> m (Svg t, a)
-svgElement attributes body = do
+svgElement tag attributes body = do
   (element, result) <-
     createElement (Just svgNamespace) tag (toDom attributes) body
   pure (Svg element, result)
-  where tag = Text.pack $ symbolVal (Proxy :: Proxy element)
 {-# INLINABLE svgElement #-}
 
 -- | Create an SVG element with no body.
@@ -112,10 +110,11 @@ svgElement attributes body = do
 -- @
 -- svg' @"circle" [class_ =: "ball"]
 -- @
-svgElement' :: forall element m t. (KnownSymbol element, Dom t m)
-            => AttributeSet t element "SVG"
+svgElement' :: forall m t. (Dom t m)
+            => Text
+            -> AttributeSet t
             -> m (Svg t)
-svgElement' attributes = fst <$> svgElement attributes (pure ())
+svgElement' tag attributes = fst <$> svgElement tag attributes (pure ())
 {-# INLINABLE svgElement' #-}
 
 -- ** Grouping
@@ -126,21 +125,21 @@ svgElement' attributes = fst <$> svgElement attributes (pure ())
 -- Can be used both inside other SVG elements and to embed SVG
 -- elements into HTML.
 svg :: forall a m t. Dom t m
-    => AttributeSet t "svg" "SVG"
+    => AttributeSet t
     -- ^ attributes
     -> m a
     -- ^ contents
     -> m (Svg t, a)
-svg = svgElement
+svg = svgElement "svg"
 
 -- | A group of SVG elements.
 g :: forall a m t. Dom t m
-  => AttributeSet t "g" "SVG"
+  => AttributeSet t
   -- ^ Attributes
   -> m a
   -- ^ SVG elements to group
   -> m (Svg t, a)
-g = svgElement
+g = svgElement "g"
 {-# INLINE g #-}
 
 -- | Define elements that are not rendered immediately, but can be
@@ -168,7 +167,7 @@ defs :: forall a m t. Dom t m
      -- ^ A list of definitions.
      -> m (Map Id a)
 defs definitions =
-  snd <$> svgElement @"defs" [] do
+  snd <$> svgElement "defs" [] do
     Map.fromList <$> forM definitions \ (Def name create base) -> do
       result <- create $ base <> [id_ =: name]
       pure (name, result)
@@ -189,8 +188,8 @@ defs definitions =
 -- @
 data Def t m a where
   Def :: Id
-      -> (AttributeSet t element "SVG" -> m a)
-      -> AttributeSet t element "SVG"
+      -> (AttributeSet t -> m a)
+      -> AttributeSet t
       -> Def t m a
 
 -- | Use an element defined elsewhere in the current document,
@@ -208,7 +207,7 @@ data Def t m a where
 use :: forall m t. Dom t m
     => Id
     -- ^ The id of the element to use
-    -> AttributeSet t "use" "SVG"
+    -> AttributeSet t
     -- ^ Other attributes of the @use@ tag. An @href@ set here will be
     -- overridden.
     --
@@ -219,7 +218,8 @@ use :: forall m t. Dom t m
     -- See MDN:
     -- [use](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use)
     -> m (Svg t)
-use elementId attributes = svgElement' $ attributes <> [ href =: Url.byId elementId ]
+use elementId attributes = svgElement' "use" $
+  attributes <> [ href =: Url.byId elementId ]
 
 -- | A @pattern@ element defines an object that can be tiled along x-
 -- and y-coordinate intervals.
@@ -235,12 +235,12 @@ use elementId attributes = svgElement' $ attributes <> [ href =: Url.byId elemen
 --   rect (pure (Rectangle 100 100 0 0)) (pure $ fill $ paintWith "bg")
 -- @
 pattern_ :: forall a m t. Dom t m
-         => AttributeSet t "pattern" "SVG"
+         => AttributeSet t
          -- ^ Attributes
          -> m a
          -- ^ Pattern contents
          -> m (Svg t, a)
-pattern_ = svgElement
+pattern_ = svgElement "pattern"
 
 -- ** Shapes
 
@@ -259,10 +259,10 @@ pattern_ = svgElement
 --        ]
 -- @
 circle :: forall m t. Dom t m
-       => AttributeSet t "circle" "SVG"
+       => AttributeSet t
        -- ^ attributes
        -> m (Svg t)
-circle = svgElement'
+circle = svgElement' "circle"
 
 -- | Create a retangle (@rect@ element).
 --
@@ -278,19 +278,19 @@ circle = svgElement'
 --      ]
 -- @
 rect :: forall m t. Dom t m
-     => AttributeSet t "rect" "SVG"
+     => AttributeSet t
      -- ^ attributes
      -> m (Svg t)
-rect = svgElement'
+rect = svgElement' "rect"
 
 -- | A @path@ element.
 --
 -- The shape of the path is specified by the @d@ attribute.
 path :: forall m t. Dom t m
-     => AttributeSet t "path" "SVG"
+     => AttributeSet t
      -- ^ attributes
      -> m (Svg t)
-path = svgElement'
+path = svgElement' "path"
 
 -- ** Gradients
 
@@ -327,35 +327,33 @@ data Stop = Stop Double Color
 
 -- | A linear gradient, transitioning between stops along a straight
 -- line.
---
--- __Examples__
---
---
 linear :: forall m t. Dom t m
        => Dynamic t [Stop]
        -- ^ Gradient stops
-       -> AttributeSet t "linearGradient" "SVG"
+       -> AttributeSet t
        -- ^ Attributes
        -> m (Svg t)
-linear stops attributes = fst <$> svgElement attributes (dynStops stops)
+linear stops attributes =
+  fst <$> svgElement "linearGradient" attributes (dynStops stops)
 
 -- | A radial gradient which transitions colors from a center point
 -- (@offset = 0@) out in a circle up to some radius (@offset = 1@).
 radial :: forall m t. Dom t m
        => Dynamic t [Stop]
        -- ^ Gradient stops
-       -> AttributeSet t "radialGradient" "SVG"
+       -> AttributeSet t
        -- ^ Attributes
        -> m (Svg t)
-radial stops attributes = fst <$> svgElement attributes (dynStops stops)
+radial stops attributes =
+  fst <$> svgElement "radialGradient" attributes (dynStops stops)
 
 -- | A gradient stop. Defines a color and a position that the gradient
 -- will transition through.
 stop :: forall m t. Dom t m
-     => AttributeSet t "stop" "SVG"
+     => AttributeSet t
      -- ^ attributes
      -> m (Svg t)
-stop = svgElement'
+stop = svgElement' "stop"
 
 -- | A dynamic set of @stop@ elements.
 dynStops :: forall m t. Dom t m

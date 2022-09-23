@@ -151,7 +151,7 @@ haskellPaths Haskell {..} = HaskellPaths { leftAngle, lambda, topLine, bottomLin
 -- Colors taken from Haskell.org logo
 haskell :: forall m t. Dom t m
         => Haskell
-        -> AttributeSet t "g" "SVG"
+        -> AttributeSet t
         -> m (Svg t)
 haskell config attributes = fst <$> g attributes do
   path [ d =: leftAngle, fill =: "#453a62" ]
