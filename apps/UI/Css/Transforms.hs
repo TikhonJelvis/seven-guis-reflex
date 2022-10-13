@@ -10,25 +10,93 @@
 module UI.Css.Transforms where
 
 import           Data.Default.Class      (Default (..))
-import           Data.Foldable           (toList)
 import           Data.Hashable           (Hashable)
+import qualified Data.Map                as Map
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Vector             (Vector)
+import qualified Data.Vector             as Vector
 import           Data.Vector.Instances   ()
 
+import           GHC.Exts                (IsList (..))
 import           GHC.Generics            (Generic)
 
 import           Linear                  (V2 (..), V3 (..))
 
 import           Text.Printf             (printf)
 
+import           UI.Attributes           (CombineAttributeValue, logical)
 import qualified UI.Attributes.Attribute as Attribute
 import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute)
 import qualified UI.Css.Rules            as Rules
 import           UI.Css.Rules            (CssRules)
 import           UI.Css.Values           (Angle, Css, Factor, Length,
                                           RelativeLength, px)
+
+-- | A list of CSS transform functions (see 'Transform') to apply to
+-- the element and its children.
+--
+-- When the @transform@ attribute is set multiple times, it will be
+-- combined with functions added later appearing later in the list of
+-- transforms.
+--
+-- __Example__
+--
+-- Rotate a rectangle by 45°:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [Rotate (Deg 45)]
+--      ]
+-- @
+--
+-- Order matters. Translate /then/ rotate a rectangle:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [translate (V2 10 10), rotate (Deg 45)]
+--      ]
+-- @
+--
+-- Compare with rotating /then/ translating:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [rotate (Deg 45), translate (V2 10 10)]
+--      ]
+-- @
+--
+-- Multiple transforms are combined with later transform functions
+-- added after earlier ones. The same as the previous example:
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: "#36f"
+--      , transform =: [rotate (Deg 45)]
+--      , transform =: [translate (V2 10 10)]
+--      ]
+-- @
+transform :: Attribute Transforms
+transform = logical "transform" $ \ existing transforms ->
+  let rules :: CssRules
+      rules = [("transform", toAttributeValue transforms)]
+  in case transforms of
+    [] -> Map.update delete "style" existing
+    _  -> Map.insertWith (go transforms) "style" (toAttributeValue rules) existing
+  where go transforms _ oldStyle = toAttributeValue @CssRules
+          case fromAttributeValue oldStyle of
+            Just oldStyle' -> oldStyle' <> [("transform", toAttributeValue transforms)]
+            Nothing        -> [("transform", toAttributeValue transforms)]
+
+        delete oldStyle =
+          toAttributeValue . Rules.deleteProperty "transform" <$> fromAttributeValue oldStyle
 
 -- | CSS supports a number of different __transform functions__. Each
 -- of these functions can be expressed as a matrix (with 'Matrix3D'),
@@ -98,6 +166,8 @@ data Transform = Matrix3D !(Vector Double)
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Transform
+
 -- | To the corresponding @<transform-function>@.
 --
 -- >>> toAttributeValue (Matrix3D [1..16])
@@ -149,12 +219,26 @@ instance AsAttributeValue Transform where
 
   fromAttributeValue = error "Parsing CSS not implemented"
 
-    -- TODO: implement fromAttributeValue
-instance AsAttributeValue [Transform] where
-  toAttributeValue = Text.intercalate " " . map toAttributeValue
-  fromAttributeValue = error "unimplemented"
+-- | A series of transforms to be applied in order.
+newtype Transforms = Transforms (Vector Transform)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
+  deriving newtype (Semigroup, Monoid)
 
-  combineAttributeValues = (<>)
+instance IsList Transforms where
+  type Item Transforms = Transform
+
+  toList (Transforms xs) = toList xs
+  fromList = Transforms . fromList
+
+instance CombineAttributeValue Transforms where
+  combineAttributeValues (Transforms a) (Transforms b) = Transforms (a <> b)
+
+    -- TODO: implement fromAttributeValue
+instance AsAttributeValue Transforms where
+  toAttributeValue (Transforms ts) =
+    Text.intercalate " " . map toAttributeValue $ Vector.toList ts
+  fromAttributeValue = error "unimplemented"
 
 -- ** Setting CSS Transforms
 
@@ -166,19 +250,13 @@ instance AsAttributeValue [Transform] where
 addTransform :: Transform -> CssRules -> CssRules
 addTransform = \case
   p@Perspective{} -> Rules.updateProperty before "transform" (toAttributeValue p)
-  transform       -> Rules.updateProperty after "transform" (toAttributeValue transform)
+  t               -> Rules.updateProperty after "transform" (toAttributeValue t)
   where before new old = new <> " " <> old
         after new old  = old <> " " <> new
 
-    -- TODO: handle Perspective correctly?
--- | Set the @tranform@ property of a value, overriding any previous
--- setting.
-setTransform :: [Transform] -> CssRules -> CssRules
-setTransform (toAttributeValue -> transforms) = Rules.setProperty "transform" transforms
-
 -- | Translate an element along the given X and Y distances in @px@.
-translate :: V2 Double -> CssRules -> CssRules
-translate (V2 x y) = addTransform $ Translate (px x) (px y) "0"
+translate :: V2 Double -> Transforms
+translate (V2 x y) = [Translate (px x) (px y) "0"]
 
 -- | Rotate an element in 2D around its @transform-origin@.
 --
@@ -264,6 +342,7 @@ data TransformOrigin = TransformOrigin
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue TransformOrigin
 instance AsAttributeValue TransformOrigin where
   toAttributeValue TransformOrigin { x, y, z } =
     x <> " " <> y <> " " <> z
@@ -288,6 +367,7 @@ data TransformBox = ContentBox | BorderBox | FillBox | StrokeBox | ViewBox
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue TransformBox
 instance AsAttributeValue TransformBox where
   toAttributeValue = \case
     ContentBox -> "content-box"

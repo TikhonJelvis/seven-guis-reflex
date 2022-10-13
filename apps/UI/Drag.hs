@@ -29,7 +29,7 @@ import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..))
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transition (..),
-                                                    s)
+                                                    s, transform)
 import qualified UI.Css.Animations                 as Animations
 import qualified UI.Css.Transforms                 as Transforms
 import           UI.Element                        (Dom)
@@ -64,7 +64,7 @@ demo = void do
     ]
   dragAnywhere
   where translate :: Dynamic t (V2 Double) -> AttributeSet t
-        translate p = [ style ==: Transforms.translate <$> p <*> pure mempty ]
+        translate p = [ transform ==: Transforms.translate <$> p ]
 
         withTransition p = translate p <> [ class_ =: ["smooth-drag"] ]
 
@@ -93,8 +93,9 @@ demo = void do
         dragAnywhere = mdo
           (element, _) <- Html.div_ attributes $
             Dom.text "drag me!"
-          let attributes = [ style ==: translated, class_ =: ["drag-me"] ]
-              translated = Transforms.translate <$> total <*> pure mempty
+          let attributes = [ transform ==: Transforms.translate <$> total
+                           , class_ =: ["drag-me"]
+                           ]
           Drags { total } <- drags def element
           pure ()
 
@@ -123,16 +124,17 @@ demo = void do
             transform <- Reflex.holdDyn Nothing $
               Reflex.leftmost [computed, Nothing <$ end]
             let base = transform <&> \case
-                  Just t  -> Css.setProperty "transform" t mempty
+                  Just t  -> [("transform", toAttributeValue t)]
                   Nothing -> []
             pure ()
           pure ()
 
         dragOrSnap :: Dynamic t (Maybe (V2 Double)) -> AttributeSet t
-        dragOrSnap current = [ style ==: rules ]
-          where rules = current <&> \case
-                  Just d  -> Transforms.translate d mempty
-                  Nothing -> Animations.transition snap mempty
+        dragOrSnap current =
+          [ transform ==: maybe [] Transforms.translate <$> current
+          , style     ==: maybe animate (const []) <$> current
+          ]
+          where animate = Animations.transition snap mempty
         snap = def { property = "transform", duration = s 1}
 
         dragHandle = mdo

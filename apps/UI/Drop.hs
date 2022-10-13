@@ -22,7 +22,7 @@ import           UI.Attributes                     (class_, style,
                                                     toAttributeValue)
 import           UI.Attributes.AttributeSet.Reflex ((=:), (==:))
 import           UI.Color                          (Color)
-import           UI.Css                            (CssRules, s)
+import           UI.Css                            (CssRules, s, transform)
 import qualified UI.Css.Animations                 as Animations
 import           UI.Css.Animations                 (Transition (..))
 import qualified UI.Css.Transforms                 as Transforms
@@ -65,15 +65,12 @@ demo = void do
             let attributes =
                   [ class_ =: ["draggable"]
                   , style ==: rules
+                  , transform ==: Transforms.translate <$> total
                   ]
                 rules = do
                   threshold <- atLeast
                   let isHovering = maybe False (> threshold) . Map.lookup ()
-                  colorHover <- colorIf "green" . isHovering <$> hovering
-
-                  move <- Transforms.translate <$> total
-                  pure $ move colorHover
-
+                  colorIf "green" . isHovering <$> hovering
 
             drags@Drags { total } <-
               Drag.drags def { container = Just container } element
@@ -90,12 +87,9 @@ demo = void do
               Reflex.leftmost [id <$ start, snapTo <$ end]
             let attributes =
                   [ class_ =: ["draggable"]
-                  , style ==: rules
+                  , style ==: snapping <*> mempty
+                  , transform ==: Transforms.translate . fromMaybe 0 <$> current
                   ]
-                rules = do
-                  move    <- Transforms.translate . fromMaybe 0 <$> current
-                  animate <- snapping
-                  pure $ animate $ move mempty
 
             drags@Drags { current, start, end } <-
               Drag.drags def { container = Just container } element

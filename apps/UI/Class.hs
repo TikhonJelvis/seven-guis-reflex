@@ -42,10 +42,13 @@ import           UI.Attributes.Attribute
 newtype ClassName = ClassName Text
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
-  deriving newtype (IsString, AsAttributeValue)
+  deriving newtype (IsString, CombineAttributeValue, AsAttributeValue)
 
 instance Display ClassName where
   displayBuilder (ClassName c) = "." <> displayBuilder c
+
+instance CombineAttributeValue (Set ClassName) where
+  combineAttributeValues = Set.union
 
 instance AsAttributeValue (Set ClassName) where
   toAttributeValue =

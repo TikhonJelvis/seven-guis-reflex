@@ -24,7 +24,7 @@ import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..), classIf)
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transform (..),
-                                                    u)
+                                                    transform, u)
 import qualified UI.Css.Transforms                 as Transforms
 import qualified UI.Drag                           as Drag
 import           UI.Drag                           (DragConfig (..), Drags (..))
@@ -42,8 +42,8 @@ import           UI.Svg.Attributes                 (GradientUnits (..),
                                                     fill_rule, gradientUnits,
                                                     height, paintWith, r,
                                                     stroke, stroke_width,
-                                                    transform, transform_origin,
-                                                    width, x, y)
+                                                    transform_origin, width, x,
+                                                    y)
 import           UI.Svg.Haskell                    (HaskellPaths (..),
                                                     haskellPaths)
 import qualified UI.Url                            as Url
@@ -68,11 +68,16 @@ demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
   where dragAttributes :: Drags t -> Maybe (AttributeSet t)
         dragAttributes Drags { current } = Just
           [ class_ ==: classIf "dragging" . isJust <$> current
+          , style =: [("border-width", "10px")]
+          , style =: [("border-color", "blue")]
           , style  ==: whenDragged . isJust <$> current
+          , transform ==: rotatedWhen . isJust <$> current
           ]
 
-        whenDragged True =
-          Css.setProperty "z-index" (100 :: Double) $ Transforms.rotate (Deg 5) mempty
+        rotatedWhen True  = [Rotate (Deg 5)]
+        rotatedWhen False = []
+
+        whenDragged True = [("z-index", "100")]
         whenDragged False = []
 
         label = Html.div_ [ class_ =: ["label"] ] . Element.text
@@ -134,7 +139,7 @@ draggable
   face
   CardConfig { container, draggingEnabled, attributes } = mdo
   let attributes' = fromMaybe [] attributes <>
-        [ style ==: Transforms.translate <$> total <*> pure mempty
+        [ transform ==: Transforms.translate <$> total
         , style =: Css.backfaceVisibility Css.Hidden mempty
         , class_ ==: classIf "dragging" . isJust <$> current
         , class_ =: ["draggable", "card", ClassName $ suitName suit, ClassName $ rankName rank]

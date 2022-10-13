@@ -10,10 +10,12 @@ module UI.Attributes
   )
 where
 
+import qualified Data.Map                as Map
 import           Data.Set                (Set)
 
 import           UI.Attributes.Attribute
 import           UI.Class                (ClassName)
+import qualified UI.Css.Rules            as Css
 import           UI.Css.Rules            (CssRules)
 import           UI.Id                   (Id)
 import           UI.Url                  (Url)
@@ -72,10 +74,13 @@ id_ = native "id"
 class_ :: Attribute (Set ClassName)
 class_ = native "class"
 
-         -- TODO: structured version of CSS style attribute
 -- | Set the CSS styles for an element.
 style :: Attribute CssRules
-style = native "style"
+style = logical "style" \ existing new ->
+  let go _ = Css.withRules \case
+        Just old -> old <> new
+        Nothing  -> new
+  in Map.insertWith go "style" (toAttributeValue new) existing
 
 -- * Element Attributes
 

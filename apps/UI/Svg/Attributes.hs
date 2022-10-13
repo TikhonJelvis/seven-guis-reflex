@@ -20,11 +20,13 @@ import           Text.ParserCombinators.ReadP (char, choice, readP_to_S,
 import qualified Text.Printf                  as Text
 
 import           UI.Attributes                (AsAttributeValue (..),
-                                               Attribute (..), Lowercase (..),
-                                               native, skipHtmlWhitespace)
+                                               Attribute (..),
+                                               CombineAttributeValue,
+                                               Lowercase (..), native,
+                                               skipHtmlWhitespace)
 import           UI.Color                     (Color)
 import           UI.Css                       (Angle, Transform (..),
-                                               TransformOrigin, px)
+                                               TransformOrigin, Transforms, px)
 import           UI.Css.Values                (Length, RelativeLength)
 import           UI.Id                        (Id (..))
 import           UI.Svg.Path                  (Path)
@@ -94,61 +96,6 @@ r = native "r"
 
 -- ** Transforms
 
-    -- TODO: better way to share between SVG attributes and CSS
-    -- properties?
--- | A list of CSS transform functions (see 'Transform') to apply to
--- the element and its children.
---
--- When the @transform@ attribute is set multiple times, it will be
--- combined with functions added later appearing later in the list of
--- transforms.
---
--- __Example__
---
--- Rotate a rectangle by 45°:
---
--- @
--- rect [ height    =: 10
---      , width     =: 20
---      , fill      =: "#36f"
---      , transform =: [Rotate (Deg 45)]
---      ]
--- @
---
--- Order matters. Translate /then/ rotate a rectangle:
---
--- @
--- rect [ height    =: 10
---      , width     =: 20
---      , fill      =: "#36f"
---      , transform =: [translate (V2 10 10), rotate (Deg 45)]
---      ]
--- @
---
--- Compare with rotating /then/ translating:
---
--- @
--- rect [ height    =: 10
---      , width     =: 20
---      , fill      =: "#36f"
---      , transform =: [rotate (Deg 45), translate (V2 10 10)]
---      ]
--- @
---
--- Multiple transforms are combined with later transform functions
--- added after earlier ones. The same as the previous example:
---
--- @
--- rect [ height    =: 10
---      , width     =: 20
---      , fill      =: "#36f"
---      , transform =: [rotate (Deg 45)]
---      , transform =: [translate (V2 10 10)]
---      ]
--- @
-transform :: Attribute [Transform]
-transform = native "transform"
-
 -- | Translate an element along the given X and Y distances in @px@.
 --
 -- __Example__
@@ -162,7 +109,7 @@ transform = native "transform"
 --      , transform =: [translate (V2 10 20)]
 --      ]
 -- @
-translate :: V2 Double -> [Transform]
+translate :: V2 Double -> Transforms
 translate (V2 x y) = [Translate (px x) (px y) "0"]
 
 -- | Uniformly scale the element.
@@ -176,7 +123,7 @@ translate (V2 x y) = [Translate (px x) (px y) "0"]
 --   circle [ cx =: 10, cy =: 10, r =: 2, fill =: "#36f" ]
 --   circle [ cx =: 15, cy =: 5, r =: 2, fill =: "#f63" ]
 -- @
-scale :: Double -> [Transform]
+scale :: Double -> Transforms
 scale n = [Scale (toAttributeValue n) (toAttributeValue n)]
 
 -- | Rotate an element in 2D around its @transform-origin@.
@@ -184,7 +131,7 @@ scale n = [Scale (toAttributeValue n) (toAttributeValue n)]
 -- See MDN:
 --  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
 --  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
-rotate :: Angle -> [Transform]
+rotate :: Angle -> Transforms
 rotate θ = [Rotate θ]
 
 -- | Flip an element around an axis running through the element's
@@ -209,7 +156,7 @@ rotate θ = [Rotate θ]
 -- @
 -- flipAround (Deg 45)
 -- @
-flipAround :: Angle -> [Transform]
+flipAround :: Angle -> Transforms
 flipAround θ = [Rotate θ, Scale "-1" "1", Rotate (-θ)]
 
 -- | Add a 2D matrix transform.
@@ -237,7 +184,7 @@ flipAround θ = [Rotate θ, Scale "-1" "1", Rotate (-θ)]
 -- (with translation by @(tx, ty)@)
 --
 -- Any other number of entries will result in a runtime error.
-matrix :: Vector Double -> [Transform]
+matrix :: Vector Double -> Transforms
 matrix [a, b, c, d] =
   [Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]]
 matrix [a, b, c, d, tx, ty] =
@@ -263,6 +210,8 @@ data ViewBox = ViewBox
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
+
+instance CombineAttributeValue ViewBox
 
 -- | >>> toAttributeValue $ ViewBox (V2 0 1) (V2 10 20)
 -- "0.0 1.0 10.0 20.0"
@@ -323,7 +272,7 @@ data SpreadMethod = Pad
                   -- ^ Repeat the gradient, resetting @offset@ to @0..1@.
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving AsAttributeValue via Lowercase SpreadMethod
+  deriving (CombineAttributeValue, AsAttributeValue) via Lowercase SpreadMethod
 
 -- | How a gradient should behave outside of its bounds.
 --
@@ -355,6 +304,7 @@ data GradientUnits = UserSpaceOnUse
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue GradientUnits
 instance AsAttributeValue GradientUnits where
   toAttributeValue = \case
     UserSpaceOnUse    -> "userSpaceOnUse"
@@ -427,7 +377,7 @@ data FillRule = Nonzero
               -- and outside if @ltr - rtl@ is even.
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving AsAttributeValue via Lowercase FillRule
+  deriving (CombineAttributeValue , AsAttributeValue) via Lowercase FillRule
 
 -- TODO: examples
 -- | Set the algorithm to use for filling complex shapes.
@@ -495,6 +445,7 @@ newtype Dasharray = Dasharray (Vector Length)
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Dasharray
 instance AsAttributeValue Dasharray where
   toAttributeValue (Dasharray a) = case toList a of
     [] -> "none"
@@ -553,7 +504,7 @@ data Linecap = Butt
              -- determined by @stroke-width@.
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving AsAttributeValue via Lowercase Linecap
+  deriving (CombineAttributeValue, AsAttributeValue) via Lowercase Linecap
 
 -- | The shape to draw at the end of lines.
 --
@@ -578,6 +529,7 @@ data Linejoin = Arcs | Bevel | Miter | MiterClip | Round_
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Linejoin
 instance AsAttributeValue Linejoin where
   toAttributeValue = \case
     Arcs      -> "arcs"
@@ -629,6 +581,7 @@ data Paint = None
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Paint
 instance AsAttributeValue Paint where
   toAttributeValue = \case
     None                  -> "none"

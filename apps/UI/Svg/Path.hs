@@ -12,7 +12,7 @@ import           GHC.Generics  (Generic)
 
 import           Text.Printf   (printf)
 
-import           UI.Attributes (AsAttributeValue (..))
+import           UI.Attributes (AsAttributeValue (..), CombineAttributeValue)
 
 -- | A sequence of commands specifying a path.
 newtype Path = Path { toCommands :: [Command] }
@@ -25,6 +25,7 @@ instance IsList Path where
   fromList = Path
   toList = toCommands
 
+instance CombineAttributeValue Path
 instance AsAttributeValue Path where
   toAttributeValue (Path commands) =
     Text.intercalate " " $ toAttributeValue <$> commands
@@ -233,6 +234,7 @@ data Command = M !Double !Double
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Command
 instance AsAttributeValue Command where
   toAttributeValue = Text.pack . \case
     M x y                      -> printf "M %f,%f" x y

@@ -12,7 +12,8 @@ import           Data.Text.Display       (Display)
 import           GHC.Exts                (IsList)
 import           GHC.Generics            (Generic)
 
-import           UI.Attributes.Attribute (AsAttributeValue (..))
+import           UI.Attributes.Attribute (AsAttributeValue (..),
+                                          CombineAttributeValue (..))
 
 -- | A CSS property name.
 newtype Property = Property Text
@@ -31,6 +32,10 @@ newtype CssRules = CssRules (Map Property Text)
   deriving anyclass (Hashable)
   deriving newtype (IsList, Semigroup, Monoid)
 
+instance CombineAttributeValue CssRules where
+   -- we want *newer* values (second argument) to take priority
+  combineAttributeValues = flip (<>)
+
 instance AsAttributeValue CssRules where
   toAttributeValue (CssRules (Map.toList -> rules)) =
     Text.intercalate ";" [ property <> " : " <> value
@@ -46,9 +51,11 @@ instance AsAttributeValue CssRules where
             let (a, b) = Text.break (== ':') declaration
             in (Property $ Text.strip a, Text.strip $ Text.drop 1 b)
 
-  combineAttributeValues = (<>)
-
 -- * Manipulating CSS Rules
+
+-- | Apply an operation over a set of CSS rules encoded in text.
+withRules :: (Maybe CssRules -> CssRules) -> Text -> Text
+withRules f css = toAttributeValue $ f (fromAttributeValue css)
 
     -- TODO: types CSS rules based on Attribute + AttributeSet
 -- | Set a property to a given value.
@@ -102,6 +109,10 @@ updateProperty :: (Text -> Text -> Text)
                -> CssRules
 updateProperty f property value (CssRules rules) =
   CssRules $ Map.insertWith f property value rules
+
+-- | Remove the given property from the set of rules, if present.
+deleteProperty :: Property -> CssRules -> CssRules
+deleteProperty property (CssRules rules) = CssRules $ Map.delete property rules
 
 -- | Set the @user-select@ and @-webkit-user-select@ properties.
 --

@@ -38,7 +38,7 @@ import           UI.Attributes.Attribute
 newtype Id = Id Text
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
-  deriving newtype (IsString, AsAttributeValue)
+  deriving newtype (IsString, CombineAttributeValue, AsAttributeValue)
 
 instance Display Id where
   displayBuilder (Id i) = "#" <> displayBuilder i
@@ -54,8 +54,12 @@ instance IsList Ids where
   toList (Ids ids) = toList ids
 
     -- TODO: fromAttributeValue (once we've switched to megaparsec)
+instance CombineAttributeValue Ids where
+  combineAttributeValues (Ids a) (Ids b) = Ids (a <> b)
+
 instance AsAttributeValue Ids where
   toAttributeValue (Ids xs) =
     Text.intercalate " " $ Vector.toList $ toAttributeValue <$> xs
 
-  fromAttributeValue = undefined
+  fromAttributeValue =
+    error "Unimplemented: need parsing library (or something)"

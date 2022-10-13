@@ -18,7 +18,8 @@ import qualified Numeric
 
 import           Text.Printf            (printf)
 
-import           UI.Attributes          (AsAttributeValue (..))
+import           UI.Attributes          (AsAttributeValue (..),
+                                         CombineAttributeValue)
 
 -- | A color with an alpha channel.
 newtype Color = Color (AlphaColour Double)
@@ -47,6 +48,7 @@ toRgba (Color c) = (r, g, b, a)
   where Colour.RGB r g b = Colour.toSRGB24 (c `over` Colour.black)
         a = round $ 255 * Colour.alphaChannel c
 
+instance CombineAttributeValue Color
 -- | Colors with 100% opacity are rendered as @#xxxxxx@ and colors
 -- with any other level of opacity are rendered as @#xxxxxxxx@.
 instance AsAttributeValue Color where
@@ -91,6 +93,8 @@ newtype Opaque = Opaque (Colour Double)
 instance Hashable Opaque where
   hashWithSalt s (Opaque c) = hashWithSalt s (r, g, b)
     where RGB r g b = Colour.toSRGB24 c
+
+instance CombineAttributeValue Opaque
 
 -- | Renders to @#xxxxxx@ format, always lowercase
 --

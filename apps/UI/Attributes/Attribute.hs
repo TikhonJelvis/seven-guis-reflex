@@ -63,11 +63,14 @@ module UI.Attributes.Attribute
   , logical
   , boolean
   , (=.)
-  , override
 
+  , CombineAttributeValue (..)
   , AsAttributeValue (..)
   , ShowRead (..)
   , Lowercase (..)
+
+  , Month (..)
+  , Week (..)
 
   , htmlWhitespace
   , isHtmlWhitespace
@@ -83,7 +86,9 @@ import qualified Data.Char                    as Char
 import           Data.GADT.Compare            (GCompare (..), GEq (..),
                                                GOrdering (..))
 import           Data.GADT.Show               (GShow (..))
+import           Data.Hashable                (Hashable)
 import           Data.Map                     (Map)
+import qualified Data.Map                     as Map
 import           Data.Proxy                   (Proxy (..))
 import           Data.Set                     (Set)
 import           Data.Text                    (Text)
@@ -152,9 +157,9 @@ import qualified Unsafe.Coerce                as Unsafe
 --   ["cx" =. x, "cy" =. y, "r" =. radius]
 -- @
 data Attribute a = Attribute
-  { toAttributes :: a -> Map Text Text
+  { toAttributes :: Map Text Text -> a -> Map Text Text
   -- ^ How to convert the attribute value to one or more HTML
-  -- attributes.
+  -- attributes, given the current attribute values.
 
   , combine      :: a -> a -> a
   -- ^ How to combine two instances of this attribute.
@@ -225,19 +230,27 @@ instance GCompare Attribute where
 
 -- | Define a __native__ attribute: an 'Attribute' that corresponds 1:1
 -- with an attribute on the element.
+--
+-- This will use the type's underlying combine function to handle
+-- previous DOM values set to the attribute.
 native :: forall a. (Typeable a, AsAttributeValue a)
        => Text
        -- ^ attribute name
        -> Attribute a
 native name = Attribute
-  { toAttributes = \ a -> [(name, toAttributeValue a)]
+  { toAttributes = \ attributes a ->
+      case fromAttributeValue =<< Map.lookup name attributes of
+        Just previous -> [(name, toAttributeValue $ combineAttributeValues previous a)]
+        Nothing       -> [(name, toAttributeValue a)]
   , combine      = combineAttributeValues
   , type_        = Just $ typeRep (Proxy @a)
   , name
   }
 
+  -- TODO: Do we still need Typeable a?
 -- | Define a __logical__ attribute by providing a mapping from the
--- attribute value to a set of HTML/XML attribute-value pairs.
+-- attribute value and the current compiled attributes to a set of
+-- HTML/XML attribute-value pairs.
 --
 -- Values will be combined by taking the newer value, overriding the
 -- older value.
@@ -246,18 +259,18 @@ native name = Attribute
 --
 -- @
 -- c :: Attribute Circle
--- c = logical "c" \ Circle { center = V2 x y, radius } ->
+-- c = logical "c" \ _ Circle { center = V2 x y, radius } ->
 --       ["cx" =. x, "cy" =. y, "r" =. radius]
 -- @
-logical :: forall a. Typeable a
+logical :: forall a. (CombineAttributeValue a, Typeable a)
         => Text
         -- ^ attribute name
-        -> (a -> Map Text Text)
+        -> (Map Text Text -> a -> Map Text Text)
         -- ^ mapping to native attributes
         -> Attribute a
 logical name toAttributes = Attribute
   { toAttributes
-  , combine = const
+  , combine = combineAttributeValues
   , name
   , type_ = Just $ typeRep (Proxy @a)
   }
@@ -284,9 +297,9 @@ logical name toAttributes = Attribute
 -- -- ⇒ <input type="checkbox">
 -- @
 boolean :: Text -> Attribute Bool
-boolean name = logical name $ \case
-  True  -> [(name, "")]
-  False -> []
+boolean name = logical name set
+  where set _ True  = [(name, "")]
+        set _ False = []
 
 -- | Encode a pair of an attribute name and value.
 --
@@ -311,75 +324,22 @@ boolean name = logical name $ \case
 (=.) :: AsAttributeValue a => Text -> a -> (Text, Text)
 attribute =. value = (attribute, toAttributeValue value)
 
--- | Override any value set for the given name, using the provided
--- 'Text' value directly on the element.
---
--- This lets us:
---
---  * override attributes like @class_@ that collect multiple values
---
---  * set attributes to invalid/non-standard/unsupported values
---
---  * set attributes not supported by the library or on elements the
---    library does not support
---
---  * set attributes where the attribute name is dynamic
---
--- A value set with 'override' will always take precdence over other
--- native/logical attributes with the same name. If 'override' is used
--- multiple times, only the /last/ value will be set.
---
--- __Example__
---
--- Setting a @data-<foo>@ attribute with a dynamic name:
---
--- @
--- data_ :: Text -> Attribute Text
--- data_ name = override ("data-" <> name)
---
--- myElement dataValue = div [ data_ "my-data" =: dataValue ] (pure ())
--- @
---
--- Overriding the @type@ of an @input@ element, normally set through
--- the type parameter:
---
--- @
--- -- will be a password field, not a text field
--- myInput = input @"text" [ override "type" =: "password" ]
--- @
---
--- Set a non-standard (Safari-only) attribute:
---
--- @
--- input @"text" [ override "autocorrect" =: "off" ]
--- @
-override :: Text -> Attribute Text
-override name = Attribute
-  { name
-  , type_        = Nothing -- different than "normal" Text attribute
-  , toAttributes = \ value -> [(name, value)]
-  , combine      = const
-  }
-
 -- * Attribute Values
 
--- | Types that can be converted to and from HTML or XML attribute
--- values.
-class AsAttributeValue a where
-  -- TODO: handle escaping attribute values properly?
-  -- | Convert to an attribute value.
-  --
-  -- This should be be valid HTML syntax for an attribute value
-  -- /without/ surrounding quotes, but with any internal quotes
-  -- escaped as necessary.
-  toAttributeValue :: a -> Text
-
-  -- | Parse HTML syntax for an attribute into the corresponding
-  -- value. Returns 'Nothing' if the value cannot be parsed, either
-  -- because the HTML is invalid or because the corresponding Haskell
-  -- type does not cover all valid possibilities.
-  fromAttributeValue :: Text -> Maybe a
-
+                     -- TODO: use plain Semigroup instead?
+-- | Values that can be combined into a single attribute.
+--
+-- Most attributes do not have a logical way to combine values, so the
+-- default is to keep the newer (second) value. However, some types
+-- have logical ways to keep both the existing and the new
+-- values. Examples:
+--
+--  - @Set ClassName@ (for @class@) combines through set union
+--  - @[Transform]@ (for CSS transforms) composes the transforms in
+--    order
+--
+-- Think of this as a DOM-specific variant of 'Semigroup'.
+class CombineAttributeValue a where
   -- | How to combine values when multiple values are specified for
   -- the same attribute.
   --
@@ -411,43 +371,90 @@ class AsAttributeValue a where
   combineAttributeValues :: a -> a -> a
   combineAttributeValues _old new = new
 
--- | For optional values. When nothing, convert to HTML as the empty
--- string (@""@).
---
--- Note: for @Text@, this means that @Just ""@ and @Nothing@ are not
--- distinguishable as attribute values.
+-- | Types that can be converted to and from HTML or XML attribute
+-- values.
+class CombineAttributeValue a => AsAttributeValue a where
+  -- TODO: handle escaping attribute values properly?
+  -- | Convert to an attribute value.
+  --
+  -- This should be be valid HTML syntax for an attribute value
+  -- /without/ surrounding quotes, but with any internal quotes
+  -- escaped as necessary.
+  toAttributeValue :: a -> Text
+
+  -- | Parse HTML syntax for an attribute into the corresponding
+  -- value. Returns 'Nothing' if the value cannot be parsed, either
+  -- because the HTML is invalid or because the corresponding Haskell
+  -- type does not cover all valid possibilities.
+  fromAttributeValue :: Text -> Maybe a
+
+instance CombineAttributeValue (Maybe a)
 instance AsAttributeValue a => AsAttributeValue (Maybe a) where
   toAttributeValue = maybe "" toAttributeValue
-  fromAttributeValue ""   = Just Nothing
-  fromAttributeValue text = Just <$> fromAttributeValue text
 
+  fromAttributeValue = \case
+    ""    -> Just Nothing
+    value -> Just <$> fromAttributeValue value
+
+instance CombineAttributeValue Bool
+
+instance CombineAttributeValue Text
 instance AsAttributeValue Text where
   toAttributeValue = id
   fromAttributeValue = Just
 
+instance CombineAttributeValue String
 instance AsAttributeValue String where
   toAttributeValue = Text.pack
   fromAttributeValue = Just . Text.unpack
 
+instance CombineAttributeValue Int
 deriving via ShowRead Int instance AsAttributeValue Int
+
+instance CombineAttributeValue Integer
 deriving via ShowRead Integer instance AsAttributeValue Integer
+
+instance CombineAttributeValue Word
 deriving via ShowRead Word instance AsAttributeValue Word
+
+instance CombineAttributeValue Natural
 deriving via ShowRead Natural instance AsAttributeValue Natural
+
+instance CombineAttributeValue Double
 deriving via ShowRead Double instance AsAttributeValue Double
+
+instance CombineAttributeValue Day
 deriving via ShowRead Day instance AsAttributeValue Day
 
+instance CombineAttributeValue TimeOfDay
 instance AsAttributeValue TimeOfDay where
   toAttributeValue = Text.pack . Time.iso8601Show
   fromAttributeValue (Text.unpack -> str) =
     Time.iso8601ParseM str <|> Time.iso8601ParseM (str <> ":00")
     -- seconds are optional in the normalized HTML time format
 
+instance CombineAttributeValue LocalTime
 instance AsAttributeValue LocalTime where
   toAttributeValue = Text.pack . Time.iso8601Show
   fromAttributeValue (Text.unpack -> str) =
     Time.iso8601ParseM str <|> Time.iso8601ParseM (str <> ":00")
     -- the normalized datetime-local format in HTML leaves out the
     -- seconds when they are :00
+
+  -- TODO: use type as defined in newer (>= 1.12) versions of time?
+-- | A month (1–12) in a given year
+data Month = Month Integer Int
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+
+instance CombineAttributeValue Month
+
+-- | A week (0–53) in a given year.
+data Week = Week Integer Int
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (Hashable)
+
+instance CombineAttributeValue Week
 
 -- ** Deriving Via
 
@@ -470,6 +477,7 @@ instance AsAttributeValue LocalTime where
 newtype ShowRead a = ShowRead a
   deriving newtype (Show, Read)
 
+instance CombineAttributeValue (ShowRead a)
 instance (Show a, Read a) => AsAttributeValue (ShowRead a) where
   toAttributeValue = Text.pack . show
   fromAttributeValue = readMaybe . Text.unpack
@@ -487,6 +495,7 @@ instance (Show a, Read a) => AsAttributeValue (ShowRead a) where
 newtype Lowercase a = Lowercase a
   deriving newtype (Show, Read)
 
+instance CombineAttributeValue (Lowercase a)
 instance (Show a, Read a) => AsAttributeValue (Lowercase a) where
   toAttributeValue = Text.toLower . Text.pack . show
   fromAttributeValue = readMaybe . Text.unpack . capitalize

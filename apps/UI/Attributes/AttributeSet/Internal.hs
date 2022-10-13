@@ -141,11 +141,6 @@ empty :: forall f. AttributeSet f
 empty = AttributeSet DMap.empty
 
 -- | A set of attributes with a single attribute set.
---
--- >>> import UI.Attributes.Attribute (override)
--- >>> import Data.Functor.Identity (Identity)
--- >>> display $ singleton @Identity @"HTML" (override @'["HTML"] "foo" =: "bar")
--- "[foo=\"...\"]"
 singleton :: forall f. Applicative f => SetAttribute f -> AttributeSet f
 singleton = \case
   SetAttribute attribute value -> AttributeSet $ DMap.singleton attribute value
@@ -165,8 +160,7 @@ instance Applicative f => IsList (AttributeSet f) where
              -> DMap Attribute f
              -> DMap Attribute f
           go (SetAttribute attribute v) =
-            DMap.insertWithKey' (combineDyn attribute) attribute v
-          combineDyn attribute _ = liftA2 (Attribute.combine attribute)
+            DMap.insertWithKey' (const $ liftA2 $ Attribute.combine attribute) attribute v
 
   toList :: AttributeSet f -> [SetAttribute f]
   toList (AttributeSet dmap) = DMap.foldrWithKey go [] dmap
@@ -231,17 +225,8 @@ infixr 1 ==:
 --              | (attribute, value) <- toList attributeSet
 --              ]
 -- @
---
--- Note: if there are multiple attributes with different types setting
--- the same name, only one value will be set:
---
---  * if one was set with 'override', it takes precdence over others
---
---  * if multiple attributes were set /without/ 'override', which one
---    takes precdence is unspecified
 toDom :: forall f. Applicative f => AttributeSet f -> f (Map Text Text)
 toDom (AttributeSet dmap) = DMap.foldlWithKey go (pure []) dmap
   where go :: forall v. f (Map Text Text) -> Attribute v -> f v -> f (Map Text Text)
         go existing attribute value =
-          liftA2 (<>) converted existing
-          where converted = Attribute.toAttributes attribute <$> value
+          Attribute.toAttributes attribute <$> existing <*> value

@@ -23,7 +23,8 @@ import           Text.Printf             (printf)
 import qualified Text.URI                as URI
 import           Text.URI                (URI)
 
-import           UI.Attributes.Attribute (AsAttributeValue (..))
+import           UI.Attributes.Attribute (AsAttributeValue (..),
+                                          CombineAttributeValue)
 import           UI.Id                   (Id (..))
 
 -- | A URL for referring to external locations like links,
@@ -45,6 +46,7 @@ instance Hashable Url where
 instance Display Url where
   displayBuilder = Builder.fromText . URI.render . toURI
 
+instance CombineAttributeValue Url
 instance AsAttributeValue Url where
   toAttributeValue = URI.render . toURI
   fromAttributeValue = parseUrl

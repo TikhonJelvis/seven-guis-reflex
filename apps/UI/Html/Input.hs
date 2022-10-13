@@ -101,7 +101,10 @@ import           Reflex                              (Dynamic, Event, Reflex)
 import qualified Reflex.Dom                          as Dom
 
 import           UI.Attributes.Attribute             (AsAttributeValue,
-                                                      Attribute, boolean,
+                                                      Attribute,
+                                                      CombineAttributeValue,
+                                                      Month (..), Week (..),
+                                                      boolean,
                                                       fromAttributeValue,
                                                       isHtmlWhitespace, logical,
                                                       native, toAttributeValue,
@@ -223,8 +226,6 @@ input type_ attributes config = do
   pure $ HtmlInput element
   where domAttributes =
           toDom $ attributes <> [native "type" =: type_]
-        -- NOTE: using native rather than override so that "type" can
-        -- always be overriden by the caller
 {-# INLINABLE input #-}
 
 -- | A version of 'input' that automatically handles converting
@@ -773,13 +774,15 @@ data Enabled = Enabled
   deriving stock (Show, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Enabled
+
 -- | 'Enabled' if 'True', 'Disabled' if 'False'.
 enabledIf :: Bool -> Enabled
 enabledIf = bool Disabled Enabled
 
 -- | Set whether an input is enabled or disabled.
 enabled :: Attribute Enabled
-enabled = logical "enabled" \case
+enabled = logical "enabled" $ const \case
   Enabled  -> []
   Disabled -> [("disabled", "")]
 
@@ -843,7 +846,7 @@ number_max = native "max"
 -- If the user enters a value that does not conform to the step, the
 -- browser will round it to the nearest valid value.
 number_step :: Attribute (Maybe Double)
-number_step = logical "step" \case
+number_step = logical "step" $ const \case
   Just n  -> ["step" =. n]
   Nothing -> ["step" =. ("any" :: Text)]
 
@@ -885,22 +888,24 @@ color_value = native "value"
 -- __Example__
 --
 -- @
--- month [ month_value =: (2022, 12) ] never
+-- month [ month_value =: Month 2022 12 ] never
 -- @
-month_value :: Attribute (Integer, Int)
-month_value = logical "value" (\ month -> [("value", toText month)])
-  where toText = Text.pack . Time.formatShow Time.yearMonthFormat
+month_value :: Attribute Month
+month_value = logical "value" (\ _ month -> [("value", toText month)])
+  where toText (Month y m) =
+          Text.pack $ Time.formatShow Time.yearMonthFormat (y, m)
 
 -- | A value for week inputs: (year, week) pairs.
 --
 -- __Example__
 --
 -- @
--- week [ week_value =: (2022, 37) ] never
+-- week [ week_value =: Week 2022 37 ] never
 -- @
-week_value :: Attribute (Integer, Int)
-week_value = logical "value" (\ month -> [("value", toText month)])
-  where toText = Text.pack . Time.formatShow (Time.yearWeekFormat Time.ExtendedFormat)
+week_value :: Attribute Week
+week_value = logical "value" (\ _ month -> [("value", toText month)])
+  where toText (Week y w) =
+          Text.pack $ Time.formatShow (Time.yearWeekFormat Time.ExtendedFormat) (y, w)
 
 -- | A value for date pickers.
 --

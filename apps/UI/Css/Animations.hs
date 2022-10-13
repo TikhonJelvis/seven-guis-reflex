@@ -8,7 +8,8 @@ import           Data.Vector.Instances   ()
 
 import           GHC.Generics            (Generic)
 
-import           UI.Attributes           (AsAttributeValue)
+import           UI.Attributes           (AsAttributeValue,
+                                          CombineAttributeValue)
 import           UI.Attributes.Attribute (AsAttributeValue (..))
 import qualified UI.Css.Rules            as Rules
 import           UI.Css.Rules            (CssRules, Property (..))
@@ -45,6 +46,7 @@ data Transition = Transition
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Transition
 instance AsAttributeValue Transition where
   toAttributeValue Transition { property, duration, timing, delay } =
     Text.intercalate " " [ toAttributeValue property

@@ -26,6 +26,7 @@ import qualified Text.Email.Validate     as Validate
 import qualified Text.Printf             as Text
 
 import           UI.Attributes.Attribute (AsAttributeValue (..),
+                                          CombineAttributeValue (..),
                                           isHtmlWhitespace)
 
 -- | A valid email address with its parts encoded in UTF-8.
@@ -44,11 +45,15 @@ instance IsString Email where
     Just email -> email
     Nothing    -> error $ Text.printf "Invalid email syntax: “%s”" string
 
+instance CombineAttributeValue Email
 instance AsAttributeValue Email where
   toAttributeValue = toText
   fromAttributeValue = validate
 
 -- | comma separated list of email addresses
+instance CombineAttributeValue (Vector Email) where
+  combineAttributeValues = (<>)
+
 instance AsAttributeValue (Vector Email) where
   toAttributeValue =
     Text.intercalate "," . map toAttributeValue . Vector.toList

@@ -1,4 +1,12 @@
 * Attribute Sets
+Attribute sets are a mapping of *attributes* to *structured values*
+which can be converted to strings and set on DOM elements.
+
+Each attribute supports values of some corresponding Haskell type. The
+type of value determines how it is converted to/from DOM strings as
+well as how multiple instances of the same attribute are combined.
+
+* Design Notes
 The main reflex-dom pattern for working with DOM elements has two levels:
 
   1. Pulling together time-varying values (dynamics/etc) to specify
@@ -25,7 +33,7 @@ concepts: *attributes* and *attribute sets*.
     Note that this reasonably describes both *native* attributes of
     DOM elements as well as *logical* attributes that map a value to
     zero or more native attributes on an element.
-    
+
   - attribute set :: a set of attribute definitions, mapping
     attributes to values that can change over time. The attributes for
     a given element often pull in values and logic from distinct parts
@@ -39,13 +47,23 @@ HTML or SVG. However, I later found it was useful to support *logical*
 attributes where a single Haskell value would map to zero or more
 *native* attributes:
 
-  1. Structured attributes. Example: ~center~ takes 2D points as
-     values and maps to the native ~cx~ and ~cy~ attributes in SVG.
+  - Structured attributes :: Attributes like ~center~ that take a
+    structured value (~V2 Length~ for points) and maps to the native
+    ~cx~ and ~cy~ attributes in SVG.
 
-  2. Boolean attributes. Example: ~enabled~ is either ~Enabled~ or
-     ~Disabled~. When ~Disabled~, it sets the ~disabled~ attribute
-     on the element with no value; when ~Enabled~, it removes the
-     ~disabled~ attribute (if set).
+  - Boolean attributes :: Attributes like ~disabled~ do not have a
+    meaningful value; instead, they are turned on by setting them on
+    an element and turned off by removing them. We can implement these
+    as logical attributes with either a ~Bool~ or domain-specific (ie
+    ~Enabled~) value.
+
+  - CSS properties :: SVG already supports setting (most?) CSS
+    properties as attributes; supporting logical properties lets us
+    do this in HTML as well (implemented in terms of the ~style~
+    attribute).
+
+Supporting logical attributes lets the system /grow/[fn:1] because it
+lets users add attributes that behave just like native ones.
 
 **** Overlap
 
@@ -62,12 +80,29 @@ We might also want to provide some code facilities that make it easier
 to understand how the structured definitions in an attribute set get
 mapped to native attributes with string values.
 
+Idea: handle overlap as part of the ~AsAttributeValue~ class, same as
+~combine~. This gives us two levels: first, multiple instances of /the
+same attribute/ are combined with ~combine~; then, when attributes are
+converted to DOM strings, the attribute implementation is responsible
+for handling the existing DOM value (if any).
+
+This /does/ create some confusing behavior around which attribute
+value will take precedence when multiple logical attributes want to
+override (rather than add to) the same native attribute. For now, I
+will avoid this question by not defining logical attributes that
+overlap unless they can be logically combined at the DOM string level
+(~class~, ~style~... etc); if it becomes a problem, I'll figure out a
+principle for handling it down the line.
+
 ** Attribute Sets
 *** Nesting
 Most attributes have a single scalar value (like a number or string),
 but some attributes like ~style~ have a nested structure of their
 own. This is important in practice: controlling an element's style
 often takes more logic than setting all the other attributes!
+
+Solution: expose CSS properties as attributes, take care of combining
+into a single ~style~ attribute in the final rendering step.
 
 *** Extension
 In writing base reflex-dom code, a common pattern I encountered was
@@ -133,6 +168,11 @@ attribute set, the order of diffs will matter. I expect that this will
 still be clearer than the entirely symmetric monoidal operation and
 will also come up a lot less often than applying a diff to a base
 attribute set.
+
+The downside is extra complexity: a set of operations + somewhat
+duplicated logic for /defining/ and /modifying/ attribute sets. After
+playing with some code I'm leaning against having diffs for this
+reason, but I'm still open to it down the line.
 
 ** In Haskell
 Since attributes and attribute sets are key concepts for this library,
@@ -292,3 +332,7 @@ exactly the same type.
 In practice, this means that list literals for attribute sets work
 well when they're defined where they're used but cause problems when
 they're moved to a helper variable, returned from a function... etc.
+
+* Footnotes
+
+[fn:1] "Grow" in the sense of [[https://www.youtube.com/watch?v=_ahvzDzKdB0]["Growing a Language"]] by Guy Steele

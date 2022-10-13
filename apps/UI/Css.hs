@@ -25,6 +25,7 @@ import           GHCJS.DOM.Types               (MonadDOM)
 import           GHCJS.DOM.Window              as Window
 
 import           UI.Attributes                 (AsAttributeValue (toAttributeValue),
+                                                CombineAttributeValue,
                                                 Lowercase (..))
 import           UI.Css.Animations
 import           UI.Css.Rules
@@ -39,7 +40,7 @@ import           UI.Element.IsElement          (IsElement, rawElement)
 data BackfaceVisibility = Visible | Hidden
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
   deriving anyclass (Hashable)
-  deriving AsAttributeValue via Lowercase BackfaceVisibility
+  deriving (CombineAttributeValue, AsAttributeValue) via Lowercase BackfaceVisibility
 
 -- | Set the @backface-visibility@ CSS property.
 backfaceVisibility :: BackfaceVisibility -> CssRules -> CssRules

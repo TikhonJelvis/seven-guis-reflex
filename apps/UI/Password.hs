@@ -8,7 +8,8 @@ import           Data.Text.Display       (Display, ShowInstance (..))
 
 import           GHC.Generics            (Generic)
 
-import           UI.Attributes.Attribute (AsAttributeValue)
+import           UI.Attributes.Attribute (AsAttributeValue,
+                                          CombineAttributeValue)
 
 -- | A password.
 --
@@ -24,7 +25,7 @@ import           UI.Attributes.Attribute (AsAttributeValue)
 newtype Password = Password Text
   deriving stock (Eq, Ord, Generic)
   deriving anyclass (Hashable)
-  deriving newtype (AsAttributeValue)
+  deriving newtype (CombineAttributeValue, AsAttributeValue)
   deriving Display via ShowInstance Password
 
 instance Show Password where

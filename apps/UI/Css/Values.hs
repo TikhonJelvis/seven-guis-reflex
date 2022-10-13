@@ -35,7 +35,8 @@ import           Data.Vector.Instances ()
 
 import           GHC.Generics          (Generic)
 
-import           UI.Attributes         (AsAttributeValue (..))
+import           UI.Attributes         (AsAttributeValue (..),
+                                        CombineAttributeValue (combineAttributeValues))
 
 -- * CSS Values
 
@@ -57,6 +58,13 @@ data Css a = Value a
            | Unset
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (Hashable)
+
+instance CombineAttributeValue a => CombineAttributeValue (Css a) where
+  combineAttributeValues a b
+    | isSpecial a || isSpecial b = b
+    | otherwise                  = combineAttributeValues a b
+    where isSpecial Value{} = False
+          isSpecial _       = True
 
 instance AsAttributeValue a => AsAttributeValue (Css a) where
   toAttributeValue = \case
@@ -164,6 +172,7 @@ pattern Grad :: Double -> Angle
 pattern Grad θ <- Rad ((* (200 / pi)) -> θ)
   where Grad θ = Rad (θ * pi / 200)
 
+instance CombineAttributeValue Angle
 instance AsAttributeValue Angle where
   toAttributeValue (Rad d) = toAttributeValue d <> "rad"
 
@@ -178,6 +187,7 @@ newtype Duration = Duration Double
   deriving newtype (Read, Num, Real, Fractional, Floating)
   deriving anyclass (Hashable)
 
+instance CombineAttributeValue Duration
 instance AsAttributeValue Duration where
   toAttributeValue (Duration d) = toAttributeValue d <> "ms"
 
