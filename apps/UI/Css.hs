@@ -5,6 +5,8 @@ module UI.Css
   , module UI.Css.Transforms
   , module UI.Css.Values
 
+  , zIndex
+  
   , BackfaceVisibility (..)
   , backfaceVisibility
 
@@ -25,6 +27,7 @@ import           GHCJS.DOM.Types               (MonadDOM)
 import           GHCJS.DOM.Window              as Window
 
 import           UI.Attributes                 (AsAttributeValue (toAttributeValue),
+                                                Attribute,
                                                 CombineAttributeValue,
                                                 Lowercase (..))
 import           UI.Css.Animations
@@ -33,9 +36,13 @@ import           UI.Css.Transforms
 import           UI.Css.Values
 import           UI.Element.IsElement          (IsElement, rawElement)
 
--- * CSS Properties
+-- * Miscellaneous Properties
 
--- ** Misc
+-- | The z-index of an element controls whether it is rendered above
+-- or below other elements. An element with a higher z-index will be
+-- rendered above an element with a lower z-index when they overlap.
+zIndex :: Attribute Int
+zIndex = css "z-index"
 
 data BackfaceVisibility = Visible | Hidden
   deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)

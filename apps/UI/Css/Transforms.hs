@@ -11,7 +11,6 @@ module UI.Css.Transforms where
 
 import           Data.Default.Class      (Default (..))
 import           Data.Hashable           (Hashable)
-import qualified Data.Map                as Map
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Vector             (Vector)
@@ -25,7 +24,7 @@ import           Linear                  (V2 (..), V3 (..))
 
 import           Text.Printf             (printf)
 
-import           UI.Attributes           (CombineAttributeValue, logical)
+import           UI.Attributes           (CombineAttributeValue)
 import qualified UI.Attributes.Attribute as Attribute
 import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute)
 import qualified UI.Css.Rules            as Rules
@@ -84,19 +83,7 @@ import           UI.Css.Values           (Angle, Css, Factor, Length,
 --      ]
 -- @
 transform :: Attribute Transforms
-transform = logical "transform" $ \ existing transforms ->
-  let rules :: CssRules
-      rules = [("transform", toAttributeValue transforms)]
-  in case transforms of
-    [] -> Map.update delete "style" existing
-    _  -> Map.insertWith (go transforms) "style" (toAttributeValue rules) existing
-  where go transforms _ oldStyle = toAttributeValue @CssRules
-          case fromAttributeValue oldStyle of
-            Just oldStyle' -> oldStyle' <> [("transform", toAttributeValue transforms)]
-            Nothing        -> [("transform", toAttributeValue transforms)]
-
-        delete oldStyle =
-          toAttributeValue . Rules.deleteProperty "transform" <$> fromAttributeValue oldStyle
+transform = Rules.css "transform"
 
 -- | CSS supports a number of different __transform functions__. Each
 -- of these functions can be expressed as a matrix (with 'Matrix3D'),

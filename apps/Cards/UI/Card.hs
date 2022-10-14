@@ -19,12 +19,12 @@ import           Linear                            (V2 (..), V3 (..))
 
 import           Reflex                            (Dynamic, toggle)
 
-import           UI.Attributes                     (class_, style)
+import           UI.Attributes                     (class_)
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..), classIf)
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transform (..),
-                                                    transform, u)
+                                                    style, transform, u)
 import qualified UI.Css.Transforms                 as Transforms
 import qualified UI.Drag                           as Drag
 import           UI.Drag                           (DragConfig (..), Drags (..))
@@ -77,7 +77,7 @@ demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
         rotatedWhen True  = [Rotate (Deg 5)]
         rotatedWhen False = []
 
-        whenDragged True = [("z-index", "100")]
+        whenDragged True  = [("z-index", "100")]
         whenDragged False = []
 
         label = Html.div_ [ class_ =: ["label"] ] . Element.text

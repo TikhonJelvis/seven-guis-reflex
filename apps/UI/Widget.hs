@@ -17,8 +17,9 @@ import           Reflex.Dom                          (DomBuilderSpace)
 
 import           Text.Printf                         (printf)
 
-import           UI.Attributes                       (class_, style)
+import           UI.Attributes                       (class_)
 import           UI.Attributes.AttributeSet.Internal ((=:), (==:))
+import           UI.Css                              (style)
 import           UI.Css.Rules                        (CssRules (..))
 import           UI.Element                          (Dom, dynText, text)
 import           UI.Event                            (EventResult)

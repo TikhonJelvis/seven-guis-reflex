@@ -24,12 +24,12 @@ import           Reflex                            (Dynamic, Event)
 import qualified Reflex.Dom                        as Dom
 
 import           UI.Attributes                     (class_, fromAttributeValue,
-                                                    style, toAttributeValue)
+                                                    toAttributeValue)
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..))
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transition (..),
-                                                    s, transform)
+                                                    s, style, transform)
 import qualified UI.Css.Animations                 as Animations
 import qualified UI.Css.Transforms                 as Transforms
 import           UI.Element                        (Dom)

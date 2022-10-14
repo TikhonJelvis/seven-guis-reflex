@@ -8,18 +8,24 @@ import           Data.String             (IsString)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Display       (Display)
+import           Data.Typeable           (Typeable)
 
 import           GHC.Exts                (IsList)
 import           GHC.Generics            (Generic)
 
+import qualified UI.Attributes           as Attributes
+import           UI.Attributes           (Attribute)
 import           UI.Attributes.Attribute (AsAttributeValue (..),
                                           CombineAttributeValue (..))
+
+-- * Properties
 
 -- | A CSS property name.
 newtype Property = Property Text
   deriving stock (Generic)
   deriving newtype (Show, Eq, Ord, Display, IsString, Hashable)
 
+-- * Rules
 
 -- TODO: structured representation of CSS rules?
 -- | A set of CSS rules for a single element.
@@ -55,7 +61,7 @@ instance AsAttributeValue CssRules where
 
 -- | Apply an operation over a set of CSS rules encoded in text.
 withRules :: (Maybe CssRules -> CssRules) -> Text -> Text
-withRules f css = toAttributeValue $ f (fromAttributeValue css)
+withRules f rules = toAttributeValue $ f (fromAttributeValue rules)
 
     -- TODO: types CSS rules based on Attribute + AttributeSet
 -- | Set a property to a given value.
@@ -122,3 +128,56 @@ setUserSelect :: Text -> CssRules -> CssRules
 setUserSelect value =
   setProperty "user-select" value . setProperty "-webkit-user-select" value
 
+-- * Attributes
+
+
+-- ** Attributes for Properties
+
+-- $ CSS properties on elements can be set in one of two ways:
+--
+--  1. Through explicit attributes like 'zIndex'
+--  2. Through the 'style' attribute
+--
+-- If the same property is set through both an explicit attribute
+-- /and/ 'style', the value from the explicit attribute will take
+-- priority. It is good practice to use explicit attributes whenever
+-- they are defined and only rely on 'style' as a "backdoor" for
+-- properties that are either not supported in the library or
+-- browser/domain-specific.
+
+-- | Set the CSS styles for an element.
+style :: Attribute CssRules
+style = Attributes.logical "style" \ existing new ->
+  let go _ = withRules \case
+        Just old -> old <> new
+        Nothing  -> new
+  in Map.insertWith go "style" (toAttributeValue new) existing
+
+-- | Create a new top-level attribute for a CSS property.
+--
+-- The way that values get mapped to/from DOM strings and how multiple
+-- instances get combined is determined by the type's
+-- 'AsAttributeValue' instance.
+--
+-- If the value would map to an empty string (@toAttributeValue x ==
+-- ""@), the property is removed from the @style@ attribute.
+--
+-- __Example__
+--
+-- @
+-- zIndex :: Attribute Int
+-- zIndex = css "z-index"
+-- @
+css :: forall a. (AsAttributeValue a, Typeable a) => Property -> Attribute a
+css property@(Property name) = Attributes.logical name \ existing new ->
+  case toAttributeValue new of
+    "" -> Map.update clearProperty "style" existing
+    newValue ->
+      let newRules = [(property, newValue)]
+      in Map.insertWith (go newRules) "style" (toAttributeValue newRules) existing
+  where go new _ = withRules \case
+          Just old -> old <> new
+          Nothing  -> new
+
+        clearProperty oldStyle =
+          toAttributeValue . deleteProperty property <$> fromAttributeValue oldStyle

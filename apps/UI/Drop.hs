@@ -18,11 +18,11 @@ import           Language.Javascript.JSaddle       (MonadJSM)
 import qualified Reflex
 import           Reflex                            (Dynamic, Event)
 
-import           UI.Attributes                     (class_, style,
-                                                    toAttributeValue)
+import           UI.Attributes                     (class_, toAttributeValue)
 import           UI.Attributes.AttributeSet.Reflex ((=:), (==:))
 import           UI.Color                          (Color)
-import           UI.Css                            (CssRules, s, transform)
+import           UI.Css                            (CssRules, s, style,
+                                                    transform)
 import qualified UI.Css.Animations                 as Animations
 import           UI.Css.Animations                 (Transition (..))
 import qualified UI.Css.Transforms                 as Transforms
