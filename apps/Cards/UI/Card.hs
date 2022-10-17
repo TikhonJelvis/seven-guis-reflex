@@ -67,8 +67,6 @@ demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
   where dragAttributes :: Drags t -> Maybe (AttributeSet t)
         dragAttributes Drags { current } = Just
           [ class_          ==: classIf "dragging" . isJust <$> current
-          , Css.borderWidth =: "10px"
-          , Css.borderColor =: "#3366FF"
           , Css.zIndex      ==: bool 1 100 . isJust <$> current
           , Css.transform   ==: rotatedWhen . isJust <$> current
           ]
