@@ -29,8 +29,8 @@ import qualified UI.Attributes.Attribute as Attribute
 import           UI.Attributes.Attribute (AsAttributeValue (..), Attribute)
 import qualified UI.Css.Rules            as Rules
 import           UI.Css.Rules            (CssRules)
-import           UI.Css.Values           (Angle, Css, Factor, Length,
-                                          RelativeLength, px)
+import           UI.Css.Values           (Angle, Factor, Length, RelativeLength,
+                                          px)
 
 -- | A list of CSS transform functions (see 'Transform') to apply to
 -- the element and its children.
@@ -250,12 +250,12 @@ translate (V2 x y) = [Translate (px x) (px y) "0"]
 -- See MDN:
 --  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
 --  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
-rotate :: Angle -> CssRules -> CssRules
-rotate = addTransform . Rotate
+rotate :: Angle -> Transforms
+rotate angle = [Rotate angle]
 
 -- | Uniformly scale an element.
-scale :: Double -> CssRules -> CssRules
-scale n = addTransform $ Scale (toAttributeValue n) (toAttributeValue n)
+scale :: Double -> Transforms
+scale n = [Scale (toAttributeValue n) (toAttributeValue n)]
 
 -- | Flip an element around an axis running through the element's
 -- /center of rotation/ at an angle of θ to the y-axis.
@@ -279,11 +279,12 @@ scale n = addTransform $ Scale (toAttributeValue n) (toAttributeValue n)
 -- @
 -- flipAround (Deg 45)
 -- @
-flipAround :: Angle -> CssRules -> CssRules
+flipAround :: Angle -> Transforms
 flipAround θ =
-  addTransform (Rotate (-θ)) .
-  addTransform (Scale "-1" "1") .
-  addTransform (Rotate θ)
+  [ Rotate (-θ)
+  , Scale "-1" "1"
+  , Rotate θ
+  ]
 
 -- | Add a 2D matrix transform.
 --
@@ -346,6 +347,11 @@ instance Default TransformOrigin where
 origin :: V2 Double -> TransformOrigin
 origin (V2 x y) = def { x = px x, y = px y }
 
+-- | The point in 3D space that an element's transform functions use
+-- as their origin.
+transformOrigin :: Attribute TransformOrigin
+transformOrigin = Rules.css "transform-origin"
+
 -- * Transform Box
 
 -- | The layout box to which the 'transform' and 'transform_origin'
@@ -373,5 +379,5 @@ instance AsAttributeValue TransformBox where
 
 -- | The layout box to which the 'transform' and 'transform_origin'
 -- properties apply.
-transform_box :: Attribute (Css TransformBox)
-transform_box = Attribute.native "transform-box"
+transformBox :: Attribute TransformBox
+transformBox = Rules.css "transform-box"

@@ -6,7 +6,12 @@ module UI.Css
   , module UI.Css.Values
 
   , zIndex
-  
+
+  , borderColor
+  , borderWidth
+  , BorderStyle
+  , borderStyle
+
   , BackfaceVisibility (..)
   , backfaceVisibility
 
@@ -26,17 +31,17 @@ import qualified GHCJS.DOM.CSSStyleDeclaration as CSSStyleDeclaration
 import           GHCJS.DOM.Types               (MonadDOM)
 import           GHCJS.DOM.Window              as Window
 
-import           UI.Attributes                 (AsAttributeValue (toAttributeValue),
-                                                Attribute,
+import           UI.Attributes                 (AsAttributeValue, Attribute,
                                                 CombineAttributeValue,
                                                 Lowercase (..))
+import           UI.Color                      (Color)
 import           UI.Css.Animations
 import           UI.Css.Rules
 import           UI.Css.Transforms
 import           UI.Css.Values
 import           UI.Element.IsElement          (IsElement, rawElement)
 
--- * Miscellaneous Properties
+-- * CSS Properties
 
 -- | The z-index of an element controls whether it is rendered above
 -- or below other elements. An element with a higher z-index will be
@@ -49,10 +54,61 @@ data BackfaceVisibility = Visible | Hidden
   deriving anyclass (Hashable)
   deriving (CombineAttributeValue, AsAttributeValue) via Lowercase BackfaceVisibility
 
--- | Set the @backface-visibility@ CSS property.
-backfaceVisibility :: BackfaceVisibility -> CssRules -> CssRules
-backfaceVisibility = setProperty "backface-visibility" . toAttributeValue
+-- | Whether to render the back of the element.
+backfaceVisibility :: Attribute BackfaceVisibility
+backfaceVisibility = css "backface-visibility"
 
+-- ** Borders
+
+-- TODO: support different settings for top/bottom/left/right borders
+--
+-- this will probably need a change to how attributes work so that we
+-- can easily talk about aggregate attributes
+
+-- | The color of the element's border.
+borderColor :: Attribute Color
+borderColor = css "border-color"
+
+-- | How wide the border of the element should be.
+borderWidth :: Attribute Length
+borderWidth = css "border-width"
+
+              -- TODO: add hidden? (name conflict with
+              -- BackfaceVisibility)
+
+              -- TODO: add picture/demo to docs
+-- | How the element's border is drawn.
+data BorderStyle = None
+                 -- ^ Don't draw the border
+                 | Dotted
+                 -- ^ Series of rounded dots
+                 | Dashed
+                 -- ^ Rectangular dashes with spaces, exact details
+                 -- may differ between browsers
+                 | Solid
+                 -- ^ Solid line
+                 | Double
+                 -- ^ Two straight lines with a space between. Both
+                 -- lines + space add up to the border-width.
+                 | Groove
+                 -- ^ Like a groove cut into the surface. Opposite of
+                 -- 'Ridge'.
+                 | Ridge
+                 -- ^ Like a ridge extruded from the surface. Opposite
+                 -- of 'Groove'.
+                 | Inset
+                 -- ^ Makes it look like the element is embedded in
+                 -- the surface. Opposite of 'Outset'.
+                 | Outset
+                 -- ^ Makes it look like the element is raised from
+                 -- the surface. Opposite of 'Inset'.
+  deriving stock (Show, Read, Eq, Ord, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+  deriving (CombineAttributeValue, AsAttributeValue) via Lowercase BorderStyle
+
+-- | Set the style of the border, controlling how the border is drawn.
+borderStyle :: Attribute BorderStyle
+borderStyle = css "border-style"
 
 -- * Computed Styles
 

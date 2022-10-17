@@ -22,8 +22,7 @@ import           UI.Attributes                     (class_, toAttributeValue)
 import           UI.Attributes.AttributeSet.Reflex ((=:), (==:))
 import           UI.Color                          (Color)
 import           UI.Css                            (CssRules, s, style,
-                                                    transform)
-import qualified UI.Css.Animations                 as Animations
+                                                    transform, transition)
 import           UI.Css.Animations                 (Transition (..))
 import qualified UI.Css.Transforms                 as Transforms
 import qualified UI.Drag                           as Drag
@@ -83,12 +82,15 @@ demo = void do
           (container, _) <- Html.div_ [ class_ =: ["draggable",  "drop-example"] ] mdo
             (target, _) <- Html.div_ [ class_ =: ["drop-target"] ] (pure ())
             (element, _) <- Html.div_ attributes (pure ())
-            snapping <- Reflex.holdDyn id $
-              Reflex.leftmost [id <$ start, snapTo <$ end]
+
+            let snapTo = [def { property = "transform", duration = s 0.5 }]
+            snapping <- Reflex.holdDyn [] $
+              Reflex.leftmost [[] <$ start, snapTo <$ end]
+
             let attributes =
-                  [ class_ =: ["draggable"]
-                  , style ==: snapping <*> mempty
-                  , transform ==: Transforms.translate . fromMaybe 0 <$> current
+                  [ class_     =: ["draggable"]
+                  , transition ==: snapping
+                  , transform  ==: Transforms.translate . fromMaybe 0 <$> current
                   ]
 
             drags@Drags { current, start, end } <-
@@ -96,9 +98,6 @@ demo = void do
             Drops { dropped } <- drops target $ pure [((), drags)]
             Reflex.performEvent_ $ moveTo element target <$ dropped
           pure ()
-
-        snapTo = Animations.transition
-          def { property = "transform", duration = s 0.5 }
 
         colorIf :: Color -> Bool -> CssRules
         colorIf color flag

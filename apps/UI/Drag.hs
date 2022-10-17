@@ -29,8 +29,7 @@ import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..))
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transition (..),
-                                                    s, style, transform)
-import qualified UI.Css.Animations                 as Animations
+                                                    s, transform, transition)
 import qualified UI.Css.Transforms                 as Transforms
 import           UI.Element                        (Dom)
 import           UI.Element.IsElement              (rawElement)
@@ -75,16 +74,12 @@ demo = void do
         toGrid n x = fromInteger $ round x - (round x `mod` n)
 
         rotateByDistance :: Dynamic t (V2 Double) -> AttributeSet t
-        rotateByDistance dragged = [ style ==: rotated ]
-          where rotated = do
-                  p <- dragged
-                  pure $ Transforms.rotate (Turn $ distance p 0 / 100) mempty
+        rotateByDistance dragged = [ transform ==: rotated <$> dragged ]
+          where rotated p = Transforms.rotate (Turn $ distance p 0 / 100)
 
         scaleByDistance :: Dynamic t (V2 Double) -> AttributeSet t
-        scaleByDistance dragged = [ style ==: scaled ]
-          where scaled = do
-                  p <- dragged
-                  pure $ Transforms.scale (1 + distance p 0 / 250) mempty
+        scaleByDistance dragged = [ transform ==: scaled <$> dragged ]
+          where scaled p = Transforms.scale (1 + distance p 0 / 250)
 
         shiftConfig = def
           { mouseEventFilter = \ e ->
@@ -114,27 +109,26 @@ demo = void do
         snapBack = mdo
           label "Snap back after each drag"
           (container, _) <- Html.div_ [ class_ =: ["draggable drag-example"] ] mdo
-            (element, _) <- Html.div_ (dragOrSnap current <> [ style ==: base ]) (pure ())
+            (element, _) <- Html.div_ (dragOrSnap current <> [ transform ==: base ]) (pure ())
             Drags { current, start, end } <- drags def { container = Just container } element
 
             -- TODO: some design that makes this behavior less
             -- convoluted?
             computed <- Reflex.performEvent $
               Css.getComputedProperty element "transform" <$ start
-            transform <- Reflex.holdDyn Nothing $
+            currentTransform <- Reflex.holdDyn Nothing $
               Reflex.leftmost [computed, Nothing <$ end]
-            let base = transform <&> \case
-                  Just t  -> [("transform", toAttributeValue t)]
+            let base = currentTransform <&> \case
+                  Just t  -> fromMaybe [] (fromAttributeValue t)
                   Nothing -> []
             pure ()
           pure ()
 
         dragOrSnap :: Dynamic t (Maybe (V2 Double)) -> AttributeSet t
         dragOrSnap current =
-          [ transform ==: maybe [] Transforms.translate <$> current
-          , style     ==: maybe animate (const []) <$> current
+          [ transform  ==: maybe [] Transforms.translate <$> current
+          , transition ==: maybe [snap] (const []) <$> current
           ]
-          where animate = Animations.transition snap mempty
         snap = def { property = "transform", duration = s 1}
 
         dragHandle = mdo

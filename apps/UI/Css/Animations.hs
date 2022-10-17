@@ -4,19 +4,27 @@ import           Data.Default.Class      (Default (..))
 import           Data.Hashable           (Hashable)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
+import           Data.Vector             (Vector)
+import qualified Data.Vector             as Vector
 import           Data.Vector.Instances   ()
 
+import           GHC.Exts                (IsList (..))
 import           GHC.Generics            (Generic)
 
-import           UI.Attributes           (AsAttributeValue,
-                                          CombineAttributeValue)
+import           UI.Attributes           (AsAttributeValue, Attribute,
+                                          CombineAttributeValue (..))
 import           UI.Attributes.Attribute (AsAttributeValue (..))
 import qualified UI.Css.Rules            as Rules
-import           UI.Css.Rules            (CssRules, Property (..))
 import           UI.Css.Values           (Duration, s)
 
 
 -- * Transitions
+
+-- | How to animate changes to the element's properties.
+--
+-- See 'Transition' for details.
+transition :: Attribute Transitions
+transition = Rules.css "transition"
 
                  -- TODO: structured type for easing functions
 type EasingFunction = Text
@@ -60,19 +68,24 @@ instance AsAttributeValue Transition where
 instance Default Transition where
   def = Transition { property = "all", duration = s 0, timing = "ease", delay = s 0 }
 
--- | Add a transition for the given property, without overriding any
--- existing transitions on the element.
-transition :: Transition -> CssRules -> CssRules
-transition = Rules.updateProperty after "transition" . toAttributeValue
-  where after new existing = existing <> ", " <> new
+-- | All of the transitions set on an element.
+newtype Transitions = Transitions (Vector Transition)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
+  deriving newtype (Semigroup, Monoid)
 
--- | Remove any transitions set for the current property.
-removeTransition :: Property -> CssRules -> CssRules
-removeTransition (Property property) =
-  Rules.updateProperty remove "transition" "" .
-  Rules.updateProperty remove' "transition-property" ""
-  where remove _ = overProperties $ filter (not . Text.isInfixOf property)
-        remove' _ = overProperties $ filter (/= property)
+instance IsList Transitions where
+  type Item Transitions = Transition
 
-        overProperties f = Text.intercalate ", " . f . parseProperties
-        parseProperties = map Text.strip . Text.split (== ',')
+  toList (Transitions xs) = toList xs
+  fromList = Transitions . fromList
+
+instance CombineAttributeValue Transitions where
+  combineAttributeValues (Transitions a) (Transitions b) = Transitions (a <> b)
+
+    -- TODO: implement fromAttributeValue
+instance AsAttributeValue Transitions where
+  toAttributeValue (Transitions ts) =
+    Text.intercalate " " . map toAttributeValue $ Vector.toList ts
+  fromAttributeValue = error "unimplemented"
+

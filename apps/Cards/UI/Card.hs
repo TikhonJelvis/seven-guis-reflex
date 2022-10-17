@@ -24,7 +24,7 @@ import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..), classIf)
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transform (..),
-                                                    style, transform, u)
+                                                    u)
 import qualified UI.Css.Transforms                 as Transforms
 import qualified UI.Drag                           as Drag
 import           UI.Drag                           (DragConfig (..), Drags (..))
@@ -41,9 +41,8 @@ import           UI.Svg.Attributes                 (GradientUnits (..),
                                                     ViewBox (..), cx, cy, fill,
                                                     fill_rule, gradientUnits,
                                                     height, paintWith, r,
-                                                    stroke, stroke_width,
-                                                    transform_origin, width, x,
-                                                    y)
+                                                    stroke, stroke_width, width,
+                                                    x, y)
 import           UI.Svg.Haskell                    (HaskellPaths (..),
                                                     haskellPaths)
 import qualified UI.Url                            as Url
@@ -67,18 +66,15 @@ demo = void $ Html.div_ [ class_ =: ["card-demo"] ] do
   pure ()
   where dragAttributes :: Drags t -> Maybe (AttributeSet t)
         dragAttributes Drags { current } = Just
-          [ class_ ==: classIf "dragging" . isJust <$> current
-          , style =: [("border-width", "10px")]
-          , style =: [("border-color", "blue")]
-          , style  ==: whenDragged . isJust <$> current
-          , transform ==: rotatedWhen . isJust <$> current
+          [ class_          ==: classIf "dragging" . isJust <$> current
+          , Css.borderWidth =: "10px"
+          , Css.borderColor =: "#3366FF"
+          , Css.zIndex      ==: bool 1 100 . isJust <$> current
+          , Css.transform   ==: rotatedWhen . isJust <$> current
           ]
 
         rotatedWhen True  = [Rotate (Deg 5)]
         rotatedWhen False = []
-
-        whenDragged True  = [("z-index", "100")]
-        whenDragged False = []
 
         label = Html.div_ [ class_ =: ["label"] ] . Element.text
 
@@ -139,18 +135,22 @@ draggable
   face
   CardConfig { container, draggingEnabled, attributes } = mdo
   let attributes' = fromMaybe [] attributes <>
-        [ transform ==: Transforms.translate <$> total
-        , style =: Css.backfaceVisibility Css.Hidden mempty
-        , class_ ==: classIf "dragging" . isJust <$> current
-        , class_ =: ["draggable", "card", ClassName $ suitName suit, ClassName $ rankName rank]
+        [ Css.transform          ==: Transforms.translate <$> total
+        , Css.backfaceVisibility =: Css.Hidden
+        , class_                 ==: classIf "dragging" . isJust <$> current
+        , class_                 =:
+          [ "draggable"
+          , "card"
+          , ClassName $ suitName suit
+          , ClassName $ rankName rank
+          ]
         ]
 
   (element, _) <- Html.div_ attributes' do
     let facing = face <&> \case
-          FaceUp   -> mempty
-          FaceDown ->
-            Transforms.addTransform (Rotate3D (V3 0 1 0) (Deg 180)) mempty
-    Html.div_ [ class_ =: ["center"], style ==: facing ] do
+          FaceUp   -> []
+          FaceDown -> [Rotate3D (V3 0 1 0) (Deg 180)]
+    Html.div_ [ class_ =: ["center"], Css.transform ==: facing ] do
       front card []
       back haskellBack []
 
@@ -212,16 +212,16 @@ haskellBack = mdo
       ]
 
     aroundLogo 400 600 110
-      [ fill_rule =: Svg.Evenodd
-      , stroke    =: "none"
-      , fill      =: paintWith "lambda-pattern"
-      , transform =: Svg.translate (V2 (-200) (-300))
+      [ fill_rule     =: Svg.Evenodd
+      , stroke        =: "none"
+      , fill          =: paintWith "lambda-pattern"
+      , Css.transform =: Svg.translate (V2 (-200) (-300))
       ]
 
     -- center logo
-    Svg.g [ transform =: Svg.scale 6 ] do
-      pair [ transform =: Svg.translate (V2 0 (-12)) ]
-      pair [ transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 0 12) ]
+    Svg.g [ Css.transform =: Svg.scale 6 ] do
+      pair [ Css.transform =: Svg.translate (V2 0 (-12)) ]
+      pair [ Css.transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 0 12) ]
 
   where backgroundGradient = Svg.radial (pure stops) . (<> attributes)
           where attributes =
@@ -247,7 +247,7 @@ haskellBack = mdo
 
         pair attributes = Svg.g attributes do
           logo []
-          logo [ transform =: Svg.translate (V2 17 0) <> Svg.flipAround (Deg 0) ]
+          logo [ Css.transform =: Svg.translate (V2 17 0) <> Svg.flipAround (Deg 0) ]
 
         logo :: AttributeSet t -> m ()
         logo attributes = void $ Svg.g (base <> attributes) do
@@ -256,8 +256,8 @@ haskellBack = mdo
           Svg.path $ part <> [ fill =: "#fff5", d =: topLine ]
           Svg.path $ part <> [ fill =: "#fff5", d =: bottomLine ]
           where part = [ stroke =: "#fff", stroke_width =: u 0.4 ]
-                base = [ transform        =: Svg.rotate (Deg 20)
-                       , transform_origin =: Transforms.origin (V2 8.5 6)
+                base = [ Css.transform       =: Svg.rotate (Deg 20)
+                       , Css.transformOrigin =: Transforms.origin (V2 8.5 6)
                        ]
 
         -- a path /around/ the logo in the center—a rectangle with a
@@ -292,19 +292,19 @@ haskellBack = mdo
         -- ↓↑
         lambdaTile attributes = fst <$> Svg.g attributes do
           top []
-          bottom [ transform =: Svg.translate (V2 (-1) 14) ]
+          bottom [ Css.transform =: Svg.translate (V2 (-1) 14) ]
           where top attributes = Svg.g attributes do
                   λ []
-                  λ [ transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 8 0) ]
-                  λ [ transform =: Svg.translate (V2 16 0) ]
+                  λ [ Css.transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 8 0) ]
+                  λ [ Css.transform =: Svg.translate (V2 16 0) ]
                 bottom attributes = Svg.g attributes do
-                  λ [ transform =: Svg.rotate (Deg 180) ]
-                  λ [ transform =: Svg.flipAround (Deg 0) <> Svg.translate (V2 8 0) ]
-                  λ [ transform =: Svg.rotate (Deg 180) <> Svg.translate (V2 16 0) ]
+                  λ [ Css.transform =: Svg.rotate (Deg 180) ]
+                  λ [ Css.transform =: Svg.flipAround (Deg 0) <> Svg.translate (V2 8 0) ]
+                  λ [ Css.transform =: Svg.rotate (Deg 180) <> Svg.translate (V2 16 0) ]
 
                 λ attributes = Svg.use "small-lambda" $
-                  attributes <> [ transform_origin =: Transforms.origin (V2 8 6)
-                                , style =: [("transform-box", "fill-box")]
+                  attributes <> [ Css.transformOrigin =: Transforms.origin (V2 8 6)
+                                , Css.transformBox =: Css.FillBox
                                 ]
 
         lambdaPattern attributes =

@@ -149,7 +149,7 @@ setUserSelect value =
 style :: Attribute CssRules
 style = Attributes.logical "style" \ existing new ->
   let go _ = withRules \case
-        Just old -> old <> new
+        Just old -> old <> new -- old takes precedence
         Nothing  -> new
   in Map.insertWith go "style" (toAttributeValue new) existing
 
@@ -176,7 +176,7 @@ css property@(Property name) = Attributes.logical name \ existing new ->
       let newRules = [(property, newValue)]
       in Map.insertWith (go newRules) "style" (toAttributeValue newRules) existing
   where go new _ = withRules \case
-          Just old -> old <> new
+          Just old -> new <> old
           Nothing  -> new
 
         clearProperty oldStyle =
