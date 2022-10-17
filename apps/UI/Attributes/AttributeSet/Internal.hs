@@ -31,38 +31,11 @@ import           UI.Attributes.Attribute (Attribute)
 -- wrapped in a functor, supporting things like using 'Dynamic' to let
 -- attributes vary over time.
 --
--- Attribute sets track what kind of attribute is allowed based on the
--- /native/ attributes it needs to support. For example, since the
--- @div@ tag only accepts global HTML attributes, the 'div' function
--- has the following type:
---
--- @
--- div :: Dom t m => AttributeSet t Attributes.Html -> m a -> m (Html t, a)
--- @
---
--- where @Html@ is a type-level list of attribute names:
---
--- @
--- type Html = ["accesskey", "autocapitalize", {- ... -}, "translate"]
--- @
---
--- The @img@ tag supports some additional attributes:
---
--- @
--- img :: Dom t m => AttributeSet t Attributes.Img -> m a -> m (Html t, a)
--- @
---
--- where @Img@ is:
---
--- @
--- type Img = ["align", "alt", {- ... -}, "width"] :> Html
--- @
---
 -- Attributes can be defined as a list, using '=:' to provide pure
 -- values and '==:' to provide values in the functor:
 --
 -- @
--- myAttributes :: Attributes t Html
+-- myAttributes :: Attributes t
 -- myAttributes =
 --   [ class_ =: ["draggable", "card"]
 --   , id =: "my-card"
@@ -229,4 +202,5 @@ toDom :: forall f. Applicative f => AttributeSet f -> f (Map Text Text)
 toDom (AttributeSet dmap) = DMap.foldlWithKey go (pure []) dmap
   where go :: forall v. f (Map Text Text) -> Attribute v -> f v -> f (Map Text Text)
         go existing attribute value =
-          Attribute.toAttributes attribute <$> existing <*> value
+          let newAttributes = Attribute.toAttributes attribute <$> existing <*> value
+          in liftA2 (<>) newAttributes existing
