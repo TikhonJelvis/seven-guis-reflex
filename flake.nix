@@ -38,12 +38,6 @@
         defaultPackage = package;
         devShell = haskellPackages.shellFor {
           packages = p: [ package ];
-
-          # HACK: temporary workaround for WebKit issue with graphic
-          # acceleration
-          #
-          # see: https://github.com/NixOS/nixpkgs/pull/170070
-          # WEBKIT_DISABLE_COMPOSITING_MODE = 1;
         };
       });
 }
