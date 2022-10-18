@@ -216,7 +216,8 @@ haskellBack = mdo
 
     -- center logo
     Svg.g [ Css.transform =: Css.scale 6
-          , Css.transformOrigin =: Css.origin (V2 20 (-12))
+          , Css.transformOrigin =: Css.origin (V2 20.5 (-14.5))
+          -- weird transform-origin numbers from guess-and-check :/
           ] do
       pair [ Css.transform =: Css.translate (V2 0 (-12)) ]
       pair [ Css.transform =: Css.flipAround (Deg 90) <> Css.translate (V2 0 12) ]
