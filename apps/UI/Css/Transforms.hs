@@ -242,6 +242,18 @@ addTransform = \case
         after new old  = old <> " " <> new
 
 -- | Translate an element along the given X and Y distances in @px@.
+--
+-- __Example__
+--
+-- Move a rectangle down and to the left (or right in RTL mode):
+--
+-- @
+-- rect [ height    =: 10
+--      , width     =: 20
+--      , fill      =: #36f
+--      , transform =: [translate (V2 10 20)]
+--      ]
+-- @
 translate :: V2 Double -> Transforms
 translate (V2 x y) = [Translate (px x) (px y) "0"]
 
@@ -251,7 +263,7 @@ translate (V2 x y) = [Translate (px x) (px y) "0"]
 --  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
 --  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
 rotate :: Angle -> Transforms
-rotate angle = [Rotate angle]
+rotate θ = [Rotate θ]
 
 -- | Uniformly scale an element.
 scale :: Double -> Transforms
@@ -333,7 +345,9 @@ data TransformOrigin = TransformOrigin
 instance CombineAttributeValue TransformOrigin
 instance AsAttributeValue TransformOrigin where
   toAttributeValue TransformOrigin { x, y, z } =
-    x <> " " <> y <> " " <> z
+       toAttributeValue x <> " "
+    <> toAttributeValue y <> " "
+    <> toAttributeValue z
 
   fromAttributeValue = error "CSS parsing not implemented yet"
 

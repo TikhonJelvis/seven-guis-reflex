@@ -11,14 +11,15 @@ import           Prelude                           hiding (div)
 
 import           UI.Attributes                     (class_)
 import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:))
+import           UI.Css                            (height, width)
 import           UI.Element                        (Dom)
 import           UI.Html                           (Html, div_)
 import           UI.Main                           (Runnable (..), withCss)
 import           UI.Svg                            (Def (..), ViewBox (..),
                                                     defs, path, pattern_, rect,
                                                     svg)
-import           UI.Svg.Attributes                 (d, fill, height, paintWith,
-                                                    viewBox, width, x, y)
+import           UI.Svg.Attributes                 (d, fill, paintWith, viewBox,
+                                                    x, y)
 import           UI.Svg.Haskell                    (HaskellPaths (..),
                                                     haskellPaths)
 
