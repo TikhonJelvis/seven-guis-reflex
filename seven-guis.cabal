@@ -112,8 +112,10 @@ executable guis
     , jsaddle-webkit2gtk
     , lens
     , linear
+    , megaparsec
     , modern-uri
     , mtl
+    , reanimate-svg
     , reflex
     , reflex-dom
     , reflex-dom-core
