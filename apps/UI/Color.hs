@@ -48,6 +48,11 @@ toRgba (Color c) = (r, g, b, a)
   where Colour.RGB r g b = Colour.toSRGB24 (c `over` Colour.black)
         a = round $ 255 * Colour.alphaChannel c
 
+-- | Construct a color out of r, g, b and a channels.
+fromRgba :: Word8 -> Word8 -> Word8 -> Word8 -> Color
+fromRgba r g b a = Color $ Colour.withOpacity base (fromIntegral a / 255)
+  where base = Colour.sRGB24 r g b
+
 instance CombineAttributeValue Color
 -- | Colors with 100% opacity are rendered as @#xxxxxx@ and colors
 -- with any other level of opacity are rendered as @#xxxxxxxx@.
