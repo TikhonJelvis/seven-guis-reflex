@@ -67,6 +67,7 @@ executable guis
     UI.Color
     UI.Css
     UI.Css.Animations
+    UI.Css.Parse
     UI.Css.Rules
     UI.Css.Transforms
     UI.Css.Values
