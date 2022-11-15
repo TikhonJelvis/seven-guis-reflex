@@ -7,6 +7,13 @@ module UI.Css
 
   , zIndex
 
+  , width
+  , minWidth
+  , maxWidth
+  , height
+  , minHeight
+  , maxHeight
+
   , borderColor
   , borderWidth
   , BorderStyle
@@ -57,6 +64,33 @@ data BackfaceVisibility = Visible | Hidden
 -- | Whether to render the back of the element.
 backfaceVisibility :: Attribute BackfaceVisibility
 backfaceVisibility = css "backface-visibility"
+
+-- ** Dimensions
+
+-- | The horizontal length of an element.
+width :: Attribute RelativeLength
+width = css "width"
+
+-- | The maximum width an element can take up.
+maxWidth :: Attribute RelativeLength
+maxWidth = css "max-width"
+
+-- | The minimum width an element can take up.
+minWidth :: Attribute RelativeLength
+minWidth = css "min-width"
+
+-- | The vertical length of an element in the user coordiante system.
+height :: Attribute RelativeLength
+height = css "height"
+
+-- | The maximum width an element can take up.
+maxHeight :: Attribute RelativeLength
+maxHeight = css "max-heightwidth"
+
+-- | The minimum width an element can take up.
+minHeight :: Attribute RelativeLength
+minHeight = css "min-height"
+
 
 -- ** Borders
 

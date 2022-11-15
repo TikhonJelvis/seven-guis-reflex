@@ -24,7 +24,7 @@ import           UI.Attributes.AttributeSet.Reflex (AttributeSet, (=:), (==:))
 import           UI.Class                          (ClassName (..), classIf)
 import qualified UI.Css                            as Css
 import           UI.Css                            (Angle (..), Transform (..),
-                                                    u)
+                                                    height, u, width)
 import qualified UI.Css.Transforms                 as Transforms
 import qualified UI.Drag                           as Drag
 import           UI.Drag                           (DragConfig (..), Drags (..))
@@ -40,9 +40,8 @@ import           UI.Svg                            (Command (..), Def (..), Svg,
 import           UI.Svg.Attributes                 (GradientUnits (..),
                                                     ViewBox (..), cx, cy, fill,
                                                     fill_rule, gradientUnits,
-                                                    height, paintWith, r,
-                                                    stroke, stroke_width, width,
-                                                    x, y)
+                                                    paintWith, r, stroke,
+                                                    stroke_width, x, y)
 import           UI.Svg.Haskell                    (HaskellPaths (..),
                                                     haskellPaths)
 import qualified UI.Url                            as Url
@@ -201,7 +200,6 @@ haskellBack = mdo
   fst <$> Svg.svg [ viewBox =: ViewBox (V2 (-100) (-300)) (V2 200 600) ] do
     Svg.defs
       [ Def "small-lambda" smallLambda []
-      , Def "lambda-tile" lambdaTile []
       , Def "lambda-pattern" lambdaPattern []
       , Def "background" backgroundGradient []
       ]
@@ -219,13 +217,16 @@ haskellBack = mdo
       [ fill_rule     =: Svg.Evenodd
       , stroke        =: "none"
       , fill          =: paintWith "lambda-pattern"
-      , Css.transform =: Svg.translate (V2 (-200) (-300))
+      , Css.transform =: Css.translate (V2 (-200) (-300))
       ]
 
     -- center logo
-    Svg.g [ Css.transform =: Svg.scale 6 ] do
-      pair [ Css.transform =: Svg.translate (V2 0 (-12)) ]
-      pair [ Css.transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 0 12) ]
+    Svg.g [ Css.transform =: Css.scale 6
+          , Css.transformOrigin =: Css.origin (V2 20.5 (-14.5))
+          -- weird transform-origin numbers from guess-and-check :/
+          ] do
+      pair [ Css.transform =: Css.translate (V2 0 (-12)) ]
+      pair [ Css.transform =: Css.flipAround (Deg 90) <> Css.translate (V2 0 12) ]
 
   where backgroundGradient = Svg.radial (pure stops) . (<> attributes)
           where attributes =
@@ -251,16 +252,15 @@ haskellBack = mdo
 
         pair attributes = Svg.g attributes do
           logo []
-          logo [ Css.transform =: Svg.translate (V2 17 0) <> Svg.flipAround (Deg 0) ]
+          logo [ Css.transform =: Css.translate (V2 17 0) <> Css.flipAround (Deg 0) ]
 
-        logo :: AttributeSet t -> m ()
-        logo attributes = void $ Svg.g (base <> attributes) do
+        logo attributes = void $ Svg.g (attributes <> base) do
           Svg.path $ part <> [ fill =: "#fff7", d =: leftAngle ]
           Svg.path $ part <> [ fill =: "#fff6", d =: lambda ]
           Svg.path $ part <> [ fill =: "#fff5", d =: topLine ]
           Svg.path $ part <> [ fill =: "#fff5", d =: bottomLine ]
           where part = [ stroke =: "#fff", stroke_width =: u 0.4 ]
-                base = [ Css.transform       =: Svg.rotate (Deg 20)
+                base = [ Css.transform       =: Css.rotate (Deg 20)
                        , Css.transformOrigin =: Transforms.origin (V2 8.5 6)
                        ]
 
@@ -286,25 +286,28 @@ haskellBack = mdo
               ]
             ]
 
-        smallLambda attributes = Svg.path $ attributes <> [ d =: lambda ]
-          -- with (def { color = "#fff", width = 0.75 }) .
-          -- with (fill $ paintWith "background") <$> attributes
+        smallLambda attributes = Svg.path $ attributes <>
+          [ d            =: lambda
+          , stroke       =: "#fff"
+          , stroke_width =: "0.75"
+          , fill         =: paintWith "background"
+          ]
 
         -- a quadrant of lambdas facing up and down to be tiled:
         --
         -- ↑↓
         -- ↓↑
-        lambdaTile attributes = fst <$> Svg.g attributes do
+        lambdaTile = fst <$> Svg.g [] do
           top []
-          bottom [ Css.transform =: Svg.translate (V2 (-1) 14) ]
+          bottom [ Css.transform =: Css.translate (V2 6 14) ]
           where top attributes = Svg.g attributes do
                   λ []
-                  λ [ Css.transform =: Svg.flipAround (Deg 90) <> Svg.translate (V2 8 0) ]
-                  λ [ Css.transform =: Svg.translate (V2 16 0) ]
+                  λ [ Css.transform =: Css.flipAround (Deg 90) <> Css.translate (V2 8 0) ]
+                  λ [ Css.transform =: Css.translate (V2 16 0) ]
                 bottom attributes = Svg.g attributes do
-                  λ [ Css.transform =: Svg.rotate (Deg 180) ]
-                  λ [ Css.transform =: Svg.flipAround (Deg 0) <> Svg.translate (V2 8 0) ]
-                  λ [ Css.transform =: Svg.rotate (Deg 180) <> Svg.translate (V2 16 0) ]
+                  λ [ Css.transform =: Css.rotate (Deg 180) ]
+                  λ [ Css.transform =: Css.flipAround (Deg 0) <> Css.translate (V2 8 0) ]
+                  λ [ Css.transform =: Css.rotate (Deg 180) <> Css.translate (V2 16 0) ]
 
                 λ attributes = Svg.use "small-lambda" $
                   attributes <> [ Css.transformOrigin =: Transforms.origin (V2 8 6)
@@ -312,10 +315,10 @@ haskellBack = mdo
                                 ]
 
         lambdaPattern attributes =
-          fst <$> Svg.pattern_ (base <> attributes) (lambdaTile [])
+          fst <$> Svg.pattern_ (base <> attributes) lambdaTile
           where base = [ viewBox =: ViewBox (V2 6 0) (V2 16 28)
-                       , width   =: "12%"
-                       , height  =: "14%"
+                       , Svg.width   =: "12%"
+                       , Svg.height  =: "14%"
                        ]
 
         HaskellPaths { leftAngle, topLine, bottomLine, lambda } = haskellPaths def

@@ -21,7 +21,9 @@
               text-display = "0.0.2.0";
             };
 
-            overrides = self: super: with pkgs.haskell.lib; { };
+            overrides = self: super: with pkgs.haskell.lib; {
+              reanimate-svg = unmarkBroken (dontCheck super.reanimate-svg);
+            };
 
             modifier = drv:
               pkgs.haskell.lib.addBuildTools drv (with haskellPackages; [

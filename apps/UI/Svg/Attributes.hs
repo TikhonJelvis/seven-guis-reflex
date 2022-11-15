@@ -3,6 +3,7 @@ module UI.Svg.Attributes where
 
 import           Control.Applicative          (optional)
 
+import qualified Data.Char                    as Char
 import           Data.Foldable                (toList)
 import           Data.Hashable                (Hashable)
 import           Data.Maybe                   (listToMaybe)
@@ -15,8 +16,9 @@ import           GHC.Generics                 (Generic)
 
 import           Linear                       (V2 (..))
 
-import           Text.ParserCombinators.ReadP (char, choice, readP_to_S,
-                                               readS_to_P, sepBy, string)
+import           Text.ParserCombinators.ReadP (char, choice, many1, readP_to_S,
+                                               readS_to_P, satisfy, sepBy,
+                                               string)
 import qualified Text.Printf                  as Text
 
 import           UI.Attributes                (AsAttributeValue (..),
@@ -25,11 +27,9 @@ import           UI.Attributes                (AsAttributeValue (..),
                                                Lowercase (..), native,
                                                skipHtmlWhitespace)
 import           UI.Color                     (Color)
-import           UI.Css                       (Angle, Transform (..),
-                                               TransformOrigin, Transforms, px)
-import           UI.Css.Values                (Length, RelativeLength)
-import           UI.Id                        (Id (..))
+import           UI.Id                        (Id)
 import           UI.Svg.Path                  (Path)
+import           UI.Units                     (Length (..), RelativeLength)
 import qualified UI.Url                       as Url
 
 -- * Sizes and Positions
@@ -74,14 +74,6 @@ y2 = native "y2"
 y₂ :: Attribute RelativeLength
 y₂ = y2
 
--- | The horizontal length of an element in the user coordinate system.
-width :: Attribute RelativeLength
-width = native "width"
-
--- | The vertical length of an element in the user coordiante system.
-height :: Attribute RelativeLength
-height = native "height"
-
 -- | The x coordinate of the shape's center.
 cx :: Attribute RelativeLength
 cx = native "cx"
@@ -94,109 +86,17 @@ cy = native "cy"
 r :: Attribute RelativeLength
 r = native "r"
 
--- ** Transforms
+-- | Width as an element-level attribute. For certain SVG elements
+-- like @pattern@, this will work but setting @width@ via CSS will
+-- not.
+width :: Attribute RelativeLength
+width = native "width"
 
--- | Translate an element along the given X and Y distances in @px@.
---
--- __Example__
---
--- Move a rectangle down and to the left (or right in RTL mode):
---
--- @
--- rect [ height    =: 10
---      , width     =: 20
---      , fill      =: #36f
---      , transform =: [translate (V2 10 20)]
---      ]
--- @
-translate :: V2 Double -> Transforms
-translate (V2 x y) = [Translate (px x) (px y) "0"]
-
--- | Uniformly scale the element.
---
--- __Example__
---
--- Scale a group of elements:
---
--- @
--- g [ transform =: [scale 10] ] do
---   circle [ cx =: 10, cy =: 10, r =: 2, fill =: "#36f" ]
---   circle [ cx =: 15, cy =: 5, r =: 2, fill =: "#f63" ]
--- @
-scale :: Double -> Transforms
-scale n = [Scale (toAttributeValue n) (toAttributeValue n)]
-
--- | Rotate an element in 2D around its @transform-origin@.
---
--- See MDN:
---  * [rotate](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/rotate)
---  * [transform-origin](https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin)
-rotate :: Angle -> Transforms
-rotate θ = [Rotate θ]
-
--- | Flip an element around an axis running through the element's
--- /center of rotation/ at an angle of θ to the y-axis.
---
--- __Examples__
---
--- Flip horizontally:
---
--- @
--- flipAround (Deg 0)
--- @
---
--- Flip vertically:
---
--- @
--- flipAround (Turn 0.25)
--- @
---
--- Flip along diagonal:
---
--- @
--- flipAround (Deg 45)
--- @
-flipAround :: Angle -> Transforms
-flipAround θ = [Rotate θ, Scale "-1" "1", Rotate (-θ)]
-
--- | Add a 2D matrix transform.
---
--- The matrix can take one of two forms:
---
--- @[a, b, c, d]@, mapping to:
---
--- @
--- matrix(a, b, c, d, 0, 0)
--- @
---
--- (no translation)
---
--- and
---
--- @[a, b, c, d, tx, ty]@
---
--- mapping to:
---
--- @
--- matrix(a, b, c, d, tx, ty)
--- @
---
--- (with translation by @(tx, ty)@)
---
--- Any other number of entries will result in a runtime error.
-matrix :: Vector Double -> Transforms
-matrix [a, b, c, d] =
-  [Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]]
-matrix [a, b, c, d, tx, ty] =
-  [Matrix3D [a, b, 0, 0, c, d, 0, 0, 0, 0, 1, 0, ty, tx, 0, 1]]
-matrix invalid =
-  error $ Text.printf "Invalid matrix: %s" (show invalid)
-  -- TODO: is this function even a good idea?
-
--- | The point in 3D space that an element's transform functions use
--- as their origin.
-transform_origin :: Attribute TransformOrigin
-transform_origin = native "transform-origin"
+-- | Height as an element-level attribute. For certain SVG elements
+-- like @pattern@, this will work but setting @height@ via CSS will
+-- not.
+height :: Attribute RelativeLength
+height = native "height"
 
 -- ** viewBox
 
@@ -454,13 +354,13 @@ instance AsAttributeValue Dasharray where
   fromAttributeValue = run do
     skipHtmlWhitespace
     xs <- choice
-      [ sepBy double (optional (char ',') *> skipHtmlWhitespace)
+      [ sepBy length (optional (char ',') *> skipHtmlWhitespace)
       , [] <$ string "none"
       ]
     skipHtmlWhitespace
     pure $ Dasharray $ Vector.fromList xs
     where run p (Text.unpack -> s) = fst <$> listToMaybe (readP_to_S p s)
-          double = readS_to_P reads
+          length = Length . Text.pack <$> many1 (satisfy Char.isAlphaNum) <* skipHtmlWhitespace
 
 -- | A list of lengths specifying the alternating length of dashes and
 -- gaps for a dashed stroke.
