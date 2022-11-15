@@ -1,26 +1,40 @@
-module UI.Css.Parse where
+module UI.Css.Parse
+  ( parseMaybe
 
+  , color
+  , colorKeywords
+
+  , number
+  , percentage
+  , numberOrPercentage
+  )
+where
+
+import qualified Data.Colour.RGBSpace.HSL   as Colour
+import qualified Data.Colour.SRGB           as Colour
+import           Data.Functor               (void)
 import           Data.HashMap.Strict        (HashMap, (!))
 import qualified Data.HashMap.Strict        as HashMap
 import           Data.Text                  (Text)
 import           Data.Void                  (Void)
 
-import           Text.Megaparsec            (Parsec, choice, notFollowedBy,
-                                             oneOf, (<?>), (<|>))
-import           Text.Megaparsec.Char       (space, string)
-import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Numeric
 
-import           UI.Color                   (Color)
+import           Text.Megaparsec            (Parsec, between, choice, many,
+                                             notFollowedBy, parseMaybe, sepBy,
+                                             try, (<?>), (<|>))
+import           Text.Megaparsec.Char       (alphaNumChar, char, hexDigitChar,
+                                             space, string)
+import qualified Text.Megaparsec.Char.Lexer as L
+import           Text.Printf                (printf)
+
+import           UI.Color                   (Color (..))
 
 type Parser = Parsec Void Text
 
 -- * Values
 
 -- $ Parsers for CSS values based on expressions.
-
--- | Parse a specific keyword.
-keyword :: Text -> Parser Text
-keyword word = lexeme $ string word
 
 -- | Parse a CSS color definition. CSS color expressions can take
 -- several forms:
@@ -29,11 +43,95 @@ keyword word = lexeme $ string word
 --   * RGBA values in hex: @#XXXX@ or @#XXXXXXXX@
 --   * Functions: @rgb()@, @rgba()@, @hsl()@, @hsla()@... etc
 --   * Keywords: @blue@, @lightseagreen@... etc
+--
+-- >>> parseMaybe color "blue"
+-- Just "#0000ff"
+--
+-- >>> parseMaybe color "orangered"
+-- Just "#ff4500"
+--
+-- >>> parseMaybe color "#fff"
+-- Just "#ffffff"
+--
+-- >>> parseMaybe color "#3366ff"
+-- Just "#3366ff"
+--
+-- >>> parseMaybe color "#fff4"
+-- Just "#ffffff44"
+--
+-- >>> parseMaybe color "#3366FFA4"
+-- Just "#3366ffa4"
+--
+-- >>> UI.Color.toOpaque <$> parseMaybe color "#3366FFA4"
+-- Just "#3366ff"
+--
+-- >>> parseMaybe color "rgb(0.2, 40%, 100%)"
+-- Just "#3366ff"
+--
+-- >>> parseMaybe color "rgba(0.2, 40%, 100%, 1)"
+-- Just "#3366ff"
+--
+-- >>> parseMaybe color "hsl(225, 100%, 60%)"
+-- Just "#3366ff"
+--
+-- >>> parseMaybe color "hsla(225, 100%, 60%, 0.5)"
+-- Just "#3366ff80"
 color :: Parser Color
-color = undefined
+color =  named
+     <|> try hex
+     <|> try rgb
+     <|> try rgba
+     <|> try hsl
+     <|> try hsla
   where named = do
-          k <- choice (keyword <$> HashMap.keys colorKeywords) <?> "<named-color>"
+          k <- choice (try . keyword <$> HashMap.keys colorKeywords) <?> "<named-color>"
           pure $ colorKeywords ! k
+
+        hex = lexeme do
+          char '#'
+          digits <- many hexDigitChar
+          convert digits
+
+        -- TODO: better error handling for functions (rgb,
+        -- rgba... etc)?
+
+        rgb = do
+          [r, g, b] <- function "rgb" numberOrPercentage
+          pure $ Color { base = Colour.sRGB r g b, alpha = 1 }
+
+        rgba = do
+          [r, g, b, a] <- function "rgba" numberOrPercentage
+          pure $ Color { base = Colour.sRGB r g b, alpha = a }
+
+            -- TODO: deg/grad/rad units for hsl and hsla
+        hsl = do
+          [h, s, l] <- function "hsl" numberOrPercentage
+          let Colour.RGB r g b = Colour.hsl h s l
+          pure $ Color { base = Colour.sRGB r g b, alpha = 1 }
+
+        hsla = do
+          [h, s, l, a] <- function "hsla" numberOrPercentage
+          let Colour.RGB r g b = Colour.hsl h s l
+          pure $ Color { base = Colour.sRGB r g b, alpha = a }
+
+            -- TODO: remaining CSS color functions
+
+        convert = \case
+          [r, g, b] ->
+            convert [r, r, g, g, b, b]
+          [r, g, b, a] ->
+            convert [r, r, g, g, b, b, a, a]
+          s@[_r1, _r2, _g1, _g2, _b1, _b2] ->
+            pure $ Color { base = Colour.sRGB24read ('#':s), alpha = 1 }
+          s@[_r1, _r2, _g1, _g2, _b1, _b2, a1, a2] ->
+            pure $ Color
+              { base  = Colour.sRGB24read ('#' : take 6 s)
+              , alpha = toDouble $ readHex [a1, a2]
+              }
+          s -> fail $ printf "Invalid color hex digits: %s" s
+
+        toDouble x = fromInteger x / 255
+        readHex = fst . head . Numeric.readHex
 
 -- | Definitions for each color keyword CSS supports.
 colorKeywords :: HashMap Text Color
@@ -187,9 +285,72 @@ colorKeywords =
   , ("yellowgreen", "#9acd32")
   ]
 
+  -- TODO: Does CSS allow spaces after a + or - sign?
+-- | Parse a normal numeric literal.
+--
+-- >>> parseMaybe number "1"
+-- Just 1.0
+--
+-- >>> parseMaybe number "1.0"
+-- Just 1.0
+--
+-- >>> parseMaybe number "-1.0"
+-- Just (-1.0)
+number :: Parser Double
+number = try float <|> integer
+  where float = L.signed (pure ()) L.float
+        integer = L.signed (pure ()) L.decimal
+
+-- | Parse a percentage, converting to a double.
+--
+-- >>> parseMaybe percentage "100%"
+-- Just 1.0
+--
+-- >>> parseMaybe percentage "0.1%"
+-- Just 1.0e-3
+--
+-- >>> parseMaybe percentage "-0.1%"
+-- Just (-1.0e-3)
+percentage :: Parser Double
+percentage = do
+  n <- number
+  char '%'
+  pure (n / 100)
+
+-- | Either a number or a percentage.
+--
+-- >>> parseMaybe numberOrPercentage "-0.1"
+-- Just (-0.1)
+--
+-- >>> parseMaybe numberOrPercentage "0.1%"
+-- Just 1.0e-3
+numberOrPercentage :: Parser Double
+numberOrPercentage = try percentage <|> number
+
 -- * Parsing Utilities
+
+-- | Parse a specific keyword.
+keyword :: Text -> Parser Text
+keyword word = lexeme (string word) <* notFollowedBy (alphaNumChar <|> char '_')
+
+               -- TODO: alternate function syntax?
+-- | Parse a function with the given name and type of argument.
+--
+-- >>> parseMaybe (function "rgb" numberOrPercentage) "rgb(1, -2.0, 3%)"
+-- Just [1.0,-2.0,3.0e-2]
+function :: Text
+         -- ^ Function name (eg @rgb@, @hsl@)
+         -> Parser a
+         -> Parser [a]
+function name argument = do
+  keyword name
+  between (symbol "(") (symbol ")") (argument `sepBy` symbol ",")
+
 
 -- | Wraps a parser into a parser that ignores trailing whitespace and
 -- comments.
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme space
+
+symbol :: Text -> Parser ()
+symbol = void . L.symbol space
