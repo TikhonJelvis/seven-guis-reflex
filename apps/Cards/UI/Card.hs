@@ -132,17 +132,23 @@ draggable
   card@Card { rank, suit }
   face
   CardConfig { container, draggingEnabled, attributes } = mdo
-  let attributes' = fromMaybe [] attributes <>
-        [ Css.transform          ==: Transforms.translate <$> total
-        , Css.backfaceVisibility =: Css.Hidden
-        , class_                 ==: classIf "dragging" . isJust <$> current
-        , class_                 =:
-          [ "draggable"
-          , "card"
-          , ClassName $ suitName suit
-          , ClassName $ rankName rank
+  let attributes' =
+        -- HACK: put the translate in front so that it goes before the
+        -- rotate
+        --
+        -- need more principled way to handle this—back to attribute
+        -- diff idea?
+          [ Css.transform ==: Transforms.translate <$> total ]
+       <> fromMaybe [] attributes
+       <> [ Css.backfaceVisibility =: Css.Hidden
+          , class_                 ==: classIf "dragging" . isJust <$> current
+          , class_                 =:
+            [ "draggable"
+            , "card"
+            , ClassName $ suitName suit
+            , ClassName $ rankName rank
+            ]
           ]
-        ]
 
   (element, _) <- Html.div_ attributes' do
     let facing = face <&> \case
